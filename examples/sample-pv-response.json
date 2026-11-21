@@ -1,0 +1,257 @@
+{
+  "engine_version": "0.2.0",
+  "methodology_version": "0.2.0",
+  "calculated_at": "2026-11-21T07:44:22+00:00",
+  "scope": "pre_tax_unlevered",
+  "energy_method": "manual_specific_yield",
+  "currency_code": "IDR",
+  "net_specific_yield_kwh_per_kwp_year": 1470.0,
+  "year_1_energy_kwh": 1470000.0,
+  "npv_amount": 784492869.07,
+  "project_irr_fraction": 0.10864527,
+  "irr_status": "ok",
+  "simple_payback_years": 8.3478,
+  "payback_status": "recovered",
+  "annual_results": [
+    {
+      "year": 0,
+      "energy_kwh": 0.0,
+      "revenue": 0.0,
+      "opex": 0.0,
+      "cash_flow": -12000000000.0,
+      "cumulative_cash_flow": -12000000000.0
+    },
+    {
+      "year": 1,
+      "energy_kwh": 1470000.0,
+      "revenue": 1617000000.0,
+      "opex": 150000000.0,
+      "cash_flow": 1467000000.0,
+      "cumulative_cash_flow": -10533000000.0
+    },
+    {
+      "year": 2,
+      "energy_kwh": 1462650.0,
+      "revenue": 1608915000.0,
+      "opex": 150000000.0,
+      "cash_flow": 1458915000.0,
+      "cumulative_cash_flow": -9074085000.0
+    },
+    {
+      "year": 3,
+      "energy_kwh": 1455336.75,
+      "revenue": 1600870425.0,
+      "opex": 150000000.0,
+      "cash_flow": 1450870425.0,
+      "cumulative_cash_flow": -7623214575.0
+    },
+    {
+      "year": 4,
+      "energy_kwh": 1448060.066,
+      "revenue": 1592866072.88,
+      "opex": 150000000.0,
+      "cash_flow": 1442866072.88,
+      "cumulative_cash_flow": -6180348502.12
+    },
+    {
+      "year": 5,
+      "energy_kwh": 1440819.766,
+      "revenue": 1584901742.51,
+      "opex": 150000000.0,
+      "cash_flow": 1434901742.51,
+      "cumulative_cash_flow": -4745446759.61
+    },
+    {
+      "year": 6,
+      "energy_kwh": 1433615.667,
+      "revenue": 1576977233.8,
+      "opex": 150000000.0,
+      "cash_flow": 1426977233.8,
+      "cumulative_cash_flow": -3318469525.82
+    },
+    {
+      "year": 7,
+      "energy_kwh": 1426447.589,
+      "revenue": 1569092347.63,
+      "opex": 150000000.0,
+      "cash_flow": 1419092347.63,
+      "cumulative_cash_flow": -1899377178.19
+    },
+    {
+      "year": 8,
+      "energy_kwh": 1419315.351,
+      "revenue": 1561246885.89,
+      "opex": 150000000.0,
+      "cash_flow": 1411246885.89,
+      "cumulative_cash_flow": -488130292.3
+    },
+    {
+      "year": 9,
+      "energy_kwh": 1412218.774,
+      "revenue": 1553440651.46,
+      "opex": 150000000.0,
+      "cash_flow": 1403440651.46,
+      "cumulative_cash_flow": 915310359.17
+    },
+    {
+      "year": 10,
+      "energy_kwh": 1405157.68,
+      "revenue": 1545673448.2,
+      "opex": 150000000.0,
+      "cash_flow": 1395673448.2,
+      "cumulative_cash_flow": 2310983807.37
+    },
+    {
+      "year": 11,
+      "energy_kwh": 1398131.892,
+      "revenue": 1537945080.96,
+      "opex": 150000000.0,
+      "cash_flow": 1387945080.96,
+      "cumulative_cash_flow": 3698928888.33
+    },
+    {
+      "year": 12,
+      "energy_kwh": 1391141.232,
+      "revenue": 1530255355.56,
+      "opex": 150000000.0,
+      "cash_flow": 1380255355.56,
+      "cumulative_cash_flow": 5079184243.89
+    },
+    {
+      "year": 13,
+      "energy_kwh": 1384185.526,
+      "revenue": 1522604078.78,
+      "opex": 150000000.0,
+      "cash_flow": 1372604078.78,
+      "cumulative_cash_flow": 6451788322.67
+    },
+    {
+      "year": 14,
+      "energy_kwh": 1377264.599,
+      "revenue": 1514991058.39,
+      "opex": 150000000.0,
+      "cash_flow": 1364991058.39,
+      "cumulative_cash_flow": 7816779381.06
+    },
+    {
+      "year": 15,
+      "energy_kwh": 1370378.276,
+      "revenue": 1507416103.09,
+      "opex": 150000000.0,
+      "cash_flow": 1357416103.09,
+      "cumulative_cash_flow": 9174195484.15
+    },
+    {
+      "year": 16,
+      "energy_kwh": 1363526.384,
+      "revenue": 1499879022.58,
+      "opex": 150000000.0,
+      "cash_flow": 1349879022.58,
+      "cumulative_cash_flow": 10524074506.73
+    },
+    {
+      "year": 17,
+      "energy_kwh": 1356708.752,
+      "revenue": 1492379627.47,
+      "opex": 150000000.0,
+      "cash_flow": 1342379627.47,
+      "cumulative_cash_flow": 11866454134.2
+    },
+    {
+      "year": 18,
+      "energy_kwh": 1349925.208,
+      "revenue": 1484917729.33,
+      "opex": 150000000.0,
+      "cash_flow": 1334917729.33,
+      "cumulative_cash_flow": 13201371863.53
+    },
+    {
+      "year": 19,
+      "energy_kwh": 1343175.582,
+      "revenue": 1477493140.68,
+      "opex": 150000000.0,
+      "cash_flow": 1327493140.68,
+      "cumulative_cash_flow": 14528865004.21
+    },
+    {
+      "year": 20,
+      "energy_kwh": 1336459.705,
+      "revenue": 1470105674.98,
+      "opex": 150000000.0,
+      "cash_flow": 1320105674.98,
+      "cumulative_cash_flow": 15848970679.19
+    },
+    {
+      "year": 21,
+      "energy_kwh": 1329777.406,
+      "revenue": 1462755146.6,
+      "opex": 150000000.0,
+      "cash_flow": 1312755146.6,
+      "cumulative_cash_flow": 17161725825.79
+    },
+    {
+      "year": 22,
+      "energy_kwh": 1323128.519,
+      "revenue": 1455441370.87,
+      "opex": 150000000.0,
+      "cash_flow": 1305441370.87,
+      "cumulative_cash_flow": 18467167196.66
+    },
+    {
+      "year": 23,
+      "energy_kwh": 1316512.876,
+      "revenue": 1448164164.02,
+      "opex": 150000000.0,
+      "cash_flow": 1298164164.02,
+      "cumulative_cash_flow": 19765331360.68
+    },
+    {
+      "year": 24,
+      "energy_kwh": 1309930.312,
+      "revenue": 1440923343.2,
+      "opex": 150000000.0,
+      "cash_flow": 1290923343.2,
+      "cumulative_cash_flow": 21056254703.88
+    },
+    {
+      "year": 25,
+      "energy_kwh": 1303380.66,
+      "revenue": 1433718726.48,
+      "opex": 150000000.0,
+      "cash_flow": 1283718726.48,
+      "cumulative_cash_flow": 22339973430.36
+    }
+  ],
+  "warnings": [],
+  "inputs": {
+    "project": {
+      "project_name": "Example 1 MWp PV Project",
+      "technology": "solar_pv",
+      "project_type": "ground_mounted",
+      "country_code": "ID",
+      "location_name": "Example location, Indonesia",
+      "capacity_kwp": 1000.0,
+      "lifetime_years": 25,
+      "currency_code": "IDR"
+    },
+    "technical": {
+      "energy_method": "manual_specific_yield",
+      "specific_yield_kwh_per_kwp_year": 1470.0,
+      "yield_boundary": "net_ac_at_delivery",
+      "performance_loss_fraction": 0.0,
+      "degradation_fraction_per_year": 0.005
+    },
+    "financial": {
+      "capex_amount": 12000000000.0,
+      "annual_opex_amount": 150000000.0,
+      "revenue_method": "fixed_tariff",
+      "tariff_per_kwh": 1100.0,
+      "discount_rate_fraction": 0.1,
+      "annual_tariff_escalation_fraction": 0.0,
+      "annual_opex_escalation_fraction": 0.0,
+      "tax_model": "pre_tax"
+    },
+    "notes": "Illustrative test data only; not a project benchmark or investment recommendation."
+  },
+  "disclaimer": "Preliminary, pre-tax, unlevered estimate. Validate all assumptions independently."
+}
