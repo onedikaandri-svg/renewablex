@@ -1,3 +1,6 @@
+import { FIELDS } from "@/lib/form";
+import { isApiIssue, translateDetailText, translateIssue, type ApiIssue } from "@/lib/errors-id";
+
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
 export type IrrStatus = "ok" | "no_sign_change" | "ambiguous" | "not_found";
@@ -29,8 +32,11 @@ export interface PVResponse {
 }
 
 export interface Problems {
+  // Pesan Indonesia, kunci "bagian.nama" seperti di lib/form.ts.
   fields: Record<string, string>;
   general: string[];
+  // Item galat asli dari mesin (type, loc, msg, ctx), disimpan utuh.
+  issues: ApiIssue[];
 }
 
 export class ApiError extends Error {
@@ -41,19 +47,31 @@ export class ApiError extends Error {
 
 export class NetworkError extends Error {}
 
-const clean = (msg: string) => msg.replace(/^Value error, /, "");
+const PERCENT_FIELDS = new Set(FIELDS.filter((f) => f.percent).map((f) => f.key));
 
-function parseProblems(detail: unknown): Problems {
-  const problems: Problems = { fields: {}, general: [] };
-  if (!Array.isArray(detail)) {
-    problems.general.push(typeof detail === "string" ? detail : "Input tidak valid.");
+export function parseProblems(detail: unknown): Problems {
+  const problems: Problems = { fields: {}, general: [], issues: [] };
+  if (typeof detail === "string") {
+    problems.general.push(translateDetailText(detail));
     return problems;
   }
-  for (const item of detail as { loc?: (string | number)[]; msg?: string }[]) {
-    const msg = clean(item.msg ?? "Input tidak valid.");
-    const loc = (item.loc ?? []).slice(1);
-    if (loc.length >= 2) problems.fields[`${loc[0]}.${loc[1]}`] = msg;
-    else problems.general.push(msg);
+  if (!Array.isArray(detail)) {
+    problems.general.push("Input tidak valid.");
+    return problems;
+  }
+  for (const item of detail) {
+    if (!isApiIssue(item)) {
+      problems.general.push("Input tidak valid.");
+      continue;
+    }
+    problems.issues.push(item);
+    const loc = item.loc.slice(1);
+    if (loc.length >= 2) {
+      const key = `${loc[0]}.${loc[1]}`;
+      problems.fields[key] = translateIssue(item, { percent: PERCENT_FIELDS.has(key) });
+    } else {
+      problems.general.push(translateIssue(item));
+    }
   }
   return problems;
 }
