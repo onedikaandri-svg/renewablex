@@ -90,3 +90,56 @@ class PVResponse(BaseModel):
     warnings: list[str]
     inputs: PVRequest
     disclaimer: str
+
+
+SensitivityVariable = Literal["specific_yield", "tariff", "capex", "opex", "discount_rate"]
+ALL_VARIABLES: list[str] = ["specific_yield", "tariff", "capex", "opex", "discount_rate"]
+
+
+class SensitivityRequest(Strict):
+    base: PVRequest
+    variables: list[SensitivityVariable] = Field(default_factory=lambda: list(ALL_VARIABLES), min_length=1, max_length=5)
+    shifts: list[float] = Field(default_factory=lambda: [-0.2, -0.1, 0.1, 0.2], min_length=1, max_length=9)
+
+    @model_validator(mode="after")
+    def check_lists(self):
+        if len(set(self.variables)) != len(self.variables):
+            raise EngineError("duplicate_variables", "variables must not repeat.")
+        if len(set(self.shifts)) != len(self.shifts):
+            raise EngineError("duplicate_shifts", "shifts must not repeat.")
+        if any(s == 0 or s < -0.9 or s > 1.0 for s in self.shifts):
+            raise EngineError("shift_out_of_bounds", "Each shift must be between -0.9 and 1.0, and not 0.")
+        return self
+
+
+class SensitivityBase(BaseModel):
+    npv_amount: float
+    project_irr_fraction: float | None
+    irr_status: Literal["ok", "no_sign_change", "ambiguous", "not_found"]
+    simple_payback_years: float | None
+    payback_status: Literal["recovered", "not_recovered"]
+
+
+class SensitivityCase(SensitivityBase):
+    shift_fraction: float
+    input_value: float
+    npv_delta: float
+
+
+class SensitivityVariableResult(BaseModel):
+    variable: SensitivityVariable
+    field: str
+    base_value: float
+    max_abs_npv_delta: float
+    cases: list[SensitivityCase]
+
+
+class SensitivityResponse(BaseModel):
+    engine_version: str
+    methodology_version: str
+    calculated_at: str
+    scope: Literal["pre_tax_unlevered"]
+    currency_code: str
+    base: SensitivityBase
+    variables: list[SensitivityVariableResult]
+    disclaimer: str

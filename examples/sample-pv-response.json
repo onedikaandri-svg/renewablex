@@ -1,7 +1,7 @@
 {
-  "engine_version": "0.2.1",
-  "methodology_version": "0.2.0",
-  "calculated_at": "2026-11-22T08:14:38+00:00",
+  "engine_version": "0.3.0",
+  "methodology_version": "0.3.0",
+  "calculated_at": "2026-11-22T19:08:08+00:00",
   "scope": "pre_tax_unlevered",
   "energy_method": "manual_specific_yield",
   "currency_code": "IDR",

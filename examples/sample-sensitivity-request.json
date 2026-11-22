@@ -1,0 +1,45 @@
+{
+  "base": {
+    "project": {
+      "project_name": "Example 1 MWp PV Project",
+      "technology": "solar_pv",
+      "project_type": "ground_mounted",
+      "country_code": "ID",
+      "location_name": "Example location, Indonesia",
+      "capacity_kwp": 1000,
+      "lifetime_years": 25,
+      "currency_code": "IDR"
+    },
+    "technical": {
+      "energy_method": "manual_specific_yield",
+      "specific_yield_kwh_per_kwp_year": 1470,
+      "yield_boundary": "net_ac_at_delivery",
+      "performance_loss_fraction": 0,
+      "degradation_fraction_per_year": 0.005
+    },
+    "financial": {
+      "capex_amount": 12000000000,
+      "annual_opex_amount": 150000000,
+      "revenue_method": "fixed_tariff",
+      "tariff_per_kwh": 1100,
+      "discount_rate_fraction": 0.1,
+      "annual_tariff_escalation_fraction": 0,
+      "annual_opex_escalation_fraction": 0,
+      "tax_model": "pre_tax"
+    },
+    "notes": "Illustrative test data only; not a project benchmark or investment recommendation."
+  },
+  "variables": [
+    "specific_yield",
+    "tariff",
+    "capex",
+    "opex",
+    "discount_rate"
+  ],
+  "shifts": [
+    -0.2,
+    -0.1,
+    0.1,
+    0.2
+  ]
+}

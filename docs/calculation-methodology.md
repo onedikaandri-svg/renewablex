@@ -187,3 +187,11 @@ RenewableX MVP outputs are preliminary estimates based on user-entered assumptio
 - IRR is found by bracketed bisection between -99% and 10,000%. It returns a status instead of a number when the cash flow has no sign change, more than one sign change (`ambiguous`), or no root in the bracket.
 - Payback uses unrounded cumulative cash flow. Rounding happens only in the response.
 - Request fields not listed in this document are rejected.
+
+## 11. Sensitivity (engine 0.3.0)
+
+- One-at-a-time analysis: each case changes a single assumption and keeps all others at the base values.
+- Shifts are relative to the base value. Variables: specific yield, tariff, CAPEX, annual OPEX, discount rate.
+- Each case is a complete run of sections 1 to 10. No separate formulas exist.
+- Ranking uses the largest absolute NPV change across the shifts of a variable.
+- One-at-a-time results do not capture interactions between assumptions.
