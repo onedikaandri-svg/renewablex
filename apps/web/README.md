@@ -19,6 +19,7 @@ Open http://localhost:3000. `NEXT_PUBLIC_API_URL` must point at the engine, and 
 
 ```bash
 npm run typecheck
+npm test
 npm run build
 ```
 
