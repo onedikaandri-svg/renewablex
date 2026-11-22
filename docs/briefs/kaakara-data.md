@@ -1,6 +1,6 @@
 # Arahan Tugas untuk kaakara (Data dan Penyimpanan)
 
-Kamu mengerjakan lapisan data RenewableX, di bawah arahan lead engineer. Baca seluruh dokumen ini dan `docs/TEAM.md` sebelum mulai.
+Kamu mengerjakan lapisan data RenewableX, di bawah arahan manager proyek. Baca seluruh dokumen ini dan `docs/TEAM.md` sebelum mulai.
 
 ## Konteks singkat
 RenewableX adalah alat screening kelayakan proyek PV (surya). Mesin FastAPI di `services/calculation-engine/` menghitung energi, NPV, IRR, dan payback dari asumsi pengguna. Kontraknya ada di `docs/api.md`, dengan contoh di `examples/`. Saat ini hanya mode `manual_specific_yield` yang jalan. Mode `location_based` mengembalikan 422 sampai ada penyedia data sumber daya surya, dan itulah tugasmu.
@@ -10,7 +10,7 @@ RenewableX adalah alat screening kelayakan proyek PV (surya). Mesin FastAPI di `
 - `services/calculation-engine/app/providers/` dan `services/calculation-engine/tests/providers/` (folder baru)
 - `docs/database-schema.md` dan `docs/providers.md`
 
-Jangan ubah sisa folder mesin, `docs/api.md`, `apps/web/`, atau `.github/`. Penyambungan penyedia ke endpoint adalah tugas lead (L3), setelah tinjauan.
+Jangan ubah sisa folder mesin, `docs/api.md`, `apps/web/`, atau `.github/`. Penyambungan penyedia ke endpoint adalah tugas Val (V4), setelah manager menyetujui hasilmu.
 
 ## Aturan khusus
 - Jangan pernah mengedit `supabase/migrations/0001_initial_schema.sql`. Perubahan selalu lewat migrasi baru bernomor berikutnya.
@@ -35,7 +35,7 @@ Lihat S1-03 di `docs/SPRINT-1-issues.md` dan bagian energi di `docs/calculation-
 - `app/providers/pvgis.py`: adapter untuk PVGIS (JRC, Komisi Eropa). Baca dokumentasi resminya yang sekarang dulu: versi API, parameter, cakupan wilayah (cek apakah Indonesia tercakup), arti nilai energi tahunan yang dikembalikan, dan ketentuan pemakaian. Tentukan dengan jujur batas yield yang dihasilkannya (apakah sudah dikurangi loss sistem) dan tulis di `docs/providers.md`. Beri batas waktu, jumlah percobaan ulang terbatas, dan cache dalam memori dengan masa berlaku.
 - Gunakan `httpx` (sudah ada di `requirements.txt`). Dependensi lain hanya bila perlu, dengan alasan di laporan.
 - Tes di `tests/providers/` memakai respons rekaman atau tiruan, mencakup keberhasilan, di luar cakupan, batas waktu, dan respons rusak.
-- Jangan mengubah `app/api/pv.py` atau `app/models/schemas.py`. Laporan harus menyebut persis apa yang lead perlu sambungkan.
+- Jangan mengubah `app/api/pv.py` atau `app/models/schemas.py`. Laporan harus menyebut persis apa yang Val perlu sambungkan.
 - Selesai bila: semua tes hijau, `docs/providers.md` memuat sumber, versi, tanggal baca, batas yield, dan keterbatasan, dan `pytest` di `services/calculation-engine` lolos.
 
 ### D3. Usulan penyimpanan proyek (hanya dokumen, belum kode)
@@ -43,7 +43,7 @@ Tulis `docs/persistence-proposal.md`: bagaimana pengguna menyimpan proyek dan ha
 - Alur masuk akun, siapa yang menulis ke database (web langsung dengan kebijakan RLS, atau mesin lewat server), dan di mana kunci rahasia dipakai.
 - Daftar endpoint atau fungsi yang dibutuhkan, tanpa mengubah kontrak yang ada.
 - Risiko dan hal yang belum diputuskan.
-- Selesai bila lead menyetujui. Jangan menulis kode untuk ini sebelum disetujui.
+- Selesai bila manager menyetujui. Jangan menulis kode untuk ini sebelum disetujui.
 
 ## Cara memeriksa pekerjaanmu
 ```bash
@@ -52,5 +52,5 @@ pip install -r requirements.txt
 pytest
 ```
 
-## Kapan berhenti dan bertanya ke lead
+## Kapan berhenti dan bertanya ke manager
 Kontrak API tampak salah atau kurang, kamu perlu mengubah file di luar wilayahmu, atau dokumentasi layanan luar bertentangan dengan asumsi di dokumen ini.
