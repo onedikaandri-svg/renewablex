@@ -10,6 +10,13 @@ from app.version import ENGINE_VERSION, METHODOLOGY_VERSION
 
 router = APIRouter(prefix="/v1/pv", tags=["pv"])
 
+NON_FINITE = HTTPException(422, detail=[{
+    "type": "value_error",
+    "code": "non_finite_result",
+    "loc": ["body"],
+    "msg": "The result is not a finite number. Check for extreme inputs.",
+}])
+
 DISCLAIMER = "Preliminary, pre-tax, unlevered estimate. Validate all assumptions independently."
 
 
@@ -40,11 +47,11 @@ def preliminary(req: PVRequest) -> PVResponse:
         npv = finance.npv(f.discount_rate_fraction, cf.flows)
         irr, irr_status = finance.irr(cf.flows)
     except (ZeroDivisionError, OverflowError):
-        raise HTTPException(422, "The result is not a finite number. Check for extreme inputs.")
+        raise NON_FINITE
     payback, payback_status = finance.simple_payback(cf.flows)
 
     if not all(math.isfinite(v) for v in [npv, *cf.flows, *cumulative]):
-        raise HTTPException(422, "The result is not a finite number. Check for extreme inputs.")
+        raise NON_FINITE
 
     rows = [AnnualRow(year=0, energy_kwh=0, revenue=0, opex=0, cash_flow=round(cf.flows[0], 2),
                       cumulative_cash_flow=round(cumulative[0], 2))]

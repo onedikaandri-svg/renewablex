@@ -1,4 +1,4 @@
-# Calculation Engine API (v0.2.0)
+# Calculation Engine API (v0.2.1)
 
 Preliminary, pre-tax, unlevered PV screening. Results are estimates from user-entered assumptions. Not bankable.
 
@@ -59,7 +59,31 @@ The body has `project`, `technical`, `financial`, and optional `notes`. Unknown 
 | `warnings` | Unusual but valid values. The engine never changes them |
 | `inputs`, `engine_version`, `methodology_version`, `calculated_at` | Provenance of the run |
 
-Errors return HTTP 422 with a readable `detail`. Numeric outputs are finite or `null` with a status.
+Numeric outputs are finite or `null` with a status.
+
+## Errors
+
+Invalid input returns HTTP 422 with `detail`, a list of items:
+
+| Field | Meaning |
+|---|---|
+| `code` | Stable identifier. Clients should branch on this, never on `msg` |
+| `type` | The validation type, kept for compatibility |
+| `loc` | Path to the field, starting with `body`. Two or fewer entries means the error is not tied to one field |
+| `msg` | English text for people reading logs. Not stable |
+| `ctx` | Limits and parameters when present, for example `{"le": 40}` |
+
+For built-in checks, `code` equals `type` (`missing`, `greater_than`, `greater_than_equal`, `less_than`, `less_than_equal`, `string_pattern_mismatch`, `literal_error`, `int_parsing`, `float_parsing`, `int_from_float`, `string_too_short`, `string_too_long`, `extra_forbidden`). The engine adds these codes:
+
+| `code` | When |
+|---|---|
+| `location_based_unavailable` | `energy_method` is `location_based` and no resource provider is configured |
+| `yield_required` | `specific_yield_kwh_per_kwp_year` is missing for `manual_specific_yield` |
+| `double_counted_loss` | `performance_loss_fraction` above 0 with a net yield |
+| `unsupported_revenue_method` | `revenue_method` other than `fixed_tariff` |
+| `non_finite_result` | Inputs so extreme that a result is not a finite number |
+
+The submitted input is not echoed back in error items.
 
 ## Conventions
 
