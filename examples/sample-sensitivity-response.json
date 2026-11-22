@@ -1,0 +1,257 @@
+{
+  "engine_version": "0.3.0",
+  "methodology_version": "0.3.0",
+  "calculated_at": "2026-11-22T19:08:08+00:00",
+  "scope": "pre_tax_unlevered",
+  "currency_code": "IDR",
+  "base": {
+    "npv_amount": 784492869.07,
+    "project_irr_fraction": 0.10864527,
+    "irr_status": "ok",
+    "simple_payback_years": 8.3478,
+    "payback_status": "recovered"
+  },
+  "variables": [
+    {
+      "variable": "specific_yield",
+      "field": "technical.specific_yield_kwh_per_kwp_year",
+      "base_value": 1470.0,
+      "max_abs_npv_delta": 2829209774.36,
+      "cases": [
+        {
+          "npv_amount": -2044716905.29,
+          "project_irr_fraction": 0.07654521,
+          "irr_status": "ok",
+          "simple_payback_years": 10.7879,
+          "payback_status": "recovered",
+          "shift_fraction": -0.2,
+          "input_value": 1176.0,
+          "npv_delta": -2829209774.36
+        },
+        {
+          "npv_amount": -630112018.11,
+          "project_irr_fraction": 0.0929283,
+          "irr_status": "ok",
+          "simple_payback_years": 9.4119,
+          "payback_status": "recovered",
+          "shift_fraction": -0.1,
+          "input_value": 1323.0,
+          "npv_delta": -1414604887.18
+        },
+        {
+          "npv_amount": 2199097756.25,
+          "project_irr_fraction": 0.12386484,
+          "irr_status": "ok",
+          "simple_payback_years": 7.5004,
+          "payback_status": "recovered",
+          "shift_fraction": 0.1,
+          "input_value": 1617.0,
+          "npv_delta": 1414604887.18
+        },
+        {
+          "npv_amount": 3613702643.43,
+          "project_irr_fraction": 0.13870678,
+          "irr_status": "ok",
+          "simple_payback_years": 6.8091,
+          "payback_status": "recovered",
+          "shift_fraction": 0.2,
+          "input_value": 1764.0,
+          "npv_delta": 2829209774.36
+        }
+      ]
+    },
+    {
+      "variable": "tariff",
+      "field": "financial.tariff_per_kwh",
+      "base_value": 1100.0,
+      "max_abs_npv_delta": 2829209774.36,
+      "cases": [
+        {
+          "npv_amount": -2044716905.29,
+          "project_irr_fraction": 0.07654521,
+          "irr_status": "ok",
+          "simple_payback_years": 10.7879,
+          "payback_status": "recovered",
+          "shift_fraction": -0.2,
+          "input_value": 880.0,
+          "npv_delta": -2829209774.36
+        },
+        {
+          "npv_amount": -630112018.11,
+          "project_irr_fraction": 0.0929283,
+          "irr_status": "ok",
+          "simple_payback_years": 9.4119,
+          "payback_status": "recovered",
+          "shift_fraction": -0.1,
+          "input_value": 990.0,
+          "npv_delta": -1414604887.18
+        },
+        {
+          "npv_amount": 2199097756.25,
+          "project_irr_fraction": 0.12386484,
+          "irr_status": "ok",
+          "simple_payback_years": 7.5004,
+          "payback_status": "recovered",
+          "shift_fraction": 0.1,
+          "input_value": 1210.0,
+          "npv_delta": 1414604887.18
+        },
+        {
+          "npv_amount": 3613702643.43,
+          "project_irr_fraction": 0.13870678,
+          "irr_status": "ok",
+          "simple_payback_years": 6.8091,
+          "payback_status": "recovered",
+          "shift_fraction": 0.2,
+          "input_value": 1320.0,
+          "npv_delta": 2829209774.36
+        }
+      ]
+    },
+    {
+      "variable": "capex",
+      "field": "financial.capex_amount",
+      "base_value": 12000000000.0,
+      "max_abs_npv_delta": 2400000000.0,
+      "cases": [
+        {
+          "npv_amount": 3184492869.07,
+          "project_irr_fraction": 0.14252975,
+          "irr_status": "ok",
+          "simple_payback_years": 6.6472,
+          "payback_status": "recovered",
+          "shift_fraction": -0.2,
+          "input_value": 9600000000.0,
+          "npv_delta": 2400000000.0
+        },
+        {
+          "npv_amount": 1984492869.07,
+          "project_irr_fraction": 0.12393384,
+          "irr_status": "ok",
+          "simple_payback_years": 7.4956,
+          "payback_status": "recovered",
+          "shift_fraction": -0.1,
+          "input_value": 10800000000.0,
+          "npv_delta": 1200000000.0
+        },
+        {
+          "npv_amount": -415507130.93,
+          "project_irr_fraction": 0.09577657,
+          "irr_status": "ok",
+          "simple_payback_years": 9.204,
+          "payback_status": "recovered",
+          "shift_fraction": 0.1,
+          "input_value": 13200000000.000002,
+          "npv_delta": -1200000000.0
+        },
+        {
+          "npv_amount": -1615507130.93,
+          "project_irr_fraction": 0.08473833,
+          "irr_status": "ok",
+          "simple_payback_years": 10.0641,
+          "payback_status": "recovered",
+          "shift_fraction": 0.2,
+          "input_value": 14400000000.0,
+          "npv_delta": -2400000000.0
+        }
+      ]
+    },
+    {
+      "variable": "discount_rate",
+      "field": "financial.discount_rate_fraction",
+      "base_value": 0.1,
+      "max_abs_npv_delta": 2187209977.33,
+      "cases": [
+        {
+          "npv_amount": 2971702846.4,
+          "project_irr_fraction": 0.10864527,
+          "irr_status": "ok",
+          "simple_payback_years": 8.3478,
+          "payback_status": "recovered",
+          "shift_fraction": -0.2,
+          "input_value": 0.08,
+          "npv_delta": 2187209977.33
+        },
+        {
+          "npv_amount": 1806255888.56,
+          "project_irr_fraction": 0.10864527,
+          "irr_status": "ok",
+          "simple_payback_years": 8.3478,
+          "payback_status": "recovered",
+          "shift_fraction": -0.1,
+          "input_value": 0.09,
+          "npv_delta": 1021763019.49
+        },
+        {
+          "npv_amount": -115484535.59,
+          "project_irr_fraction": 0.10864527,
+          "irr_status": "ok",
+          "simple_payback_years": 8.3478,
+          "payback_status": "recovered",
+          "shift_fraction": 0.1,
+          "input_value": 0.11,
+          "npv_delta": -899977404.65
+        },
+        {
+          "npv_amount": -911786033.02,
+          "project_irr_fraction": 0.10864527,
+          "irr_status": "ok",
+          "simple_payback_years": 8.3478,
+          "payback_status": "recovered",
+          "shift_fraction": 0.2,
+          "input_value": 0.12,
+          "npv_delta": -1696278902.09
+        }
+      ]
+    },
+    {
+      "variable": "opex",
+      "field": "financial.annual_opex_amount",
+      "base_value": 150000000.0,
+      "max_abs_npv_delta": 272311200.55,
+      "cases": [
+        {
+          "npv_amount": 1056804069.61,
+          "project_irr_fraction": 0.11160347,
+          "irr_status": "ok",
+          "simple_payback_years": 8.1731,
+          "payback_status": "recovered",
+          "shift_fraction": -0.2,
+          "input_value": 120000000.0,
+          "npv_delta": 272311200.55
+        },
+        {
+          "npv_amount": 920648469.34,
+          "project_irr_fraction": 0.11012696,
+          "irr_status": "ok",
+          "simple_payback_years": 8.2595,
+          "payback_status": "recovered",
+          "shift_fraction": -0.1,
+          "input_value": 135000000.0,
+          "npv_delta": 136155600.27
+        },
+        {
+          "npv_amount": 648337268.79,
+          "project_irr_fraction": 0.10715827,
+          "irr_status": "ok",
+          "simple_payback_years": 8.438,
+          "payback_status": "recovered",
+          "shift_fraction": 0.1,
+          "input_value": 165000000.0,
+          "npv_delta": -136155600.27
+        },
+        {
+          "npv_amount": 512181668.52,
+          "project_irr_fraction": 0.10566581,
+          "irr_status": "ok",
+          "simple_payback_years": 8.5302,
+          "payback_status": "recovered",
+          "shift_fraction": 0.2,
+          "input_value": 180000000.0,
+          "npv_delta": -272311200.55
+        }
+      ]
+    }
+  ],
+  "disclaimer": "Preliminary, pre-tax, unlevered estimate. Validate all assumptions independently."
+}

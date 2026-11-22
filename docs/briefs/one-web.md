@@ -37,12 +37,14 @@ Mesin mengembalikan galat validasi (HTTP 422) berbahasa Inggris, contoh "Input s
 
 ### W3. Tampilan sensitivitas
 Tambahkan panel "Sensitivitas" di bawah hasil: seberapa besar NPV berubah bila satu asumsi digeser.
-- Variabel: yield spesifik, tarif, CAPEX, OPEX, discount rate. Pergeseran: -20%, -10%, +10%, +20% terhadap nilai pengguna.
-- Tiap sel berasal dari satu panggilan `POST /v1/pv/preliminary`. Selisih = NPV varian dikurangi NPV dasar. Hanya itu hitungan yang boleh ada di web.
-- Mesin gratis lambat dan berbagi sumber daya: kirim paling banyak 2 panggilan bersamaan, tampilkan kemajuan, dan tangani kegagalan sebagian dengan jelas.
-- Letakkan seluruh logika panggilan di satu modul `lib/sensitivity.ts`. Lead akan menggantinya dengan endpoint khusus nanti (L2), jadi modul itu harus mudah diganti.
-- Urutkan baris dari yang paling berpengaruh. Beri judul yang menyebut pertanyaan yang dijawabnya. Satuan dan mata uang selalu tertulis.
-- Selesai bila: berfungsi di 375 px dan desktop, keadaan memuat, kosong, dan galat ada, dan tes untuk fungsi pembangun skenario lolos.
+- Gunakan endpoint mesin `POST /v1/pv/sensitivity` (lihat bagian Sensitivity di `docs/api.md` dan contoh `examples/sample-sensitivity-request.json`). Satu panggilan mengembalikan semuanya. Web tidak menghitung apa pun sendiri.
+- Kirim `base` berisi isian yang sama dengan permintaan hitung. Pakai pergeseran bawaan (-20%, -10%, +10%, +20%) dan kelima variabel.
+- Tampilkan variabel sesuai urutan dari mesin (sudah diurutkan dari paling berpengaruh). Tiap baris: nama variabel dalam bahasa Indonesia, nilai dasar, lalu `npv_delta` untuk tiap pergeseran. Satuan dan mata uang selalu tertulis.
+- Pergeseran bersifat relatif. Jelaskan di tampilan dengan satu kalimat pendek. Bila nilai dasar discount rate 0, deltanya memang 0, jadi beri catatan agar tidak tampak seperti error.
+- Tampilkan juga IRR dan payback tiap kasus bila tidak terlalu ramai (boleh dalam baris yang dibuka). Status `irr_status` dan `payback_status` harus ditampilkan sebagai teks, bukan angka kosong.
+- Galat dari endpoint ini memakai `code` seperti galat lain. Tambahkan terjemahan untuk `shift_out_of_range`, `shift_out_of_bounds`, `duplicate_variables`, dan `duplicate_shifts` di `errors-id.ts`.
+- Letakkan pemanggilan di satu modul `lib/sensitivity.ts`. Panggil hanya setelah hasil utama ada, dan tangani mesin yang sedang bangun dengan pesan yang sama seperti halaman utama.
+- Selesai bila: berfungsi di 375 px dan desktop, keadaan kosong, memuat, dan galat ada, dan tes untuk fungsi yang menyiapkan permintaan dan membaca respons lolos.
 
 ## Cara memeriksa pekerjaanmu
 ```bash

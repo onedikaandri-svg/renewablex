@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.pv import router as pv_router
+from app.api.sensitivity import router as sensitivity_router
 from app.version import ENGINE_VERSION
 
 app = FastAPI(
@@ -19,6 +20,7 @@ app = FastAPI(
 origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
 app.include_router(pv_router)
+app.include_router(sensitivity_router)
 
 
 @app.exception_handler(RequestValidationError)
