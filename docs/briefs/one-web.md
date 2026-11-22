@@ -1,6 +1,6 @@
 # Arahan Tugas untuk One (Web)
 
-Kamu mengerjakan antarmuka web RenewableX, di bawah arahan lead engineer. Baca seluruh dokumen ini dan `docs/TEAM.md` sebelum mulai.
+Kamu mengerjakan antarmuka web RenewableX, di bawah arahan manager proyek. Baca seluruh dokumen ini dan `docs/TEAM.md` sebelum mulai.
 
 ## Konteks singkat
 RenewableX adalah alat screening kelayakan proyek PV (surya). Pengguna mengisi asumsi, lalu melihat energi tahun 1, NPV, IRR, dan payback. Semua hitungan dilakukan mesin FastAPI. Halaman web hanya menampilkan hasilnya.
@@ -26,7 +26,7 @@ Hanya `apps/web/`. Jangan ubah `services/`, `docs/api.md`, `examples/`, `.github
 Mesin mengembalikan galat validasi (HTTP 422) berbahasa Inggris, contoh "Input should be less than or equal to 40". `lib/api.ts` kini hanya menyimpan teks `msg`.
 - Simpan juga `type` dan `ctx` dari tiap item galat FastAPI, lalu terjemahkan di satu tabel pemetaan (`greater_than`, `greater_than_equal`, `less_than`, `less_than_equal`, `missing`, `string_pattern_mismatch`, `literal_error`, `int_parsing`, `float_parsing`, `int_from_float`, dan `value_error`).
 - Tiga pesan `value_error` kustom mesin: soal hitung ganda loss pada yield bersih, `location_based` belum tersedia, dan hanya `fixed_tariff` yang didukung. Terjemahkan juga, dengan mencocokkan potongan teksnya. Teks yang tidak dikenal ditampilkan apa adanya.
-- Selesai bila: tabel pemetaan punya tes unit (tambahkan Vitest sebagai dev dependency dan skrip `npm test`), semua batas di `docs/api.md` menghasilkan pesan Indonesia yang menyebut batasnya, dan `npm run typecheck` serta `npm run build` lolos. Lead yang menambahkan `npm test` ke CI.
+- Selesai bila: tabel pemetaan punya tes unit (tambahkan Vitest sebagai dev dependency dan skrip `npm test`), semua batas di `docs/api.md` menghasilkan pesan Indonesia yang menyebut batasnya, dan `npm run typecheck` serta `npm run build` lolos. Val (engineer mesin) yang menambahkan `npm test` ke CI bila belum ada.
 
 ### W2. Aksesibilitas
 - Telusuri seluruh halaman hanya dengan keyboard dan perbaiki yang macet: urutan Tab, fokus setelah kirim, fokus setelah Kosongkan Form.
@@ -55,5 +55,5 @@ npm run build
 ```
 Untuk uji manual, jalankan mesin di komputer (lihat `docs/api.md`) atau pakai alamat Render di atas, lalu set `NEXT_PUBLIC_API_URL` di `.env.local`.
 
-## Kapan berhenti dan bertanya ke lead
+## Kapan berhenti dan bertanya ke manager
 Kontrak API tampak salah atau kurang, kamu perlu mengubah file di luar `apps/web/`, atau dua aturan di atas bertentangan.
