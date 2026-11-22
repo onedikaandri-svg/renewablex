@@ -11,14 +11,14 @@ interface Props {
 
 export default function ScreeningForm({ values, errors, busy, onChange, onSubmit, onReset }: Props) {
   return (
-    <form noValidate onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+    <form noValidate onSubmit={(e) => { e.preventDefault(); if (!busy) onSubmit(); }}>
       {GROUPS.map((g) => (
         <fieldset key={g.title}>
           <legend>{g.title}</legend>
           {g.fields.filter((f) => isVisible(f, values)).map((f) => {
             const id = idOf(f.key);
             const err = errors[f.key];
-            const common = { id, name: id, value: values[f.key] ?? "", "aria-invalid": err ? true : false, "aria-describedby": `e-${id}` };
+            const common = { id, name: id, value: values[f.key] ?? "", "aria-required": true, "aria-invalid": err ? true : false, "aria-describedby": `e-${id}` };
             return (
               <div className="fld" key={f.key}>
                 <label htmlFor={id}>{f.label}{f.unit && <> <span className="unit">({f.unit})</span></>}</label>
@@ -37,8 +37,8 @@ export default function ScreeningForm({ values, errors, busy, onChange, onSubmit
         </fieldset>
       ))}
       <div className="row">
-        <button className="btn primary" type="submit" disabled={busy}>{busy ? "Menghitung..." : "Hitung Estimasi"}</button>
-        <button className="btn ghost" type="button" onClick={onReset} disabled={busy}>Kosongkan Form</button>
+        <button className="btn primary" type="submit" aria-disabled={busy}>{busy ? "Menghitung..." : "Hitung Estimasi"}</button>
+        <button className="btn ghost" type="button" aria-disabled={busy} onClick={() => { if (!busy) onReset(); }}>Kosongkan Form</button>
       </div>
     </form>
   );
