@@ -138,3 +138,39 @@ def test_extreme_discount_rate_never_returns_non_finite_numbers():
         b["financial"]["discount_rate_fraction"] = -0.9999999999
     res = post(extreme)
     assert res.status_code == 422 and "finite" in res.text
+
+
+def detail(res):
+    return res.json()["detail"]
+
+
+@pytest.mark.parametrize("mutate,code", [
+    (lambda b: b["technical"].update(performance_loss_fraction=0.1), "double_counted_loss"),
+    (lambda b: b["technical"].update(energy_method="location_based"), "location_based_unavailable"),
+    (lambda b: b["technical"].update(specific_yield_kwh_per_kwp_year=None), "yield_required"),
+    (lambda b: b["financial"].update(revenue_method="self_consumption_savings"), "unsupported_revenue_method"),
+])
+def test_custom_errors_carry_a_stable_code(mutate, code):
+    items = detail(post(mutate))
+    assert [i["code"] for i in items] == [code]
+    assert items[0]["type"] == "value_error" and items[0]["msg"].startswith("Value error, ")
+
+
+def test_standard_errors_use_their_type_as_code_and_keep_ctx():
+    items = detail(post(lambda b: b["project"].update(lifetime_years=41)))
+    assert items[0]["code"] == items[0]["type"] == "less_than_equal"
+    assert items[0]["ctx"] == {"le": 40}
+    assert items[0]["loc"] == ["body", "project", "lifetime_years"]
+
+
+def test_error_items_do_not_echo_the_input():
+    for item in detail(post(lambda b: b["financial"].update(capex_amount=-1))):
+        assert "input" not in item and "url" not in item
+
+
+def test_non_finite_result_has_a_code_and_the_old_wording():
+    def extreme(b):
+        b["project"]["lifetime_years"] = 40
+        b["financial"]["discount_rate_fraction"] = -0.9999999999
+    item = detail(post(extreme))[0]
+    assert item["code"] == "non_finite_result" and "not a finite number" in item["msg"]
