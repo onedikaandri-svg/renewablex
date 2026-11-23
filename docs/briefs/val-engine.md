@@ -31,6 +31,7 @@ Keputusan manager atas temuan V1: temuan 1, 2, 6, dan 7 masuk ke sini.
 - Kunci versi Python. Baca dokumentasi Render yang sekarang untuk cara yang benar, dan sebut langkah yang harus dilakukan pemilik proyek, bila ada. Samakan dengan versi di CI.
 - Batasi ukuran badan permintaan ke angka yang masuk akal dan kembalikan galat 413 yang jelas. Tambahkan tesnya.
 - Log permintaan terstruktur tanpa isi badan permintaan (asumsi pengguna bisa sensitif secara bisnis). Cukup metode, jalur, status, durasi, dan versi mesin.
+- Hapus filter `paths` di `.github/workflows/ci.yml` supaya pekerjaan `test` dan `web` berjalan di setiap Pull Request. Dengan perlindungan `main` yang mewajibkan keduanya, Pull Request yang hanya mengubah `docs/` atau `supabase/` tidak pernah mendapat status itu dan tidak bisa digabung.
 - Dokumentasi interaktif `/docs` dan `/openapi.json` tetap terbuka. Itu keputusan manager untuk saat ini, ditinjau ulang bila ada akun pengguna.
 - Selesai bila: tes hijau, CI hijau, `/health` setelah pemasangan tetap normal, dan laporan menyebut tiap langkah serta cara mengujinya.
 
@@ -52,8 +53,8 @@ Keputusan manager atas temuan V1: temuan 1, 2, 6, dan 7 masuk ke sini.
 ### V4. Usulan mode `location_based` (menunggu D2 kaakara disetujui)
 Tugas ini baru dibuka setelah manager memberi tahu bahwa D2 disetujui. Langkah pertama hanya dokumen: `docs/location-based-proposal.md` berisi field baru yang dibutuhkan di `project` dan `technical` (lintang, bujur, kemiringan, azimuth), cara hasil penyedia menjadi `specific_yield` dan `yield_boundary`, galat yang mungkin muncul (dengan `code`), dan dampaknya ke web dan data. Kode ditulis setelah usulan disetujui.
 
-### V5. Pekerjaan CI `database` (menunggu tes SQL kaakara)
-Tambahkan pekerjaan di `.github/workflows/ci.yml` yang menjalankan `supabase/tests/` pada Postgres sungguhan (service container). Dibuka setelah kaakara mengirim skripnya dan manager memberi tahu.
+### V5. Pekerjaan CI `database` (dibuka setelah D1b kaakara tergabung)
+Tambahkan pekerjaan di `.github/workflows/ci.yml` yang menjalankan `supabase/tests/` pada Postgres sungguhan (service container), dengan versi Postgres yang sama dengan yang dipakai kaakara (16). Ikuti urutan dan perintah di `supabase/tests/README.md`. Tes negatif harus terbukti: tanpa migrasi 0002, pekerjaan ini harus gagal. Jangan tambahkan pekerjaan itu sebagai pemeriksaan wajib di perlindungan `main` sebelum manager meminta.
 
 ## Cara memeriksa pekerjaanmu
 ```bash

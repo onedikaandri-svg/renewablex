@@ -27,6 +27,13 @@ Skema awal dibuat sebelum mesin versi 0.2.0. Satu ketidakcocokan sudah diketahui
 - Periksa Row Level Security: tiap tabel di skema harus punya kebijakan yang membatasi pengguna hanya ke barisnya sendiri. Tulis hasil pemeriksaan per tabel di `docs/database-schema.md`.
 - Selesai bila: daftar perbedaan dan keputusan tiap item ada di laporan, migrasi 0002 bisa dijalankan di atas 0001, dan `docs/database-schema.md` sesuai kenyataan.
 
+### D1b. Tes SQL untuk skema dan RLS
+Tugas ini muncul dari kerja D1 dan sudah disetujui manager. Isinya `supabase/tests/` (`00_auth_stub.sql`, `10_helpers.sql`, `20_rls.sql`, `30_constraints.sql`, `40_legacy_seed.sql`, `41_legacy_asserts.sql`, `README.md`).
+- Digabung setelah D1, karena tes memeriksa hasil migrasi 0002.
+- Tabel atau migrasi baru wajib menambah ujinya sendiri. Tulis aturan itu di `supabase/tests/README.md`.
+- Stub `auth` hanya untuk tes dan tidak boleh masuk migrasi.
+- Selesai bila: skrip berjalan sesuai README, uji negatif membuktikan tes mendeteksi masalah, dan manager menyetujui. Val lalu menambahkan pekerjaan CI `database` (V5).
+
 ### D2. Antarmuka penyedia data lokasi (S1-03)
 Lihat S1-03 di `docs/SPRINT-1-issues.md` dan bagian energi di `docs/calculation-methodology.md`.
 - `app/providers/base.py`: antarmuka `ResourceProvider` yang menerima lintang, bujur, kemiringan, dan azimuth, lalu mengembalikan hasil bertipe berisi `specific_yield_kwh_per_kwp_year`, `yield_boundary` (nilai dari API: `net_ac_at_delivery` atau `gross_pre_loss`), serta metadata asal data: penyedia, dataset, versi dataset, periode, waktu pengambilan. Metadata ini harus bisa dipetakan ke kolom `resource_*` di tabel `technical_inputs`.
@@ -43,6 +50,8 @@ Tulis `docs/persistence-proposal.md`: bagaimana pengguna menyimpan proyek dan ha
 - Alur masuk akun, siapa yang menulis ke database (web langsung dengan kebijakan RLS, atau mesin lewat server), dan di mana kunci rahasia dipakai.
 - Daftar endpoint atau fungsi yang dibutuhkan, tanpa mengubah kontrak yang ada.
 - Risiko dan hal yang belum diputuskan.
+- Hal yang ditunda dari D1 dan wajib dibahas di usulan ini: (a) run hitungan harus benar-benar tidak bisa diubah pemiliknya, termasuk `input_snapshot` (metodologi bagian 7); (b) kebijakan RLS dibatasi ke peran `authenticated` dan memakai `(select auth.uid())`; (c) kebijakan Storage untuk `reports`; (d) membersihkan baris lama yang melanggar batasan sebelum `validate constraint`, bila nanti ada data nyata; (e) uji sekali di Supabase asli (`supabase db reset`) setelah proyek Supabase dibuat.
+- Kolom baru untuk `warning_codes` akan datang dari Val (V2b). Siapkan usulan agar penambahan itu mudah.
 - Selesai bila manager menyetujui. Jangan menulis kode untuk ini sebelum disetujui.
 
 ## Cara memeriksa pekerjaanmu

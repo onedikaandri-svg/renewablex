@@ -65,7 +65,7 @@ Rencana mesin hitung ada di `docs/briefs/val-engine.md`, tugas web di `docs/brie
 | Menunggu | Dibuka untuk |
 |---|---|
 | D2 (kaakara) disetujui | V4 (Val): sambungkan penyedia data lokasi |
-| Tes SQL dari kaakara | V5 (Val): pekerjaan CI `database` |
+| D1b (kaakara) tergabung | V5 (Val): pekerjaan CI `database` |
 | W1b dan W3 (One) | Tidak ada. Endpoint sensitivitas sudah tersedia |
 
 ## Definisi selesai
