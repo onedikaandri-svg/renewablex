@@ -32,7 +32,7 @@ RenewableX helps renewable energy developers perform preliminary technical and f
 
 - Web: Next.js + TypeScript
 - API and calculation engine: Python + FastAPI
-- Calculations: Python, NumPy, SciPy
+- Calculations: Python (the formulas currently use only the standard library)
 - Database and authentication: Supabase (PostgreSQL)
 - Charts: Recharts
 - Hosting: free-tier-compatible hosting, subject to current provider limits
@@ -53,7 +53,8 @@ renewablex/
 │       │   ├── models/
 │       │   └── services/
 │       ├── tests/
-│       └── requirements.txt
+│       ├── requirements.txt       # what the service needs to run
+│       └── requirements-dev.txt   # adds the test tools
 ├── supabase/
 │   └── migrations/
 ├── docs/
@@ -80,7 +81,7 @@ The initial Sprint 0/1 deliverable is the calculation engine. The frontend and h
 
 ### Requirements
 
-- Python 3.11+
+- Python 3.11+ (CI and the hosted service use 3.11.11)
 - Git
 
 ### Run the calculation engine
@@ -109,6 +110,7 @@ With the service running, follow [docs/api.md](docs/api.md) to post `examples/sa
 
 ```bash
 cd services/calculation-engine
+pip install -r requirements-dev.txt
 pytest
 ```
 
