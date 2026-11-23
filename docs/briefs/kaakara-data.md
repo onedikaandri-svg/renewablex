@@ -48,7 +48,7 @@ Tulis `docs/persistence-proposal.md`: bagaimana pengguna menyimpan proyek dan ha
 ## Cara memeriksa pekerjaanmu
 ```bash
 cd services/calculation-engine
-pip install -r requirements.txt
+pip install -r requirements.txt   # setelah V2 Val digabung: requirements-dev.txt
 pytest
 ```
 

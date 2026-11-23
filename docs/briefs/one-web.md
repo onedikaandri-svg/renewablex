@@ -35,6 +35,13 @@ Mesin mengembalikan galat validasi (HTTP 422) berbahasa Inggris, contoh "Input s
 - Jika kamu bisa menjalankan browser, uji sungguhan. Jika tidak, tulis jujur di laporan bahwa pemeriksaan hanya lewat pembacaan kode.
 - Selesai bila: daftar temuan beserta perbaikannya ada di laporan, dan tidak ada temuan yang dibiarkan tanpa penjelasan.
 
+### W1b. Terjemahan galat berdasarkan `code`
+Mesin kini mengirim `code` yang stabil di tiap item galat (lihat bagian Errors di `docs/api.md`). Kontrak berkata klien tidak boleh bercabang pada teks `msg`.
+- Tambahkan `code: string` ke `ApiIssue` dan teruskan lewat `Problems.issues`.
+- Terjemahkan berdasarkan `code` di tabel pemetaan yang sama. Kode bawaan sama dengan `type`. Tambahkan kode mesin: `location_based_unavailable`, `yield_required`, `double_counted_loss`, `unsupported_revenue_method`, dan `non_finite_result`.
+- Pertahankan pencocokan potongan teks hanya sebagai cadangan untuk item tanpa `code`. Hapus komentar yang masih menyebut menunggu `code` dari mesin.
+- Selesai bila: tes unit diperbarui dan lolos, serta `npm run typecheck`, `npm test`, dan `npm run build` lolos.
+
 ### W3. Tampilan sensitivitas
 Tambahkan panel "Sensitivitas" di bawah hasil: seberapa besar NPV berubah bila satu asumsi digeser.
 - Gunakan endpoint mesin `POST /v1/pv/sensitivity` (lihat bagian Sensitivity di `docs/api.md` dan contoh `examples/sample-sensitivity-request.json`). Satu panggilan mengembalikan semuanya. Web tidak menghitung apa pun sendiri.
@@ -44,6 +51,11 @@ Tambahkan panel "Sensitivitas" di bawah hasil: seberapa besar NPV berubah bila s
 - Tampilkan juga IRR dan payback tiap kasus bila tidak terlalu ramai (boleh dalam baris yang dibuka). Status `irr_status` dan `payback_status` harus ditampilkan sebagai teks, bukan angka kosong.
 - Galat dari endpoint ini memakai `code` seperti galat lain. Tambahkan terjemahan untuk `shift_out_of_range`, `shift_out_of_bounds`, `duplicate_variables`, dan `duplicate_shifts` di `errors-id.ts`.
 - Letakkan pemanggilan di satu modul `lib/sensitivity.ts`. Panggil hanya setelah hasil utama ada, dan tangani mesin yang sedang bangun dengan pesan yang sama seperti halaman utama.
+- Galat dari endpoint sensitivitas memakai `loc` berawalan `["body","base",...]`, bukan `["body",...]`. Petakan ke kolom form dengan benar, jangan memakai pemotongan `loc` yang sama dengan panggilan utama.
+- Satu pergeseran yang keluar batas menggagalkan seluruh permintaan (`shift_out_of_range`). Jelaskan itu dengan kalimat yang jelas, jangan sebagai galat umum.
+- `input_value` bisa memuat sisa pembulatan floating point (contoh 13200000000.000002). Bulatkan untuk tampilan.
+- Bila nilai dasar suatu variabel 0 (misalnya discount rate 0), deltanya selalu 0. Beri catatan agar tidak tampak seperti error.
+- Teks `disclaimer` dari mesin berbahasa Inggris. Jangan tampilkan apa adanya: tulis teks Indonesianya sendiri berdasarkan `scope: pre_tax_unlevered` (sebelum pajak, tanpa pendanaan, estimasi pendahuluan).
 - Selesai bila: berfungsi di 375 px dan desktop, keadaan kosong, memuat, dan galat ada, dan tes untuk fungsi yang menyiapkan permintaan dan membaca respons lolos.
 
 ## Cara memeriksa pekerjaanmu
