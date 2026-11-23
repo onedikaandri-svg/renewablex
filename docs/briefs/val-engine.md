@@ -6,7 +6,7 @@ Kamu memegang mesin hitung RenewableX, menggantikan pekerjaan teknis yang sebelu
 RenewableX adalah alat screening kelayakan proyek PV (surya). Mesin FastAPI menghitung energi, NPV, IRR, payback, dan sensitivitas dari asumsi pengguna. Halaman web (One) dan lapisan data (kaakara) bergantung pada kontrak API yang kamu pegang. Karena itu ketepatan angka dan kestabilan kontrak adalah prioritas pertama.
 
 ## Wilayah kamu
-`services/calculation-engine/` (kecuali `app/providers/` dan `tests/providers/` milik kaakara), `docs/api.md`, `docs/calculation-methodology.md`, `examples/`, dan `.github/`. Jangan ubah `apps/web/`, `supabase/`, atau `docs/TEAM.md` dan `docs/briefs/`.
+`services/calculation-engine/` (kecuali `app/providers/` dan `tests/providers/` milik kaakara), `docs/api.md`, `docs/calculation-methodology.md`, `examples/`, `.github/`, `README.md`, dan `docs/SPRINT-0-issues.md` serta `docs/SPRINT-1-issues.md`. Jangan ubah `apps/web/`, `supabase/`, atau `docs/TEAM.md` dan `docs/briefs/`.
 
 ## Aturan khusus
 - **Perubahan kontrak** (field, nilai yang diizinkan, bentuk respons, kode galat) mempengaruhi One dan kaakara. Sebelum mengubahnya, tulis usulan di laporan: isi sebelum dan sesudah di `docs/api.md`, dampak ke web dan data, dan apakah kompatibel mundur. Tunggu persetujuan manager. Perubahan yang kompatibel mundur (menambah field) lebih disukai daripada mengubah atau menghapus.
@@ -25,15 +25,28 @@ RenewableX adalah alat screening kelayakan proyek PV (surya). Mesin FastAPI meng
 - Selesai bila: laporan temuan diterima manager.
 
 ### V2. Pengerasan untuk produksi
-- Pisahkan dependensi: `requirements.txt` hanya untuk menjalankan layanan, `requirements-dev.txt` untuk tes (pytest, httpx, numpy-financial). Perbarui `.github/workflows/ci.yml` supaya menginstal keduanya. Build Command Render (`pip install -r requirements.txt`) tidak perlu berubah.
-- Kunci versi Python. Baca dokumentasi Render yang sekarang untuk cara yang benar, dan sebut langkah yang harus dilakukan pemilik proyek, bila ada.
+Keputusan manager atas temuan V1: temuan 1, 2, 6, dan 7 masuk ke sini.
+- Pisahkan dependensi. `requirements.txt` hanya untuk menjalankan layanan: fastapi, uvicorn, pydantic, dan **httpx** (adapter penyedia kaakara memakainya di produksi, jadi httpx tetap di sini). `requirements-dev.txt` berisi `-r requirements.txt`, pytest, dan numpy-financial. Keluarkan `numpy` dari `requirements.txt` setelah memastikan tidak ada modul mesin yang mengimpornya (numpy-financial membawa numpy sendiri di lingkungan tes). Perbarui `.github/workflows/ci.yml` supaya menginstal `requirements-dev.txt`, dan perbarui perintah di `README.md` dan `docs/api.md`. Build Command Render (`pip install -r requirements.txt`) tidak perlu berubah.
+- Tambahkan `npm test` ke job `web` di `ci.yml`, di antara `typecheck` dan `build`. Ini pertama kalinya tes One berjalan di CI. Kalau ada yang merah, laporkan, jangan memperbaiki berkas One.
+- Kunci versi Python. Baca dokumentasi Render yang sekarang untuk cara yang benar, dan sebut langkah yang harus dilakukan pemilik proyek, bila ada. Samakan dengan versi di CI.
 - Batasi ukuran badan permintaan ke angka yang masuk akal dan kembalikan galat 413 yang jelas. Tambahkan tesnya.
 - Log permintaan terstruktur tanpa isi badan permintaan (asumsi pengguna bisa sensitif secara bisnis). Cukup metode, jalur, status, durasi, dan versi mesin.
+- Dokumentasi interaktif `/docs` dan `/openapi.json` tetap terbuka. Itu keputusan manager untuk saat ini, ditinjau ulang bila ada akun pengguna.
 - Selesai bila: tes hijau, CI hijau, `/health` setelah pemasangan tetap normal, dan laporan menyebut tiap langkah serta cara mengujinya.
 
-### V3. Kelengkapan tes metodologi (S1-06)
-- Bandingkan kasus uji di `docs/calculation-methodology.md` dan kriteria S1-06 di `docs/SPRINT-1-issues.md` dengan tes yang ada. Tulis tes untuk setiap kasus yang belum tercakup.
+### V2b. Kode peringatan (perubahan kontrak, kompatibel mundur, sudah disetujui manager)
+- Tambahkan `warning_codes: list[str]` pada respons `/v1/pv/preliminary`, urutannya sejajar dengan `warnings`. `warnings` tetap ada. Kode: `yield_unusually_high`, `degradation_unusually_high`, `performance_loss_unusually_high`.
+- `disclaimer` tidak diberi kode. Web menulis teks Indonesianya sendiri berdasarkan `scope`.
+- Naikkan versi mesin ke 0.4.0 (minor, sesuai aturan di `docs/HANDOVER-engine.md`), dan perbarui `docs/api.md`, `examples/`, dan tes.
+- Selesai bila: tiap kode punya tes, contoh respons diperbarui, dan laporan menyebut dampak ke web. Manager lalu memberi One tugas memakainya.
+
+### V3. Kelengkapan tes dan dokumen
+- Bandingkan kasus uji di `docs/calculation-methodology.md` dan kriteria S1-06 di `docs/SPRINT-1-issues.md` dengan tes yang ada. Tulis tes untuk setiap kasus yang belum tercakup, termasuk yang kamu daftarkan di V1: `performance_loss_fraction` di luar rentang lewat API, hasil tak terhingga di sensitivitas, dan `shift_out_of_range` untuk variabel selain yield.
 - Tambahkan tes sifat: tarif lebih tinggi menaikkan NPV, CAPEX lebih tinggi menurunkannya, degradasi 0 membuat energi tiap tahun sama, umur 1 tahun menghasilkan satu arus kas operasi.
+- Tambahkan tes penjaga contoh: `examples/sample-pv-response.json` dan `examples/sample-sensitivity-response.json` dibandingkan dengan keluaran mesin (abaikan `calculated_at`).
+- Rapikan `input_value` di respons sensitivitas supaya tidak memuat sisa floating point (misalnya batasi ke 12 digit signifikan). Perubahan ini kompatibel mundur, sertakan tesnya.
+- Lengkapi `docs/api.md`: tabel Response (`scope`, `energy_method`, `currency_code`, `net_specific_yield_kwh_per_kwp_year`, `year_1_energy_kwh`, `disclaimer`), `loc` berawalan `["body","base",...]` di galat sensitivitas, kode galat bawaan lain seperti `json_invalid`, dan hasil sensitivitas bernilai 0 bila nilai dasar 0.
+- Rapikan `docs/calculation-methodology.md` (judul bagian 10, `yield_basis` menjadi `yield_boundary`) dan hapus em dash serta en dash di dokumen milikmu (`calculation-methodology.md`, `README.md`, `docs/SPRINT-0-issues.md`, `docs/SPRINT-1-issues.md`).
 - Selesai bila: tiap kriteria S1-06 punya tes yang disebut namanya di laporan.
 
 ### V4. Usulan mode `location_based` (menunggu D2 kaakara disetujui)
@@ -45,10 +58,12 @@ Tambahkan pekerjaan di `.github/workflows/ci.yml` yang menjalankan `supabase/tes
 ## Cara memeriksa pekerjaanmu
 ```bash
 cd services/calculation-engine
-pip install -r requirements.txt
+pip install -r requirements.txt   # setelah V2 digabung: requirements-dev.txt
 pytest
 ```
 Untuk mencoba langsung: jalankan `uvicorn app.main:app --reload` dan ikuti `docs/api.md`.
+
+Jika kamu tidak bisa menjalankan `pytest`, tulis jujur di laporan. Tes otomatis di Pull Request menjadi penentu, dan pemilik proyek membawa hasilnya. Karena itu jaga setiap Pull Request kecil dan tulis kode dengan hati-hati.
 
 ## Kapan berhenti dan bertanya ke manager
 Kontrak perlu berubah, dua aturan bertentangan, kamu perlu mengubah file di luar wilayahmu, atau dokumentasi layanan luar bertentangan dengan asumsi di dokumen ini.

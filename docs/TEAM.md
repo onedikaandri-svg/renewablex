@@ -18,7 +18,7 @@ Setiap orang hanya mengubah wilayahnya sendiri. Butuh perubahan di wilayah lain?
 
 | Wilayah | Pemilik |
 |---|---|
-| `services/calculation-engine/` (kecuali `app/providers/` dan `tests/providers/`), `docs/api.md`, `docs/calculation-methodology.md`, `examples/`, `.github/` | Val |
+| `services/calculation-engine/` (kecuali `app/providers/` dan `tests/providers/`), `docs/api.md`, `docs/calculation-methodology.md`, `examples/`, `.github/`, `README.md`, `docs/SPRINT-0-issues.md`, `docs/SPRINT-1-issues.md` | Val |
 | `apps/web/`, `DESIGN.md` (usulan perubahan lewat manager) | One |
 | `supabase/` (migrasi baru dan `supabase/tests/`), `services/calculation-engine/app/providers/`, `services/calculation-engine/tests/providers/`, `docs/database-schema.md`, `docs/providers.md` | kaakara |
 | `docs/TEAM.md`, `docs/briefs/` | Manager |

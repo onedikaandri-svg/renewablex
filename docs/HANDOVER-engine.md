@@ -24,6 +24,9 @@ Dokumen ini menjelaskan keadaan mesin hitung RenewableX saat dipindahkan dari ma
 8. **Sensitivitas:** satu variabel dalam satu waktu, pergeseran relatif, tiap kasus adalah hitungan penuh yang sama dengan `/preliminary`.
 9. **Versi:** versi mesin naik minor untuk penambahan endpoint atau field, versi metodologi naik bila rumus atau definisi berubah.
 10. **Kontrak:** `docs/api.md` dan `examples/` mengikuti kode. Bila berbeda, dokumen yang diperbaiki.
+11. **`httpx` tetap di `requirements.txt` produksi**, karena adapter penyedia data lokasi (kaakara) memakainya.
+12. **`/docs` dan `/openapi.json` tetap terbuka** untuk saat ini. Ditinjau ulang bila ada akun pengguna.
+13. **Peringatan bisa dibaca mesin:** `warning_codes` akan ditambahkan di V2b. `disclaimer` tidak diberi kode, web menulis teks Indonesianya sendiri.
 
 ## Pemasangan (sudah berjalan)
 - **Render:** layanan `renewablex`, paket gratis, Root Directory `services/calculation-engine`, Build Command `pip install -r requirements.txt`, Start Command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Variabel `ALLOWED_ORIGINS` berisi alamat Vercel dan `http://localhost:3000`, dipisah koma, tanpa garis miring di akhir.
