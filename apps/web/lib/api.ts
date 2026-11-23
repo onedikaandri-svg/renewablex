@@ -18,6 +18,7 @@ export interface PVResponse {
   engine_version: string;
   methodology_version: string;
   calculated_at: string;
+  scope: string;
   currency_code: string;
   net_specific_yield_kwh_per_kwp_year: number;
   year_1_energy_kwh: number;
@@ -49,7 +50,8 @@ export class NetworkError extends Error {}
 
 const PERCENT_FIELDS = new Set(FIELDS.filter((f) => f.percent).map((f) => f.key));
 
-export function parseProblems(detail: unknown): Problems {
+// `skip` = jumlah awalan `loc` sebelum nama bagian: 1 untuk ["body", ...], 2 untuk ["body", "base", ...].
+export function parseProblems(detail: unknown, skip = 1): Problems {
   const problems: Problems = { fields: {}, general: [], issues: [] };
   if (typeof detail === "string") {
     problems.general.push(translateDetailText(detail));
@@ -65,7 +67,7 @@ export function parseProblems(detail: unknown): Problems {
       continue;
     }
     problems.issues.push(item);
-    const loc = item.loc.slice(1);
+    const loc = item.loc.slice(skip);
     if (loc.length >= 2) {
       const key = `${loc[0]}.${loc[1]}`;
       problems.fields[key] = translateIssue(item, { percent: PERCENT_FIELDS.has(key) });

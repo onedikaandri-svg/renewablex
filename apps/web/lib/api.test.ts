@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, parseProblems, runPreliminary } from "./api";
+import type { ApiIssue } from "./errors-id";
 
 // Bentuk item galat diambil dari respons 422 asli mesin hitung (FastAPI + Pydantic v2),
 // tanpa kolom `input`. Satu baris per batas di docs/api.md.
 const bound = (section: string, field: string, type: string, key: string, value: number) => ({
   type,
+  code: type,
   loc: ["body", section, field],
   msg: "Input should be ...",
   ctx: { [key]: value },
@@ -45,16 +47,26 @@ describe("parseProblems: setiap batas di docs/api.md", () => {
 });
 
 describe("parseProblems: bentuk lain dari mesin", () => {
-  it("value_error tingkat bagian masuk ke general", () => {
-    const p = parseProblems([
-      {
-        type: "value_error",
-        loc: ["body", "financial"],
-        msg: "Value error, Only fixed_tariff is supported in this version.",
-        ctx: { error: {} },
-      },
-    ]);
+  // Item asli dari mesin 0.3.0 (kolom `code`, tanpa `ctx` untuk galat kustom).
+  const CUSTOM: [string, ApiIssue, string][] = [
+    ["location_based_unavailable", { type: "value_error", code: "location_based_unavailable", loc: ["body", "technical"], msg: "Value error, location_based needs a configured resource provider. Use manual_specific_yield." }, "Mode berbasis lokasi (location_based) belum tersedia. Isi yield spesifik secara manual."],
+    ["yield_required", { type: "value_error", code: "yield_required", loc: ["body", "technical"], msg: "Value error, specific_yield_kwh_per_kwp_year is required for manual_specific_yield." }, "Yield spesifik wajib diisi untuk metode yield manual."],
+    ["double_counted_loss", { type: "value_error", code: "double_counted_loss", loc: ["body", "technical"], msg: "Value error, performance_loss_fraction must be 0 when the yield is already net, or losses count twice." }, "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali."],
+    ["unsupported_revenue_method", { type: "value_error", code: "unsupported_revenue_method", loc: ["body", "financial"], msg: "Value error, Only fixed_tariff is supported in this version." }, "Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung."],
+    ["non_finite_result", { type: "value_error", code: "non_finite_result", loc: ["body"], msg: "The result is not a finite number. Check for extreme inputs." }, "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem."],
+  ];
+
+  it.each(CUSTOM)("kode %s tingkat bagian masuk ke general", (_code, item, expected) => {
+    const p = parseProblems([item]);
     expect(p.fields).toEqual({});
+    expect(p.general).toEqual([expected]);
+    expect(p.issues[0].code).toBe(item.code);
+  });
+
+  it("item tanpa code (mesin lama) tetap diterjemahkan lewat teks", () => {
+    const p = parseProblems([
+      { type: "value_error", loc: ["body", "financial"], msg: "Value error, Only fixed_tariff is supported in this version.", ctx: { error: {} } },
+    ]);
     expect(p.general).toEqual(["Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung."]);
   });
 
@@ -65,8 +77,8 @@ describe("parseProblems: bentuk lain dari mesin", () => {
 
   it("beberapa galat sekaligus, type dan ctx disimpan utuh", () => {
     const items = [
-      { type: "missing", loc: ["body", "financial", "capex_amount"], msg: "Field required" },
-      { type: "string_pattern_mismatch", loc: ["body", "project", "currency_code"], msg: "x", ctx: { pattern: "^[A-Z]{3}$" } },
+      { type: "missing", code: "missing", loc: ["body", "financial", "capex_amount"], msg: "Field required" },
+      { type: "string_pattern_mismatch", code: "string_pattern_mismatch", loc: ["body", "project", "currency_code"], msg: "x", ctx: { pattern: "^[A-Z]{3}$" } },
     ];
     const p = parseProblems(items);
     expect(p.fields["financial.capex_amount"]).toBe("Wajib diisi.");
@@ -77,6 +89,15 @@ describe("parseProblems: bentuk lain dari mesin", () => {
   it("bentuk tak terduga tidak membuat galat baru", () => {
     expect(parseProblems({ foo: 1 }).general).toEqual(["Input tidak valid."]);
     expect(parseProblems([{ nope: true }]).general).toEqual(["Input tidak valid."]);
+  });
+});
+
+describe("parseProblems: awalan loc lain", () => {
+  it("skip 2 membuang body dan base, sehingga kunci sama dengan kunci form", () => {
+    const item = { type: "missing", code: "missing", loc: ["body", "base", "financial", "capex_amount"], msg: "Field required" };
+    expect(parseProblems([item], 2).fields).toEqual({ "financial.capex_amount": "Wajib diisi." });
+    // Dengan skip bawaan kuncinya salah ("base.financial"), itulah yang dihindari endpoint sensitivitas.
+    expect(parseProblems([item]).fields).toEqual({ "base.financial": "Wajib diisi." });
   });
 });
 

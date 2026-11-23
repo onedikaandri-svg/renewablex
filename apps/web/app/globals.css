@@ -14,10 +14,11 @@ a[href],button,summary,select,label[for],[role=button]{cursor:pointer}
 .tag,.note,.src,footer{color:var(--muted);font-size:.875rem}
 .tag,.note{margin:0}
 .note+.note{margin-top:.25rem}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .status .note{margin-bottom:.5rem}
 h1{font-size:clamp(1.5rem,4vw,1.875rem);line-height:1.2;color:var(--navytext);margin:1.5rem 0 .5rem;max-width:40rem}
 h2{font-size:1.125rem;margin:.125rem 0 .75rem;color:var(--navytext)}
-h3{font-size:1rem;margin:0 0 .25rem;color:inherit}
+h3,h4{font-size:1rem;margin:0 0 .25rem;color:inherit}
 .lead{margin:0 0 1.25rem;max-width:40rem}
 .eyebrow{margin:0;font-size:.875rem;font-weight:700;color:var(--accent)}
 .grid{display:grid;gap:1rem;grid-template-columns:minmax(0,1fr);align-items:start}
@@ -45,6 +46,8 @@ input[aria-invalid=true],select[aria-invalid=true]{border:2px solid var(--errtex
 .state p{margin:0}
 .state p+p{margin-top:.5rem}
 .state.bad{background:var(--errbg);color:var(--errtext)}
+.state .row{margin-top:.75rem}
+.state.bad .btn{background:var(--bg)}
 .state ul,.warn ul{margin:.25rem 0 .5rem;padding-left:1.25rem}
 .warn{background:var(--warnbg);border-radius:.5rem;padding:1rem 1.25rem;margin-bottom:.75rem}
 .kpis{display:grid;gap:.75rem;grid-template-columns:repeat(auto-fit,minmax(11rem,1fr))}
@@ -52,6 +55,14 @@ input[aria-invalid=true],select[aria-invalid=true]{border:2px solid var(--errtex
 .kpi span{display:block;color:var(--muted);font-size:.875rem}
 .kpi b{display:block;font-size:1.5rem;line-height:1.25;color:var(--navytext);margin:.125rem 0}
 .sec{margin-top:1.5rem}
+.more{margin-top:.75rem}
+.more summary{min-height:2.75rem;display:flex;align-items:center;font-weight:600;color:var(--navytext)}
+.more .tw{margin-top:.5rem}
+table.sens{min-width:36rem}
+table.sens-main{min-width:0}
+.tw-auto{max-height:none}
+.sens-main th,.sens-main td{padding-inline:.5rem}
+.sub{display:block;font-weight:400;font-size:.8125rem;color:var(--muted)}
 svg{display:block;width:100%;height:auto}
 svg text{fill:var(--muted);font-size:12px;font-family:inherit}
 .tw{overflow:auto;max-height:20rem;border:1px solid var(--border);border-radius:.375rem}

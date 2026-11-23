@@ -1,5 +1,5 @@
 import type { IrrStatus, PVResponse } from "@/lib/api";
-import { fmt, money } from "@/lib/format";
+import { disclaimerId, fmt, money } from "@/lib/format";
 import Chart from "./Chart";
 
 const IRR_NOTE: Record<IrrStatus, string> = {
@@ -78,7 +78,7 @@ export default function Results({ res }: { res: PVResponse }) {
         </div>
       </div>
       <p className="note sec">
-        {res.disclaimer} Mesin v{res.engine_version}, metodologi v{res.methodology_version}, dihitung {res.calculated_at}.
+        {disclaimerId(res.scope)} Mesin v{res.engine_version}, metodologi v{res.methodology_version}, dihitung {res.calculated_at}.
       </p>
     </>
   );

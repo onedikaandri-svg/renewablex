@@ -3,15 +3,18 @@
 import { useEffect, useState } from "react";
 import Results from "@/components/Results";
 import ScreeningForm from "@/components/ScreeningForm";
+import Sensitivity from "@/components/Sensitivity";
 import { ApiError, runPreliminary, type PVResponse } from "@/lib/api";
 import { buildRequest, byVisualOrder, DEFAULTS, EMPTY, idOf, labelOf, type Values } from "@/lib/form";
+import { SLOW_ENGINE_NOTE } from "@/lib/format";
 
 type State =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "invalid"; messages: string[] }
   | { kind: "failed"; message: string }
-  | { kind: "done"; res: PVResponse };
+  // `body` disimpan agar sensitivitas memakai asumsi yang sama dengan hasil, walau form diubah sesudahnya.
+  | { kind: "done"; res: PVResponse; body: unknown };
 
 // Memindahkan fokus ke elemen pertama yang ada, setelah React selesai menggambar ulang.
 function focusFirst(...ids: string[]) {
@@ -52,7 +55,7 @@ export default function Page() {
     setNotice("");
     setState({ kind: "loading" });
     try {
-      setState({ kind: "done", res: await runPreliminary(body) });
+      setState({ kind: "done", res: await runPreliminary(body), body });
       focusFirst("h-out");
     } catch (err) {
       if (err instanceof ApiError) reject(err.problems.fields, err.problems.general);
@@ -87,7 +90,7 @@ export default function Page() {
             {state.kind === "loading" && (
               <div className="state">
                 <p>Menghitung arus kas&hellip;</p>
-                {slow && <p className="note">Mesin hitung sedang bangun. Ini bisa sampai satu menit pada pemakaian pertama.</p>}
+                {slow && <p className="note">{SLOW_ENGINE_NOTE}</p>}
               </div>
             )}
             {state.kind !== "loading" && notice && <p className="note">{notice}</p>}
@@ -108,7 +111,12 @@ export default function Page() {
               <p>{state.message} Coba lagi sebentar lagi. Isian Anda tidak hilang.</p>
             </div>
           )}
-          {state.kind === "done" && <Results res={state.res} />}
+          {state.kind === "done" && (
+            <>
+              <Results res={state.res} />
+              <Sensitivity request={state.body} />
+            </>
+          )}
         </section>
       </div>
       <p className="src">
