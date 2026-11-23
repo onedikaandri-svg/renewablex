@@ -65,7 +65,7 @@ export default function Results({ res }: { res: PVResponse }) {
             <tbody>
               {res.annual_results.map((r) => (
                 <tr key={r.year}>
-                  <td>{r.year}</td>
+                  <th scope="row">{r.year}</th>
                   <td>{fmt(r.energy_kwh)}</td>
                   <td>{fmt(r.revenue)}</td>
                   <td>{fmt(r.opex)}</td>

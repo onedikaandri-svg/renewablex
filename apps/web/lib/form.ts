@@ -57,6 +57,15 @@ export const EMPTY: Values = Object.fromEntries(FIELDS.map((f) => [f.key, f.kind
 export const labelOf = (key: string) => FIELDS.find((f) => f.key === key)?.label ?? key;
 export const idOf = (key: string) => key.replace(".", "-");
 
+// Urutan kunci sesuai urutan tampil di form. Kunci yang tidak dikenal ditaruh di akhir.
+export function byVisualOrder(keys: string[]): string[] {
+  const rank = (k: string) => {
+    const i = FIELDS.findIndex((f) => f.key === k);
+    return i < 0 ? FIELDS.length : i;
+  };
+  return [...keys].sort((a, b) => rank(a) - rank(b));
+}
+
 export function isVisible(f: FieldDef, v: Values) {
   return f.key !== "technical.performance_loss_fraction" || v["technical.yield_boundary"] === "gross_pre_loss";
 }
