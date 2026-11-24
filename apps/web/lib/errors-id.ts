@@ -3,6 +3,8 @@
 
 export interface ApiIssue {
   type: string;
+  // Kode stabil dari mesin (docs/api.md). Kode bawaan sama dengan `type`. Item lama tidak punya.
+  code?: string;
   loc: (string | number)[];
   msg: string;
   ctx?: Record<string, unknown>;
@@ -41,34 +43,30 @@ const LENGTHS: Record<string, { key: string; text: (n: string) => string }> = {
   string_too_long: { key: "max_length", text: (n) => `Maksimal ${n} karakter.` },
 };
 
-// Pesan kustom mesin (model_validator di schemas.py dan pv.py). Dicocokkan lewat potongan teks
-// huruf kecil, sampai L1 menambahkan `code` yang bisa dibaca mesin. Aturan pertama yang cocok dipakai.
-const CUSTOM_MESSAGES: ReadonlyArray<{ fragment: string; text: string }> = [
-  {
-    fragment: "location_based needs a configured resource provider",
-    text: "Mode berbasis lokasi (location_based) belum tersedia. Isi yield spesifik secara manual.",
-  },
-  {
-    fragment: "is required for manual_specific_yield",
-    text: "Yield spesifik wajib diisi untuk metode yield manual.",
-  },
-  {
-    fragment: "losses count twice",
-    text: "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali.",
-  },
-  {
-    fragment: "only fixed_tariff is supported",
-    text: "Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung.",
-  },
-  {
-    fragment: "result is not a finite number",
-    text: "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem.",
-  },
+// Terjemahan untuk kode buatan mesin (lihat tabel kode di docs/api.md).
+const CODE_MESSAGES: Record<string, string> = {
+  location_based_unavailable: "Mode berbasis lokasi (location_based) belum tersedia. Isi yield spesifik secara manual.",
+  yield_required: "Yield spesifik wajib diisi untuk metode yield manual.",
+  double_counted_loss:
+    "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali.",
+  unsupported_revenue_method: "Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung.",
+  non_finite_result: "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem.",
+};
+
+// Cadangan untuk item tanpa `code` (mesin lama): potongan teks huruf kecil menunjuk ke kode.
+// Aturan pertama yang cocok dipakai. Item yang punya `code` tidak pernah lewat sini.
+const FRAGMENT_CODES: ReadonlyArray<{ fragment: string; code: string }> = [
+  { fragment: "location_based needs a configured resource provider", code: "location_based_unavailable" },
+  { fragment: "is required for manual_specific_yield", code: "yield_required" },
+  { fragment: "losses count twice", code: "double_counted_loss" },
+  { fragment: "only fixed_tariff is supported", code: "unsupported_revenue_method" },
+  { fragment: "result is not a finite number", code: "non_finite_result" },
 ];
 
-function matchCustom(msg: string): string | null {
+function matchFragment(msg: string): string | null {
   const lowered = msg.toLowerCase();
-  return CUSTOM_MESSAGES.find((m) => lowered.includes(m.fragment))?.text ?? null;
+  const hit = FRAGMENT_CODES.find((f) => lowered.includes(f.fragment));
+  return hit ? CODE_MESSAGES[hit.code] : null;
 }
 
 function translatePattern(pattern: unknown): string {
@@ -86,33 +84,36 @@ function translateLiteral(expected: unknown): string {
 }
 
 // Mengembalikan alasan tanpa nama isian, karena nama isian dipasang oleh pemanggil.
-// Teks atau tipe yang tidak dikenal dikembalikan apa adanya.
+// Pencocokan lewat `code` (bila tidak ada, `type`). Teks atau kode yang tidak dikenal
+// dikembalikan apa adanya.
 export function translateIssue(issue: ApiIssue, options: TranslateOptions = {}): string {
   const ctx = issue.ctx ?? {};
   const percent = options.percent ?? false;
+  const key = issue.code ?? issue.type;
 
-  const bound = BOUNDS[issue.type];
+  const bound = BOUNDS[key];
   if (bound) {
     const limit = formatLimit(ctx[bound.key], percent);
     return limit === null ? issue.msg : bound.text(limit);
   }
 
-  const length = LENGTHS[issue.type];
+  const length = LENGTHS[key];
   if (length) {
     const n = formatLimit(ctx[length.key], false);
     return n === null ? issue.msg : length.text(n);
   }
 
-  if (issue.type in FIXED) return FIXED[issue.type];
-  if (issue.type === "string_pattern_mismatch") return translatePattern(ctx.pattern);
-  if (issue.type === "literal_error") return translateLiteral(ctx.expected);
-  if (issue.type === "value_error") return matchCustom(issue.msg) ?? issue.msg;
+  if (key in FIXED) return FIXED[key];
+  if (key === "string_pattern_mismatch") return translatePattern(ctx.pattern);
+  if (key === "literal_error") return translateLiteral(ctx.expected);
+  if (key in CODE_MESSAGES) return CODE_MESSAGES[key];
+  if (issue.code === undefined && issue.type === "value_error") return matchFragment(issue.msg) ?? issue.msg;
   return issue.msg;
 }
 
 // Untuk `detail` berupa teks biasa (HTTPException dari mesin, bukan galat validasi).
 export function translateDetailText(text: string): string {
-  return matchCustom(text) ?? text;
+  return matchFragment(text) ?? text;
 }
 
 export function isApiIssue(value: unknown): value is ApiIssue {
