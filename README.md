@@ -109,6 +109,7 @@ With the service running, follow [docs/api.md](docs/api.md) to post `examples/sa
 ### Run tests
 
 ```bash
+## Menjalankan Tes (Mesin)
 cd services/calculation-engine
 pip install -r requirements-dev.txt
 pytest
