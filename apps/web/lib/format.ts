@@ -6,7 +6,8 @@ export const fixed = (n: number, digits: number) =>
 
 export const money = (v: number, currency: string) => `${fmt(v / 1e9, 2)} miliar ${currency}`;
 
-export const SLOW_ENGINE_NOTE = "Mesin hitung sedang bangun. Ini bisa sampai satu menit pada pemakaian pertama.";
+// Pesan saat server Render sedang bangun dari mode tidur (free tier).
+export const SLOW_ENGINE_NOTE = "Server gratis ini butuh waktu hingga 50 detik untuk bangun dari mode tidur. Mohon tunggu dan jangan tutup halaman ini.";
 
 // Teks `disclaimer` dari mesin berbahasa Inggris, jadi web menulis sendiri berdasarkan `scope`.
 export function disclaimerId(scope: string): string {

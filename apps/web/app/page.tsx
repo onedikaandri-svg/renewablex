@@ -13,10 +13,8 @@ type State =
   | { kind: "loading" }
   | { kind: "invalid"; messages: string[] }
   | { kind: "failed"; message: string }
-  // `body` disimpan agar sensitivitas memakai asumsi yang sama dengan hasil, walau form diubah sesudahnya.
   | { kind: "done"; res: PVResponse; body: unknown };
 
-// Memindahkan fokus ke elemen pertama yang ada, setelah React selesai menggambar ulang.
 function focusFirst(...ids: string[]) {
   requestAnimationFrame(() => {
     for (const id of ids) {
@@ -33,10 +31,9 @@ export default function Page() {
   const [notice, setNotice] = useState("");
   const [slow, setSlow] = useState(false);
 
-  // A free-tier server can take up to a minute to wake, so say so after a few seconds.
   useEffect(() => {
     if (state.kind !== "loading") { setSlow(false); return; }
-    const t = setTimeout(() => setSlow(true), 4000);
+    const t = setTimeout(() => setSlow(true), 3000); // 3 detik
     return () => clearTimeout(t);
   }, [state.kind]);
 
@@ -91,16 +88,22 @@ export default function Page() {
         <section aria-labelledby="h-out">
           <p className="eyebrow">Langkah 2</p>
           <h2 id="h-out" tabIndex={-1}>Hasil Analisis &amp; Arus Kas</h2>
-          {/* Wilayah status tetap ada di DOM supaya perubahan isinya diumumkan pembaca layar. */}
           <div className="status" role="status">
             {state.kind === "loading" && (
               <div className="state">
                 <p>Menghitung arus kas&hellip;</p>
-                {slow && <p className="note">{SLOW_ENGINE_NOTE}</p>}
+                {slow && (
+                  <div style={{ marginTop: "1rem", padding: "1rem", backgroundColor: "var(--surface-subtle)", borderRadius: "var(--radius-md)" }}>
+                    <p className="note" style={{ color: "var(--text)", fontWeight: 600 }}>Mesin hitung sedang bangun.</p>
+                    <p className="note">{SLOW_ENGINE_NOTE}</p>
+                    <p className="note">Mohon tunggu, jangan tutup halaman ini. Prosesnya memakan waktu hingga 50 detik.</p>
+                  </div>
+                )}
               </div>
             )}
             {state.kind !== "loading" && notice && <p className="note">{notice}</p>}
           </div>
+          
           {state.kind === "idle" && (
             <div className="state">
               <h3>Belum ada hasil</h3>
