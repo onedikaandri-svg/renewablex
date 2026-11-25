@@ -88,6 +88,7 @@ class PVResponse(BaseModel):
     payback_status: Literal["recovered", "not_recovered"]
     annual_results: list[AnnualRow]
     warnings: list[str]
+    warning_codes: list[str] = Field(default_factory=list)
     inputs: PVRequest
     disclaimer: str
 
