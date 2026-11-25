@@ -65,12 +65,17 @@ export default function Page() {
 
   return (
     <>
-      <h1>Screening PV: Hitung Energi, NPV, IRR, dan Payback</h1>
-      <p className="lead">Isi asumsi proyek, lalu lihat arus kas selama umur proyek. Hasilnya estimasi pendahuluan, sebelum pajak dan tanpa pendanaan.</p>
+      <div className="page-head">
+        <h1>Screening PV: Hitung Energi, NPV, IRR, dan Payback</h1>
+        <p className="lead">
+          Isi asumsi proyek, lalu lihat arus kas selama umur proyek. Hasilnya estimasi pendahuluan, sebelum pajak dan tanpa pendanaan.
+        </p>
+      </div>
+
       <div className="grid">
         <section className="card" aria-labelledby="h-in">
           <p className="eyebrow">Langkah 1</p>
-          <h2 id="h-in">Asumsi Proyek: Masukkan Data Anda</h2>
+          <h2 id="h-in">Asumsi Proyek</h2>
           <p className="note">Form terisi contoh ilustratif dari <code>examples/sample-pv-project.json</code>. Bukan benchmark dan bukan rekomendasi investasi.</p>
           <p className="note">Semua isian wajib diisi.</p>
           <ScreeningForm
@@ -82,9 +87,10 @@ export default function Page() {
             onReset={() => { setValues(EMPTY); setErrors({}); setState({ kind: "idle" }); setNotice("Form dikosongkan."); focusFirst("project-project_name"); }}
           />
         </section>
+
         <section aria-labelledby="h-out">
           <p className="eyebrow">Langkah 2</p>
-          <h2 id="h-out" tabIndex={-1}>Hasil: Arus Kas Selama Umur Proyek</h2>
+          <h2 id="h-out" tabIndex={-1}>Hasil Analisis &amp; Arus Kas</h2>
           {/* Wilayah status tetap ada di DOM supaya perubahan isinya diumumkan pembaca layar. */}
           <div className="status" role="status">
             {state.kind === "loading" && (
@@ -96,7 +102,10 @@ export default function Page() {
             {state.kind !== "loading" && notice && <p className="note">{notice}</p>}
           </div>
           {state.kind === "idle" && (
-            <div className="state"><h3>Belum ada hasil</h3><p>Periksa asumsi di form, lalu tekan &ldquo;Hitung Estimasi&rdquo;. Hasil muncul di sini.</p></div>
+            <div className="state">
+              <h3>Belum ada hasil</h3>
+              <p>Periksa asumsi di form, lalu tekan &ldquo;Hitung Estimasi&rdquo;. Hasil muncul di sini.</p>
+            </div>
           )}
           {state.kind === "invalid" && (
             <div className="state bad" role="alert" id="invalid-box" tabIndex={-1}>
@@ -119,6 +128,7 @@ export default function Page() {
           )}
         </section>
       </div>
+
       <p className="src">
         Sumber: asumsi dari pengguna. Rumus mengikuti <code>docs/calculation-methodology.md</code> dan dijalankan oleh mesin hitung RenewableX (<code>docs/api.md</code>).
       </p>

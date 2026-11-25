@@ -1,129 +1,157 @@
-// Satu tabel terjemahan untuk galat validasi mesin hitung (FastAPI, HTTP 422).
-// Bentuk item galat: https://docs.pydantic.dev/latest/errors/validation_errors/
+import { describe, expect, it } from "vitest";
+import { translateDetailText, translateIssue, type ApiIssue } from "./errors-id";
 
-export interface ApiIssue {
-  type: string;
-  // Kode stabil dari mesin (docs/api.md). Kode bawaan sama dengan `type`. Item lama tidak punya.
-  code?: string;
-  loc: (string | number)[];
-  msg: string;
-  ctx?: Record<string, unknown>;
-}
+// Seperti mesin 0.3.0: setiap item punya `code`, dan kode bawaan sama dengan `type`.
+const issue = (type: string, msg: string, ctx?: Record<string, unknown>, code: string | null = type): ApiIssue => ({
+  type,
+  ...(code === null ? {} : { code }),
+  loc: ["body", "project", "x"],
+  msg,
+  ctx,
+});
 
-export interface TranslateOptions {
-  // Isian ditampilkan dalam persen, tetapi mesin menghitung dalam pecahan (0,1 = 10%).
-  percent?: boolean;
-}
+describe("batas numerik", () => {
+  it("menyebut batas dengan format Indonesia", () => {
+    expect(translateIssue(issue("greater_than", "", { gt: 0 }))).toBe("Harus lebih besar dari 0.");
+    expect(translateIssue(issue("greater_than_equal", "", { ge: 1 }))).toBe("Tidak boleh kurang dari 1.");
+    expect(translateIssue(issue("less_than", "", { lt: 5 }))).toBe("Harus lebih kecil dari 5.");
+    expect(translateIssue(issue("less_than_equal", "", { le: 10000000 }))).toBe("Tidak boleh lebih dari 10.000.000.");
+    expect(translateIssue(issue("less_than_equal", "", { le: 0.5 }))).toBe("Tidak boleh lebih dari 0,5.");
+  });
 
-const numberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 6 });
+  it("menerima batas berupa string (Decimal)", () => {
+    expect(translateIssue(issue("less_than_equal", "", { le: "40" }))).toBe("Tidak boleh lebih dari 40.");
+  });
 
-// Pydantic menyerialkan batas sebagai angka JSON, atau string bila berupa Decimal.
-function formatLimit(value: unknown, percent: boolean): string | null {
-  const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
-  if (typeof n !== "number" || !Number.isFinite(n)) return null;
-  return percent ? `${numberFormat.format(n * 100)}%` : numberFormat.format(n);
-}
+  it("isian persen: batas pecahan ditampilkan sebagai persen", () => {
+    expect(translateIssue(issue("less_than", "", { lt: 1 }), { percent: true })).toBe("Harus lebih kecil dari 100%.");
+    expect(translateIssue(issue("greater_than", "", { gt: -1 }), { percent: true })).toBe("Harus lebih besar dari -100%.");
+    expect(translateIssue(issue("less_than_equal", "", { le: 0.1 }), { percent: true })).toBe("Tidak boleh lebih dari 10%.");
+  });
 
-const BOUNDS: Record<string, { key: string; text: (limit: string) => string }> = {
-  greater_than: { key: "gt", text: (l) => `Harus lebih besar dari ${l}.` },
-  greater_than_equal: { key: "ge", text: (l) => `Tidak boleh kurang dari ${l}.` },
-  less_than: { key: "lt", text: (l) => `Harus lebih kecil dari ${l}.` },
-  less_than_equal: { key: "le", text: (l) => `Tidak boleh lebih dari ${l}.` },
-};
+  it("tanpa batas di ctx, teks asli dipakai", () => {
+    expect(translateIssue(issue("less_than_equal", "Input should be less than or equal to 40"))).toBe(
+      "Input should be less than or equal to 40",
+    );
+  });
+});
 
-const FIXED: Record<string, string> = {
-  missing: "Wajib diisi.",
-  int_parsing: "Harus berupa bilangan bulat.",
-  float_parsing: "Harus berupa angka.",
-  int_from_float: "Harus berupa bilangan bulat tanpa pecahan.",
-};
+describe("tipe lain", () => {
+  it("missing dan parsing", () => {
+    expect(translateIssue(issue("missing", "Field required"))).toBe("Wajib diisi.");
+    expect(translateIssue(issue("int_parsing", ""))).toBe("Harus berupa bilangan bulat.");
+    expect(translateIssue(issue("float_parsing", ""))).toBe("Harus berupa angka.");
+    expect(translateIssue(issue("int_from_float", ""))).toBe("Harus berupa bilangan bulat tanpa pecahan.");
+  });
 
-const LENGTHS: Record<string, { key: string; text: (n: string) => string }> = {
-  string_too_short: { key: "min_length", text: (n) => `Minimal ${n} karakter.` },
-  string_too_long: { key: "max_length", text: (n) => `Maksimal ${n} karakter.` },
-};
+  it("string_pattern_mismatch", () => {
+    expect(translateIssue(issue("string_pattern_mismatch", "", { pattern: "^[A-Z]{2}$" }))).toBe(
+      "Harus 2 huruf kapital (A sampai Z).",
+    );
+    expect(translateIssue(issue("string_pattern_mismatch", "", { pattern: "^[A-Z]{3}$" }))).toBe(
+      "Harus 3 huruf kapital (A sampai Z).",
+    );
+    expect(translateIssue(issue("string_pattern_mismatch", "", { pattern: "^\\d+$" }))).toBe(
+      "Format tidak sesuai pola ^\\d+$.",
+    );
+  });
 
-// Terjemahan untuk kode buatan mesin (lihat tabel kode di docs/api.md).
-const CODE_MESSAGES: Record<string, string> = {
-  location_based_unavailable: "Mode berbasis lokasi (location_based) belum tersedia. Isi yield spesifik secara manual.",
-  yield_required: "Yield spesifik wajib diisi untuk metode yield manual.",
-  double_counted_loss:
-    "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali.",
-  unsupported_revenue_method: "Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung.",
-  non_finite_result: "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem.",
-  // Endpoint sensitivitas.
-  shift_out_of_range:
-    "Sensitivitas tidak bisa dihitung: salah satu pergeseran membuat sebuah asumsi melewati batas yang diizinkan mesin. Biasanya nilai asumsi Anda sudah dekat batasnya, misalnya yield spesifik atau discount rate.",
-  shift_out_of_bounds: "Pergeseran harus berada antara -90% dan +100%, dan tidak boleh 0%.",
-  duplicate_variables: "Daftar asumsi yang digeser tidak boleh berulang.",
-  duplicate_shifts: "Daftar pergeseran tidak boleh berulang.",
-};
+  it("literal_error", () => {
+    expect(
+      translateIssue(issue("literal_error", "", { expected: "'ground_mounted', 'rooftop', 'floating' or 'carport'" })),
+    ).toBe("Harus salah satu dari: ground_mounted, rooftop, floating, carport.");
+    expect(translateIssue(issue("literal_error", "", { expected: "'solar_pv'" }))).toBe("Harus salah satu dari: solar_pv.");
+  });
 
-// Cadangan untuk item tanpa `code` (mesin lama): potongan teks huruf kecil menunjuk ke kode.
-// Aturan pertama yang cocok dipakai. Item yang punya `code` tidak pernah lewat sini.
-const FRAGMENT_CODES: ReadonlyArray<{ fragment: string; code: string }> = [
-  { fragment: "location_based needs a configured resource provider", code: "location_based_unavailable" },
-  { fragment: "is required for manual_specific_yield", code: "yield_required" },
-  { fragment: "losses count twice", code: "double_counted_loss" },
-  { fragment: "only fixed_tariff is supported", code: "unsupported_revenue_method" },
-  { fragment: "result is not a finite number", code: "non_finite_result" },
-];
+  it("panjang teks", () => {
+    expect(translateIssue(issue("string_too_short", "", { min_length: 1 }))).toBe("Minimal 1 karakter.");
+    expect(translateIssue(issue("string_too_long", "", { max_length: 120 }))).toBe("Maksimal 120 karakter.");
+  });
+});
 
-function matchFragment(msg: string): string | null {
-  const lowered = msg.toLowerCase();
-  const hit = FRAGMENT_CODES.find((f) => lowered.includes(f.fragment));
-  return hit ? CODE_MESSAGES[hit.code] : null;
-}
+describe("kode buatan mesin (code)", () => {
+  // Teks msg sengaja diganti: terjemahan harus mengikuti `code`, bukan teks.
+  const byCode = (code: string, msg = "teks apa pun") => translateIssue(issue("value_error", msg, undefined, code));
 
-function translatePattern(pattern: unknown): string {
-  if (typeof pattern !== "string") return "Format tidak sesuai.";
-  const letters = /^\^\[A-Z\]\{(\d+)\}\$$/.exec(pattern);
-  if (letters) return `Harus ${letters[1]} huruf kapital (A sampai Z).`;
-  return `Format tidak sesuai pola ${pattern}.`;
-}
+  it("double_counted_loss", () => {
+    expect(byCode("double_counted_loss")).toBe(
+      "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali.",
+    );
+  });
+  it("location_based_unavailable", () => {
+    expect(byCode("location_based_unavailable")).toContain("location_based");
+  });
+  it("yield_required", () => {
+    expect(byCode("yield_required")).toBe("Yield spesifik wajib diisi untuk metode yield manual.");
+  });
+  it("unsupported_revenue_method", () => {
+    expect(byCode("unsupported_revenue_method")).toBe(
+      "Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung.",
+    );
+  });
+  it("non_finite_result", () => {
+    expect(byCode("non_finite_result")).toBe(
+      "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem.",
+    );
+  });
+  it("code mengalahkan teks: msg yang mirip kode lain tidak menyesatkan", () => {
+    expect(byCode("yield_required", "Value error, Only fixed_tariff is supported in this version.")).toBe(
+      "Yield spesifik wajib diisi untuk metode yield manual.",
+    );
+  });
+  it("code tidak dikenal: teks asli, tanpa mencocokkan potongan teks", () => {
+    expect(byCode("kode_baru", "Value error, Only fixed_tariff is supported in this version.")).toBe(
+      "Value error, Only fixed_tariff is supported in this version.",
+    );
+  });
+});
 
-function translateLiteral(expected: unknown): string {
-  if (typeof expected !== "string") return "Nilai tidak termasuk pilihan yang tersedia.";
-  // Contoh dari Pydantic: "'a', 'b' or 'c'"
-  const options = expected.replace(/'/g, "").replace(/\s+or\s+/, ", ");
-  return `Harus salah satu dari: ${options}.`;
-}
+describe("kode endpoint sensitivitas", () => {
+  const byCode = (code: string, msg: string) => translateIssue(issue("value_error", msg, undefined, code));
 
-// Mengembalikan alasan tanpa nama isian, karena nama isian dipasang oleh pemanggil.
-// Pencocokan lewat `code` (bila tidak ada, `type`). Teks atau kode yang tidak dikenal
-// dikembalikan apa adanya.
-export function translateIssue(issue: ApiIssue, options: TranslateOptions = {}): string {
-  const ctx = issue.ctx ?? {};
-  const percent = options.percent ?? false;
-  const key = issue.code ?? issue.type;
+  it("shift_out_of_range: kalimat jelas, bukan teks Inggris", () => {
+    const text = byCode("shift_out_of_range", "A shift of +20% moves specific_yield outside its allowed range.");
+    expect(text).toContain("salah satu pergeseran");
+    expect(text).toContain("melewati batas");
+  });
+  it("shift_out_of_bounds, duplicate_variables, duplicate_shifts", () => {
+    expect(byCode("shift_out_of_bounds", "Value error, x")).toBe("Pergeseran harus berada antara -90% dan +100%, dan tidak boleh 0%.");
+    expect(byCode("duplicate_variables", "Value error, x")).toBe("Daftar asumsi yang digeser tidak boleh berulang.");
+    expect(byCode("duplicate_shifts", "Value error, x")).toBe("Daftar pergeseran tidak boleh berulang.");
+  });
+});
 
-  const bound = BOUNDS[key];
-  if (bound) {
-    const limit = formatLimit(ctx[bound.key], percent);
-    return limit === null ? issue.msg : bound.text(limit);
-  }
+describe("cadangan untuk item tanpa code", () => {
+  const noCode = (msg: string) => translateIssue(issue("value_error", `Value error, ${msg}`, undefined, null));
 
-  const length = LENGTHS[key];
-  if (length) {
-    const n = formatLimit(ctx[length.key], false);
-    return n === null ? issue.msg : length.text(n);
-  }
+  it("hitung ganda loss", () => {
+    expect(noCode("performance_loss_fraction must be 0 when the yield is already net, or losses count twice.")).toBe(
+      "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali.",
+    );
+  });
+  it("location_based, fixed_tariff, dan yield manual", () => {
+    expect(noCode("location_based needs a configured resource provider. Use manual_specific_yield.")).toContain("location_based");
+    expect(noCode("Only fixed_tariff is supported in this version.")).toContain("tarif tetap");
+    expect(noCode("specific_yield_kwh_per_kwp_year is required for manual_specific_yield.")).toContain("wajib diisi");
+  });
+  it("teks tidak dikenal ditampilkan apa adanya", () => {
+    expect(noCode("sesuatu yang baru")).toBe("Value error, sesuatu yang baru");
+  });
+  it("tipe bawaan tanpa code tetap diterjemahkan lewat type", () => {
+    expect(translateIssue(issue("less_than_equal", "", { le: 40 }, null))).toBe("Tidak boleh lebih dari 40.");
+  });
+  it("tipe tidak dikenal ditampilkan apa adanya", () => {
+    expect(translateIssue(issue("extra_forbidden", "Extra inputs are not permitted"))).toBe("Extra inputs are not permitted");
+  });
+});
 
-  if (key in FIXED) return FIXED[key];
-  if (key === "string_pattern_mismatch") return translatePattern(ctx.pattern);
-  if (key === "literal_error") return translateLiteral(ctx.expected);
-  if (key in CODE_MESSAGES) return CODE_MESSAGES[key];
-  if (issue.code === undefined && issue.type === "value_error") return matchFragment(issue.msg) ?? issue.msg;
-  return issue.msg;
-}
-
-// Untuk `detail` berupa teks biasa (HTTPException dari mesin, bukan galat validasi).
-export function translateDetailText(text: string): string {
-  return matchFragment(text) ?? text;
-}
-
-export function isApiIssue(value: unknown): value is ApiIssue {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return typeof v.type === "string" && typeof v.msg === "string" && Array.isArray(v.loc);
-}
+describe("detail berupa teks", () => {
+  it("menerjemahkan hasil tidak terhingga", () => {
+    expect(translateDetailText("The result is not a finite number. Check for extreme inputs.")).toBe(
+      "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem.",
+    );
+  });
+  it("teks lain apa adanya", () => {
+    expect(translateDetailText("Not Found")).toBe("Not Found");
+  });
+});

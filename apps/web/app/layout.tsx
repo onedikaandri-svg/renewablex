@@ -17,13 +17,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <header className="top">
           <div className="wrap">
-            <p className="brand">RenewableX</p>
+            <div className="brand-group">
+              <div className="brand-mark" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                </svg>
+              </div>
+              <p className="brand">RenewableX</p>
+              <span className="chip">PV Screening v0.2</span>
+            </div>
             <p className="tag">Screening kelayakan PV, versi pendahuluan</p>
           </div>
         </header>
         <main className="wrap">{children}</main>
         <footer>
-          <div className="wrap">RenewableX | Estimasi pendahuluan, bukan studi bankable</div>
+          <div className="wrap">RenewableX · Estimasi pendahuluan, bukan studi bankable</div>
         </footer>
       </body>
     </html>
