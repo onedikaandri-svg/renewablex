@@ -29,6 +29,7 @@ export interface PVResponse {
   payback_status: "recovered" | "not_recovered";
   annual_results: AnnualRow[];
   warnings: string[];
+  warning_codes?: string[];
   disclaimer: string;
 }
 
