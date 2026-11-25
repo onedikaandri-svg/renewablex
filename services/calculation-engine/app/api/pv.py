@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from app.models.schemas import AnnualRow, PVRequest, PVResponse
 from app.providers.base import ResourceError, ResourceErrorKind
 from app.providers.pvgis import PVGISProvider
+from app.providers.nasa import NASAProvider
 from app.services.calculate import NonFiniteResult, calculate
 from app.version import ENGINE_VERSION, METHODOLOGY_VERSION
 
@@ -29,15 +30,19 @@ def _fetch_resource(req: PVRequest) -> tuple[PVRequest, dict[str, Any] | None]:
     if t.energy_method != "location_based":
         return req, None
 
-    if t.resource_source == "nasa":
+    if t.resource_source == "pvgis":
+        provider = PVGISProvider(loss_percent=t.performance_loss_fraction * 100)
+    elif t.resource_source == "nasa":
+        # NASA menggunakan Performance Ratio internal (bawaan 0.75)
+        provider = NASAProvider()
+    else:
         raise HTTPException(422, detail=[{
             "type": "value_error",
             "code": "resource_source_unavailable",
             "loc": ["body", "technical", "resource_source"],
-            "msg": "Sumber data NASA belum tersedia. Silakan gunakan pvgis.",
+            "msg": f"Sumber data {t.resource_source} tidak dikenal.",
         }])
 
-    provider = PVGISProvider(loss_percent=t.performance_loss_fraction * 100)
     try:
         res = provider.get_resource(
             latitude=t.latitude,
@@ -59,11 +64,11 @@ def _fetch_resource(req: PVRequest) -> tuple[PVRequest, dict[str, Any] | None]:
             "msg": str(e),
         }]) from e
 
-    # Perbarui Technical dengan data dari PVGIS
+    # Perbarui Technical dengan data dari provider
     t_updated = t.model_copy(update={
         "specific_yield_kwh_per_kwp_year": res.specific_yield_kwh_per_kwp_year,
         "yield_boundary": res.yield_boundary,
-        "performance_loss_fraction": 0.0, # Loss sudah dihitung PVGIS
+        "performance_loss_fraction": 0.0, # Loss sudah dihitung provider
     })
     req_updated = req.model_copy(update={"technical": t_updated})
     
