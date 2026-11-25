@@ -174,7 +174,11 @@ def test_non_finite_result_has_a_code_and_the_old_wording():
         b["financial"]["discount_rate_fraction"] = -0.9999999999
     item = detail(post(extreme))[0]
     assert item["code"] == "non_finite_result" and "not a finite number" in item["msg"]
-def test_warning_codes(client):
+def test_warning_codes():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    client = TestClient(app)
+
     payload = {
         "project": {"project_name": "Test", "technology": "solar_pv", "project_type": "ground_mounted", "country_code": "ID", "capacity_kwp": 1000, "lifetime_years": 20, "currency_code": "IDR"},
         "technical": {"energy_method": "manual_specific_yield", "specific_yield_kwh_per_kwp_year": 3000, "yield_boundary": "gross_pre_loss", "performance_loss_fraction": 0.4, "degradation_fraction_per_year": 0.03},
