@@ -1,5 +1,6 @@
 import type { IrrStatus, PVResponse } from "@/lib/api";
 import { disclaimerId, fmt, money } from "@/lib/format";
+import { translateWarning, translateDetailText } from "@/lib/errors-id";
 import Chart from "./Chart";
 
 const IRR_NOTE: Record<IrrStatus, string> = {
@@ -22,12 +23,18 @@ function Kpi({ label, value, note, tone }: { label: string; value: string; note:
 export default function Results({ res }: { res: PVResponse }) {
   const c = res.currency_code;
   const life = res.annual_results.length - 1;
+  
+  // Jika mesin mengirim warning_codes, terjemahkan. Jika tidak (mesin lama), terjemahkan teks Inggrisnya.
+  const displayWarnings = (res.warning_codes && res.warning_codes.length > 0)
+    ? res.warning_codes.map((code) => translateWarning(code))
+    : res.warnings.map((msg) => translateDetailText(msg));
+
   return (
     <>
-      {res.warnings.length > 0 && (
+      {displayWarnings.length > 0 && (
         <div className="warn" role="note">
           <h3>Perhatian</h3>
-          <ul>{res.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+          <ul>{displayWarnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
         </div>
       )}
 

@@ -59,20 +59,30 @@ const CODE_MESSAGES: Record<string, string> = {
   duplicate_shifts: "Daftar pergeseran tidak boleh berulang.",
 };
 
+// Terjemahan untuk peringatan (warning_codes) dari mesin.
+const WARNING_MESSAGES: Record<string, string> = {
+  high_specific_yield: "Yield spesifik di atas 2.500 kWh/kWp/tahun tidak biasa. Periksa sumber data dan batas yield.",
+  high_degradation: "Degradasi di atas 2% per tahun tidak biasa untuk modul PV.",
+  high_performance_loss: "Loss kinerja di atas 35% tidak biasa. Periksa agar tidak terhitung dua kali.",
+};
+
 // Cadangan untuk item tanpa `code` (mesin lama): potongan teks huruf kecil menunjuk ke kode.
-// Aturan pertama yang cocok dipakai. Item yang punya `code` tidak pernah lewat sini.
 const FRAGMENT_CODES: ReadonlyArray<{ fragment: string; code: string }> = [
   { fragment: "location_based needs a configured resource provider", code: "location_based_unavailable" },
   { fragment: "is required for manual_specific_yield", code: "yield_required" },
   { fragment: "losses count twice", code: "double_counted_loss" },
   { fragment: "only fixed_tariff is supported", code: "unsupported_revenue_method" },
   { fragment: "result is not a finite number", code: "non_finite_result" },
+  // Cadangan untuk peringatan bahasa Inggris dari mesin lama.
+  { fragment: "specific yield above 2,500", code: "high_specific_yield" },
+  { fragment: "degradation above 2%", code: "high_degradation" },
+  { fragment: "performance loss above 35%", code: "high_performance_loss" },
 ];
 
 function matchFragment(msg: string): string | null {
   const lowered = msg.toLowerCase();
   const hit = FRAGMENT_CODES.find((f) => lowered.includes(f.fragment));
-  return hit ? CODE_MESSAGES[hit.code] : null;
+  return hit ? (CODE_MESSAGES[hit.code] || WARNING_MESSAGES[hit.code]) : null;
 }
 
 function translatePattern(pattern: unknown): string {
@@ -90,8 +100,6 @@ function translateLiteral(expected: unknown): string {
 }
 
 // Mengembalikan alasan tanpa nama isian, karena nama isian dipasang oleh pemanggil.
-// Pencocokan lewat `code` (bila tidak ada, `type`). Teks atau kode yang tidak dikenal
-// dikembalikan apa adanya.
 export function translateIssue(issue: ApiIssue, options: TranslateOptions = {}): string {
   const ctx = issue.ctx ?? {};
   const percent = options.percent ?? false;
@@ -120,6 +128,11 @@ export function translateIssue(issue: ApiIssue, options: TranslateOptions = {}):
 // Untuk `detail` berupa teks biasa (HTTPException dari mesin, bukan galat validasi).
 export function translateDetailText(text: string): string {
   return matchFragment(text) ?? text;
+}
+
+// Fungsi baru untuk menerjemahkan kode peringatan (warning_codes).
+export function translateWarning(code: string): string {
+  return WARNING_MESSAGES[code] ?? code;
 }
 
 export function isApiIssue(value: unknown): value is ApiIssue {
