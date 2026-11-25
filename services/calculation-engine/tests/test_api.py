@@ -11,7 +11,8 @@ from app.providers.base import ResourceResult, ResourceError, ResourceErrorKind
 
 client = TestClient(app)
 
-EEXAMPLES = Path(__file__).parent.parent.parent.parent / "examples"
+# Naik 4 level dari tests/ untuk mencapai root repo (renewablex)
+EXAMPLES = Path(__file__).resolve().parents[3] / "examples"
 SAMPLE = json.loads((EXAMPLES / "sample-pv-project.json").read_text())
 
 
@@ -175,7 +176,6 @@ def test_self_consumption_savings_success():
     response = client.post("/v1/pv/preliminary", json=payload)
     assert response.status_code == 200
     data = response.json()
-    # Memastikan mesin tidak error dan mengembalikan angka yang wajar
     assert data["year_1_energy_kwh"] == pytest.approx(1470000.0)
     assert data["npv_amount"] > 0
 
