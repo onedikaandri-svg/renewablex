@@ -7,9 +7,32 @@ class CashFlows(NamedTuple):
     opex: list[float]  # index 0 is year 1
 
 
-def cash_flows(capex, energy_kwh, tariff, tariff_esc, opex, opex_esc) -> CashFlows:
-    """Escalation compounds from year 2, so year 1 uses the base tariff and OPEX."""
-    revenues = [e * tariff * (1 + tariff_esc) ** t for t, e in enumerate(energy_kwh)]
+def cash_flows(
+    capex: float,
+    energy_kwh: list[float],
+    revenue_method: str,
+    tariff: float | None,
+    tariff_esc: float,
+    annual_consumption_kwh: float | None,
+    self_consumption_tariff: float | None,
+    feed_in_tariff: float | None,
+    opex: float,
+    opex_esc: float,
+) -> CashFlows:
+    """Escalation compounds from year 2, so year 1 uses the base values."""
+    revenues = []
+    for t, e in enumerate(energy_kwh):
+        esc_factor = (1 + tariff_esc) ** t
+        if revenue_method == "fixed_tariff":
+            rev = e * (tariff or 0) * esc_factor
+        elif revenue_method == "self_consumption_savings":
+            q_self = min(e, annual_consumption_kwh or 0)
+            q_grid = max(e - (annual_consumption_kwh or 0), 0)
+            rev = (q_self * (self_consumption_tariff or 0) + q_grid * (feed_in_tariff or 0)) * esc_factor
+        else:
+            raise ValueError(f"Metode pendapatan tidak dikenal: {revenue_method}")
+        revenues.append(rev)
+
     opexes = [opex * (1 + opex_esc) ** t for t in range(len(energy_kwh))]
     return CashFlows([-capex] + [r - o for r, o in zip(revenues, opexes)], revenues, opexes)
 
