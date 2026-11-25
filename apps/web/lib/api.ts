@@ -33,11 +33,43 @@ export interface PVResponse {
   disclaimer: string;
 }
 
+// Tipe untuk Respons Sensitivitas
+export interface SensitivityBase {
+  npv_amount: number;
+  project_irr_fraction: number | null;
+  irr_status: IrrStatus;
+  simple_payback_years: number | null;
+  payback_status: "recovered" | "not_recovered";
+}
+
+export interface SensitivityCase extends SensitivityBase {
+  shift_fraction: number;
+  input_value: number;
+  npv_delta: number;
+}
+
+export interface SensitivityVariableResult {
+  variable: string;
+  field: string;
+  base_value: number;
+  max_abs_npv_delta: number;
+  cases: SensitivityCase[];
+}
+
+export interface SensitivityResponse {
+  engine_version: string;
+  methodology_version: string;
+  calculated_at: string;
+  scope: string;
+  currency_code: string;
+  base: SensitivityBase;
+  variables: SensitivityVariableResult[];
+  disclaimer: string;
+}
+
 export interface Problems {
-  // Pesan Indonesia, kunci "bagian.nama" seperti di lib/form.ts.
   fields: Record<string, string>;
   general: string[];
-  // Item galat asli dari mesin (type, loc, msg, ctx), disimpan utuh.
   issues: ApiIssue[];
 }
 
@@ -51,7 +83,6 @@ export class NetworkError extends Error {}
 
 const PERCENT_FIELDS = new Set(FIELDS.filter((f) => f.percent).map((f) => f.key));
 
-// `skip` = jumlah awalan `loc` sebelum nama bagian: 1 untuk ["body", ...], 2 untuk ["body", "base", ...].
 export function parseProblems(detail: unknown, skip = 1): Problems {
   const problems: Problems = { fields: {}, general: [], issues: [] };
   if (typeof detail === "string") {
@@ -91,6 +122,22 @@ export async function runPreliminary(body: unknown): Promise<PVResponse> {
     throw new NetworkError(`Tidak bisa terhubung ke mesin hitung di ${API_URL}.`);
   }
   if (res.status === 422) throw new ApiError(parseProblems((await res.json()).detail));
+  if (!res.ok) throw new NetworkError(`Mesin hitung mengembalikan error (HTTP ${res.status}).`);
+  return res.json();
+}
+
+export async function runSensitivity(body: unknown): Promise<SensitivityResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/v1/pv/sensitivity`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base: body }), // Bungkus dengan "base" sesuai kontrak API
+    });
+  } catch {
+    throw new NetworkError(`Tidak bisa terhubung ke mesin hitung di ${API_URL}.`);
+  }
+  if (res.status === 422) throw new ApiError(parseProblems((await res.json()).detail, 2)); // skip=2 karena loc-nya ["body", "base", ...]
   if (!res.ok) throw new NetworkError(`Mesin hitung mengembalikan error (HTTP ${res.status}).`);
   return res.json();
 }
