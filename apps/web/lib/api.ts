@@ -33,7 +33,6 @@ export interface PVResponse {
   disclaimer: string;
 }
 
-// Tipe untuk Respons Sensitivitas
 export interface SensitivityBase {
   npv_amount: number;
   project_irr_fraction: number | null;
@@ -126,18 +125,20 @@ export async function runPreliminary(body: unknown): Promise<PVResponse> {
   return res.json();
 }
 
-export async function runSensitivity(body: unknown): Promise<SensitivityResponse> {
+export async function runSensitivity(base: unknown, signal?: AbortSignal): Promise<SensitivityResponse> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}/v1/pv/sensitivity`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base: body }), // Bungkus dengan "base" sesuai kontrak API
+      body: JSON.stringify({ base }),
+      signal,
     });
-  } catch {
+  } catch (err) {
+    if (signal?.aborted) throw err;
     throw new NetworkError(`Tidak bisa terhubung ke mesin hitung di ${API_URL}.`);
   }
-  if (res.status === 422) throw new ApiError(parseProblems((await res.json()).detail, 2)); // skip=2 karena loc-nya ["body", "base", ...]
+  if (res.status === 422) throw new ApiError(parseProblems((await res.json()).detail, 2));
   if (!res.ok) throw new NetworkError(`Mesin hitung mengembalikan error (HTTP ${res.status}).`);
   return res.json();
 }
