@@ -564,3 +564,44 @@ footer {
   margin-top: 2.5rem;
   padding: 1.25rem 0 2rem;
 }
+
+/* Sensitivity Tables (From PR #10) */
+.more {
+  margin-top: 0.75rem;
+}
+
+.more summary {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  color: var(--navytext);
+  cursor: pointer;
+}
+
+.more .tw {
+  margin-top: 0.5rem;
+}
+
+table.sens {
+  min-width: 36rem;
+}
+
+table.sens-main {
+  min-width: 0;
+}
+
+.tw-auto {
+  max-height: none;
+}
+
+.sens-main th, .sens-main td {
+  padding-inline: 0.5rem;
+}
+
+.sub {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}

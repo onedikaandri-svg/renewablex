@@ -92,6 +92,15 @@ describe("parseProblems: bentuk lain dari mesin", () => {
   });
 });
 
+describe("parseProblems: awalan loc lain", () => {
+  it("skip 2 membuang body dan base, sehingga kunci sama dengan kunci form", () => {
+    const item = { type: "missing", code: "missing", loc: ["body", "base", "financial", "capex_amount"], msg: "Field required" };
+    expect(parseProblems([item], 2).fields).toEqual({ "financial.capex_amount": "Wajib diisi." });
+    // Dengan skip bawaan kuncinya salah ("base.financial"), itulah yang dihindari endpoint sensitivitas.
+    expect(parseProblems([item]).fields).toEqual({ "base.financial": "Wajib diisi." });
+  });
+});
+
 describe("runPreliminary", () => {
   afterEach(() => vi.unstubAllGlobals());
 

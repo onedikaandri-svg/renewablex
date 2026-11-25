@@ -106,6 +106,21 @@ describe("kode buatan mesin (code)", () => {
   });
 });
 
+describe("kode endpoint sensitivitas", () => {
+  const byCode = (code: string, msg: string) => translateIssue(issue("value_error", msg, undefined, code));
+
+  it("shift_out_of_range: kalimat jelas, bukan teks Inggris", () => {
+    const text = byCode("shift_out_of_range", "A shift of +20% moves specific_yield outside its allowed range.");
+    expect(text).toContain("salah satu pergeseran");
+    expect(text).toContain("melewati batas");
+  });
+  it("shift_out_of_bounds, duplicate_variables, duplicate_shifts", () => {
+    expect(byCode("shift_out_of_bounds", "Value error, x")).toBe("Pergeseran harus berada antara -90% dan +100%, dan tidak boleh 0%.");
+    expect(byCode("duplicate_variables", "Value error, x")).toBe("Daftar asumsi yang digeser tidak boleh berulang.");
+    expect(byCode("duplicate_shifts", "Value error, x")).toBe("Daftar pergeseran tidak boleh berulang.");
+  });
+});
+
 describe("cadangan untuk item tanpa code", () => {
   const noCode = (msg: string) => translateIssue(issue("value_error", `Value error, ${msg}`, undefined, null));
 

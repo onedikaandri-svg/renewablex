@@ -51,6 +51,12 @@ const CODE_MESSAGES: Record<string, string> = {
     "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali.",
   unsupported_revenue_method: "Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung.",
   non_finite_result: "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem.",
+  // Endpoint sensitivitas.
+  shift_out_of_range:
+    "Sensitivitas tidak bisa dihitung: salah satu pergeseran membuat sebuah asumsi melewati batas yang diizinkan mesin. Biasanya nilai asumsi Anda sudah dekat batasnya, misalnya yield spesifik atau discount rate.",
+  shift_out_of_bounds: "Pergeseran harus berada antara -90% dan +100%, dan tidak boleh 0%.",
+  duplicate_variables: "Daftar asumsi yang digeser tidak boleh berulang.",
+  duplicate_shifts: "Daftar pergeseran tidak boleh berulang.",
 };
 
 // Cadangan untuk item tanpa `code` (mesin lama): potongan teks huruf kecil menunjuk ke kode.
