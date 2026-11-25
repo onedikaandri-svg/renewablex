@@ -113,9 +113,10 @@ def test_loss_on_a_net_yield_is_rejected_as_double_counting():
     assert res.status_code == 422 and "twice" in res.text
 
 
-def test_location_mode_without_provider_asks_for_manual_input():
+def test_location_mode_requires_coordinates():
     res = post(lambda b: b["technical"].update(energy_method="location_based"))
-    assert res.status_code == 422 and "manual_specific_yield" in res.text
+    assert res.status_code == 422
+    assert res.json()["detail"][0]["code"] == "location_required"
 
 
 def test_unsupported_revenue_method_is_rejected():
@@ -146,7 +147,7 @@ def detail(res):
 
 @pytest.mark.parametrize("mutate,code", [
     (lambda b: b["technical"].update(performance_loss_fraction=0.1), "double_counted_loss"),
-    (lambda b: b["technical"].update(energy_method="location_based"), "location_based_unavailable"),
+          (lambda b: b["technical"].update(energy_method="location_based"), "location_required"),
     (lambda b: b["technical"].update(specific_yield_kwh_per_kwp_year=None), "yield_required"),
     (lambda b: b["financial"].update(revenue_method="self_consumption_savings"), "unsupported_revenue_method"),
 ])
