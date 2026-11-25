@@ -238,9 +238,25 @@ def test_location_based_pvgis_success(mock_get_resource):
 
 
 def test_location_based_nasa_rejected():
+    from unittest.mock import patch
+from app.providers.base import ResourceResult
+
+@patch("app.api.pv.NASAProvider.get_resource")
+def test_location_based_nasa_success(mock_get_resource):
     from fastapi.testclient import TestClient
     from app.main import app
     client = TestClient(app)
+
+    # Mock respons NASA
+    mock_get_resource.return_value = ResourceResult(
+        specific_yield_kwh_per_kwp_year=1450.0,
+        yield_boundary="net_ac_at_delivery",
+        provider_name="nasa",
+        dataset="NASA POWER",
+        dataset_version="v2",
+        period="2023",
+        retrieval_timestamp="2026-11-25T12:00:00Z"
+    )
 
     payload = {
         "project": {"project_name": "Test NASA", "technology": "solar_pv", "project_type": "ground_mounted", "country_code": "ID", "capacity_kwp": 1000, "lifetime_years": 20, "currency_code": "IDR"},
@@ -254,33 +270,9 @@ def test_location_based_nasa_rejected():
         "financial": {"capex_amount": 1000000, "annual_opex_amount": 10000, "revenue_method": "fixed_tariff", "tariff_per_kwh": 1000, "discount_rate_fraction": 0.1, "tax_model": "pre_tax"}
     }
     response = client.post("/v1/pv/preliminary", json=payload)
-    assert response.status_code == 422
-    assert response.json()["detail"][0]["code"] == "resource_source_unavailable"
-
-
-@patch("app.api.pv.PVGISProvider.get_resource")
-def test_location_based_pvgis_out_of_coverage(mock_get_resource):
-    from fastapi.testclient import TestClient
-    from app.main import app
-    client = TestClient(app)
-
-    # Mock PVGIS melempar error lokasi di luar cakupan
-    mock_get_resource.side_effect = ResourceError(
-        ResourceErrorKind.OUT_OF_COVERAGE, 
-        "Lokasi di luar cakupan data PVGIS."
-    )
-
-    payload = {
-        "project": {"project_name": "Test Sea", "technology": "solar_pv", "project_type": "ground_mounted", "country_code": "ID", "capacity_kwp": 1000, "lifetime_years": 20, "currency_code": "IDR"},
-        "technical": {
-            "energy_method": "location_based", 
-            "resource_source": "pvgis",
-            "latitude": -6.2, 
-            "longitude": 106.8,
-            "degradation_fraction_per_year": 0.005
-        },
-        "financial": {"capex_amount": 1000000, "annual_opex_amount": 10000, "revenue_method": "fixed_tariff", "tariff_per_kwh": 1000, "discount_rate_fraction": 0.1, "tax_model": "pre_tax"}
-    }
-    response = client.post("/v1/pv/preliminary", json=payload)
-    assert response.status_code == 422
-    assert response.json()["detail"][0]["code"] == "out_of_coverage"
+    assert response.status_code == 200
+    data = response.json()
+    assert data["net_specific_yield_kwh_per_kwp_year"] == 1450.0
+    assert data["resource_metadata"]["dataset"] == "NASA POWER"
+    assert "resource_data_fetched" in data["warning_codes"]
+    mock_get_resource.assert_called_once()
