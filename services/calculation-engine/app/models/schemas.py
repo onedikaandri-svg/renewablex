@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -23,19 +23,30 @@ class Project(Strict):
 
 class Technical(Strict):
     energy_method: Literal["manual_specific_yield", "location_based"]
+    resource_source: Literal["pvgis", "nasa"] = "pvgis"
+    
+    # Field untuk manual
     specific_yield_kwh_per_kwp_year: float | None = Field(default=None, gt=0, le=10000)
-    yield_boundary: Literal["net_ac_at_delivery", "gross_pre_loss"]
+    yield_boundary: Literal["net_ac_at_delivery", "gross_pre_loss"] = "net_ac_at_delivery"
     performance_loss_fraction: float = Field(default=0, ge=0, lt=1)
     degradation_fraction_per_year: float = Field(ge=0, lt=1)
 
+    # Field untuk location_based
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    tilt_degrees: float = Field(default=0, ge=0, le=90)
+    azimuth_degrees: float = Field(default=180, ge=-180, le=180)
+
     @model_validator(mode="after")
     def check_energy_inputs(self):
-        if self.energy_method == "location_based":
-            raise EngineError("location_based_unavailable", "location_based needs a configured resource provider. Use manual_specific_yield.")
-        if self.specific_yield_kwh_per_kwp_year is None:
-            raise EngineError("yield_required", "specific_yield_kwh_per_kwp_year is required for manual_specific_yield.")
-        if self.yield_boundary == "net_ac_at_delivery" and self.performance_loss_fraction != 0:
-            raise EngineError("double_counted_loss", "performance_loss_fraction must be 0 when the yield is already net, or losses count twice.")
+        if self.energy_method == "manual_specific_yield":
+            if self.specific_yield_kwh_per_kwp_year is None:
+                raise EngineError("yield_required", "specific_yield_kwh_per_kwp_year is required for manual_specific_yield.")
+            if self.yield_boundary == "net_ac_at_delivery" and self.performance_loss_fraction != 0:
+                raise EngineError("double_counted_loss", "performance_loss_fraction must be 0 when the yield is already net, or losses count twice.")
+        elif self.energy_method == "location_based":
+            if self.latitude is None or self.longitude is None:
+                raise EngineError("location_required", "latitude and longitude are required for location_based.")
         return self
 
 
@@ -89,6 +100,7 @@ class PVResponse(BaseModel):
     annual_results: list[AnnualRow]
     warnings: list[str]
     warning_codes: list[str] = Field(default_factory=list)
+    resource_metadata: dict[str, Any] | None = None
     inputs: PVRequest
     disclaimer: str
 

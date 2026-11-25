@@ -1,8 +1,11 @@
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
 from app.models.schemas import AnnualRow, PVRequest, PVResponse
+from app.providers.base import ResourceError, ResourceErrorKind
+from app.providers.pvgis import PVGISProvider
 from app.services.calculate import NonFiniteResult, calculate
 from app.version import ENGINE_VERSION, METHODOLOGY_VERSION
 
@@ -20,9 +23,68 @@ def non_finite() -> HTTPException:
 DISCLAIMER = "Preliminary, pre-tax, unlevered estimate. Validate all assumptions independently."
 
 
-def _warnings(req: PVRequest) -> tuple[list[str], list[str]]:
+def _fetch_resource(req: PVRequest) -> tuple[PVRequest, dict[str, Any] | None]:
+    """Mengambil data dari provider jika location_based. Mengembalikan req yang sudah diperbarui."""
+    t = req.technical
+    if t.energy_method != "location_based":
+        return req, None
+
+    if t.resource_source == "nasa":
+        raise HTTPException(422, detail=[{
+            "type": "value_error",
+            "code": "resource_source_unavailable",
+            "loc": ["body", "technical", "resource_source"],
+            "msg": "Sumber data NASA belum tersedia. Silakan gunakan pvgis.",
+        }])
+
+    provider = PVGISProvider(loss_percent=t.performance_loss_fraction * 100)
+    try:
+        res = provider.get_resource(
+            latitude=t.latitude,
+            longitude=t.longitude,
+            tilt_degrees=t.tilt_degrees,
+            azimuth_degrees=t.azimuth_degrees,
+        )
+    except ResourceError as e:
+        code = {
+            ResourceErrorKind.OUT_OF_COVERAGE: "out_of_coverage",
+            ResourceErrorKind.UNAVAILABLE: "provider_unavailable",
+            ResourceErrorKind.TIMEOUT: "provider_timeout",
+            ResourceErrorKind.INVALID_RESPONSE: "provider_invalid_response",
+        }.get(e.kind, "provider_error")
+        raise HTTPException(422, detail=[{
+            "type": "value_error",
+            "code": code,
+            "loc": ["body", "technical"],
+            "msg": str(e),
+        }]) from e
+
+    # Perbarui Technical dengan data dari PVGIS
+    t_updated = t.model_copy(update={
+        "specific_yield_kwh_per_kwp_year": res.specific_yield_kwh_per_kwp_year,
+        "yield_boundary": res.yield_boundary,
+        "performance_loss_fraction": 0.0, # Loss sudah dihitung PVGIS
+    })
+    req_updated = req.model_copy(update={"technical": t_updated})
+    
+    metadata = {
+        "provider": res.provider_name,
+        "dataset": res.dataset,
+        "version": res.dataset_version,
+        "period": res.period,
+        "retrieved_at": res.retrieval_timestamp,
+    }
+    return req_updated, metadata
+
+
+def _warnings(req: PVRequest, metadata: dict[str, Any] | None) -> tuple[list[str], list[str]]:
     t = req.technical
     warnings, codes = [], []
+    
+    if metadata:
+        dataset_name = metadata.get("dataset") or metadata.get("provider")
+        warnings.append(f"Data radiasi diambil dari {dataset_name} ({metadata.get('period', 'periode tidak diketahui')}).")
+        codes.append("resource_data_fetched")
     
     if t.specific_yield_kwh_per_kwp_year and t.specific_yield_kwh_per_kwp_year > 2500:
         warnings.append("Specific yield above 2,500 kWh/kWp/year is unusual. Check the source and the yield boundary.")
@@ -41,6 +103,9 @@ def _warnings(req: PVRequest) -> tuple[list[str], list[str]]:
 
 @router.post("/preliminary", response_model=PVResponse)
 def preliminary(req: PVRequest) -> PVResponse:
+    # Ambil data lokasi jika perlu
+    req, metadata = _fetch_resource(req)
+    
     p, t = req.project, req.technical
     try:
         c = calculate(req)
@@ -56,7 +121,7 @@ def preliminary(req: PVRequest) -> PVResponse:
             cumulative_cash_flow=round(c.cumulative[i + 1], 2),
         ))
 
-    warnings, warning_codes = _warnings(req)
+    warnings, warning_codes = _warnings(req, metadata)
 
     return PVResponse(
         engine_version=ENGINE_VERSION,
@@ -75,6 +140,7 @@ def preliminary(req: PVRequest) -> PVResponse:
         annual_results=rows,
         warnings=warnings,
         warning_codes=warning_codes,
+        resource_metadata=metadata,
         inputs=req,
         disclaimer=DISCLAIMER,
     )
