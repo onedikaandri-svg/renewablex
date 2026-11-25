@@ -5,7 +5,19 @@ from app.services.finance import cash_flows, irr, npv, simple_payback
 
 
 def test_capex_is_negative_year_0():
-    assert cash_flows(500, [100], 2, 0, 10, 0).flows[0] == -500
+    cf = cash_flows(
+        capex=500,
+        energy_kwh=[100],
+        revenue_method="fixed_tariff",
+        tariff=2,
+        tariff_esc=0,
+        annual_consumption_kwh=None,
+        self_consumption_tariff=None,
+        feed_in_tariff=None,
+        opex=10,
+        opex_esc=0,
+    )
+    assert cf.flows[0] == -500
 
 
 def test_npv_at_zero_rate_is_the_sum():
@@ -64,11 +76,58 @@ def test_payback_zero_when_no_capex():
 
 
 def test_escalation_compounds_from_year_2():
-    cf = cash_flows(0, [100, 100, 100], 2, 0.10, 10, 0.05)
+    cf = cash_flows(
+        capex=0,
+        energy_kwh=[100, 100, 100],
+        revenue_method="fixed_tariff",
+        tariff=2,
+        tariff_esc=0.10,
+        annual_consumption_kwh=None,
+        self_consumption_tariff=None,
+        feed_in_tariff=None,
+        opex=10,
+        opex_esc=0.05,
+    )
     assert cf.revenues == pytest.approx([200, 220, 242])
     assert cf.opex == pytest.approx([10, 10.5, 11.025])
 
 
 def test_no_escalation_by_default_values():
-    cf = cash_flows(0, [100, 100], 2, 0, 10, 0)
+    cf = cash_flows(
+        capex=0,
+        energy_kwh=[100, 100],
+        revenue_method="fixed_tariff",
+        tariff=2,
+        tariff_esc=0,
+        annual_consumption_kwh=None,
+        self_consumption_tariff=None,
+        feed_in_tariff=None,
+        opex=10,
+        opex_esc=0,
+    )
     assert cf.revenues == [200, 200] and cf.opex == [10, 10]
+
+
+def test_self_consumption_cash_flows():
+    energy = [1000, 1000]  # kWh per tahun
+    capex = 1_000_000
+    opex = 10_000
+    
+    cf = cash_flows(
+        capex=capex,
+        energy_kwh=energy,
+        revenue_method="self_consumption_savings",
+        tariff=None,  # Tidak dipakai di mode ini
+        tariff_esc=0,
+        annual_consumption_kwh=800,  # kWh
+        self_consumption_tariff=1500,  # IDR per kWh
+        feed_in_tariff=800,  # IDR per kWh
+        opex=opex,
+        opex_esc=0,
+    )
+
+    # Tahun 1: Q_self=800, Q_grid=200
+    # Revenue = 800*1500 + 200*800 = 1_200_000 + 160_000 = 1_360_000
+    assert cf.revenues[0] == 1_360_000
+    # Cash flow tahun 1 = 1_360_000 - 10_000 = 1_350_000
+    assert cf.flows[1] == 1_350_000
