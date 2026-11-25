@@ -57,7 +57,19 @@ export const GROUPS: Group[] = [
     fields: [
       { key: "financial.capex_amount", label: "CAPEX tahun 0", unit: "mata uang proyek", kind: "number", value: "12000000000" },
       { key: "financial.annual_opex_amount", label: "OPEX tahunan", unit: "per tahun", kind: "number", value: "150000000" },
+      
+      // Metode Pendapatan
+      { key: "financial.revenue_method", label: "Metode pendapatan", kind: "select", value: "fixed_tariff",
+        options: [["fixed_tariff", "Jual semua listrik (tarif tetap)"], ["self_consumption_savings", "Konsumsi sendiri (hemat tagihan)"]] },
+      
+      // Kolom untuk Jual semua listrik
       { key: "financial.tariff_per_kwh", label: "Tarif jual", unit: "per kWh", kind: "number", value: "1100" },
+
+      // Kolom untuk Konsumsi sendiri
+      { key: "financial.annual_consumption_kwh", label: "Kebutuhan listrik tahunan", unit: "kWh", kind: "number", value: "800000" },
+      { key: "financial.self_consumption_tariff", label: "Tarif listrik yang dihemat", unit: "per kWh", kind: "number", value: "1500" },
+      { key: "financial.feed_in_tariff", label: "Tarif jual ke grid (kelebihan)", unit: "per kWh", kind: "number", value: "800" },
+
       { key: "financial.discount_rate_fraction", label: "Discount rate", unit: "% per tahun", kind: "number", value: "10", percent: true },
       { key: "financial.annual_tariff_escalation_fraction", label: "Eskalasi tarif", unit: "% per tahun", kind: "number", value: "0", percent: true },
       { key: "financial.annual_opex_escalation_fraction", label: "Eskalasi OPEX", unit: "% per tahun", kind: "number", value: "0", percent: true },
@@ -81,6 +93,7 @@ export function byVisualOrder(keys: string[]): string[] {
 
 export function isVisible(f: FieldDef, v: Values) {
   const method = v["technical.energy_method"];
+  const revMethod = v["financial.revenue_method"];
   
   if (f.key === "technical.resource_source" || f.key === "technical.latitude" || f.key === "technical.longitude" || f.key === "technical.tilt_degrees" || f.key === "technical.azimuth_degrees") {
     return method === "location_based";
@@ -92,6 +105,14 @@ export function isVisible(f: FieldDef, v: Values) {
   
   if (f.key === "technical.performance_loss_fraction") {
     return method === "location_based" || (method === "manual_specific_yield" && v["technical.yield_boundary"] === "gross_pre_loss");
+  }
+
+  if (f.key === "financial.tariff_per_kwh") {
+    return revMethod === "fixed_tariff";
+  }
+
+  if (f.key === "financial.annual_consumption_kwh" || f.key === "financial.self_consumption_tariff" || f.key === "financial.feed_in_tariff") {
+    return revMethod === "self_consumption_savings";
   }
   
   return true;
@@ -118,7 +139,8 @@ export function buildRequest(v: Values) {
   }
   
   Object.assign(body.project, { technology: "solar_pv" });
-  Object.assign(body.financial, { revenue_method: "fixed_tariff", tax_model: "pre_tax" });
+  // revenue_method sekarang diambil dari form, bukan hardcode
+  Object.assign(body.financial, { tax_model: "pre_tax" });
   
   return { body, errors };
 }

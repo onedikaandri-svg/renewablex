@@ -52,7 +52,7 @@ const CODE_MESSAGES: Record<string, string> = {
   shift_out_of_bounds: "Pergeseran harus berada antara -90% dan +100%, dan tidak boleh 0%.",
   duplicate_variables: "Daftar asumsi yang digeser tidak boleh berulang.",
   duplicate_shifts: "Daftar pergeseran tidak boleh berulang.",
-  // Kode baru untuk lokasi
+  // Kode untuk lokasi
   location_required: "Lintang dan bujur wajib diisi jika memilih metode berbasis lokasi.",
   resource_source_unavailable: "Sumber data satelit yang dipilih belum tersedia. Gunakan PVGIS.",
   out_of_coverage: "Lokasi yang Anda masukkan berada di luar cakupan data satelit (misalnya di tengah laut).",
@@ -60,6 +60,11 @@ const CODE_MESSAGES: Record<string, string> = {
   provider_timeout: "Permintaan ke layanan satelit melebihi batas waktu. Coba lagi.",
   provider_invalid_response: "Layanan satelit mengembalikan data yang tidak dapat dibaca.",
   provider_error: "Terjadi kesalahan saat mengambil data satelit.",
+  // Kode untuk pendapatan
+  tariff_required: "Tarif jual wajib diisi untuk metode tarif tetap.",
+  consumption_required: "Kebutuhan listrik tahunan wajib diisi untuk mode konsumsi sendiri.",
+  self_consumption_tariff_required: "Tarif listrik yang dihemat wajib diisi.",
+  feed_in_tariff_required: "Tarif jual kelebihan listrik ke grid wajib diisi.",
 };
 
 const WARNING_MESSAGES: Record<string, string> = {
