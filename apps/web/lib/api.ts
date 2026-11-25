@@ -30,6 +30,7 @@ export interface PVResponse {
   annual_results: AnnualRow[];
   warnings: string[];
   warning_codes?: string[];
+  resource_metadata?: Record<string, string | null> | null; // <-- Tambahan baru
   disclaimer: string;
 }
 

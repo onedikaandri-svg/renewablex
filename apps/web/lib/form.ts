@@ -31,10 +31,24 @@ export const GROUPS: Group[] = [
     title: "Energi",
     fields: [
       { key: "project.capacity_kwp", label: "Kapasitas terpasang", unit: "kWp", kind: "number", value: "1000" },
+      { key: "technical.energy_method", label: "Metode energi", kind: "select", value: "manual_specific_yield",
+        options: [["manual_specific_yield", "Manual (input yield)"], ["location_based", "Berdasarkan lokasi (satelit)"]] },
+      
+      // Kolom untuk metode Manual
       { key: "technical.specific_yield_kwh_per_kwp_year", label: "Yield spesifik", unit: "kWh/kWp/tahun", kind: "number", value: "1470" },
       { key: "technical.yield_boundary", label: "Batas yield", kind: "select", value: "net_ac_at_delivery",
         options: [["net_ac_at_delivery", "Sudah bersih (AC di titik serah)"], ["gross_pre_loss", "Kotor, belum dikurangi loss"]] },
-      { key: "technical.performance_loss_fraction", label: "Performance loss", unit: "%", kind: "number", value: "0", percent: true },
+
+      // Kolom untuk metode Lokasi
+      { key: "technical.resource_source", label: "Sumber data satelit", kind: "select", value: "pvgis",
+        options: [["pvgis", "PVGIS (Eropa)"], ["nasa", "NASA POWER (Global)"]] },
+      { key: "technical.latitude", label: "Lintang (latitude)", unit: "contoh -6.2", kind: "number", value: "-6.2" },
+      { key: "technical.longitude", label: "Bujur (longitude)", unit: "contoh 106.8", kind: "number", value: "106.8" },
+      { key: "technical.tilt_degrees", label: "Kemiringan panel", unit: "derajat, 0 sampai 90", kind: "number", value: "10" },
+      { key: "technical.azimuth_degrees", label: "Azimut panel", unit: "derajat, 180 = utara", kind: "number", value: "180" },
+
+      // Kolom yang selalu ada
+      { key: "technical.performance_loss_fraction", label: "Performance loss", unit: "%", kind: "number", value: "14", percent: true },
       { key: "technical.degradation_fraction_per_year", label: "Degradasi tahunan", unit: "% per tahun", kind: "number", value: "0.5", percent: true },
     ],
   },
@@ -57,7 +71,6 @@ export const EMPTY: Values = Object.fromEntries(FIELDS.map((f) => [f.key, f.kind
 export const labelOf = (key: string) => FIELDS.find((f) => f.key === key)?.label ?? key;
 export const idOf = (key: string) => key.replace(".", "-");
 
-// Urutan kunci sesuai urutan tampil di form. Kunci yang tidak dikenal ditaruh di akhir.
 export function byVisualOrder(keys: string[]): string[] {
   const rank = (k: string) => {
     const i = FIELDS.findIndex((f) => f.key === k);
@@ -67,13 +80,27 @@ export function byVisualOrder(keys: string[]): string[] {
 }
 
 export function isVisible(f: FieldDef, v: Values) {
-  return f.key !== "technical.performance_loss_fraction" || v["technical.yield_boundary"] === "gross_pre_loss";
+  const method = v["technical.energy_method"];
+  
+  if (f.key === "technical.resource_source" || f.key === "technical.latitude" || f.key === "technical.longitude" || f.key === "technical.tilt_degrees" || f.key === "technical.azimuth_degrees") {
+    return method === "location_based";
+  }
+  
+  if (f.key === "technical.specific_yield_kwh_per_kwp_year" || f.key === "technical.yield_boundary") {
+    return method === "manual_specific_yield";
+  }
+  
+  if (f.key === "technical.performance_loss_fraction") {
+    return method === "location_based" || (method === "manual_specific_yield" && v["technical.yield_boundary"] === "gross_pre_loss");
+  }
+  
+  return true;
 }
 
-// Builds the API body. Only presence and number-ness are checked here; ranges belong to the engine.
 export function buildRequest(v: Values) {
   const errors: Record<string, string> = {};
   const body: Record<string, Record<string, unknown>> = { project: {}, technical: {}, financial: {} };
+  
   for (const f of FIELDS) {
     if (!isVisible(f, v)) continue;
     const raw = (v[f.key] ?? "").trim();
@@ -89,8 +116,9 @@ export function buildRequest(v: Values) {
     const [section, name] = f.key.split(".");
     body[section][name] = value;
   }
+  
   Object.assign(body.project, { technology: "solar_pv" });
-  Object.assign(body.technical, { energy_method: "manual_specific_yield" });
   Object.assign(body.financial, { revenue_method: "fixed_tariff", tax_model: "pre_tax" });
+  
   return { body, errors };
 }

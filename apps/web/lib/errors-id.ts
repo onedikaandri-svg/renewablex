@@ -3,7 +3,6 @@
 
 export interface ApiIssue {
   type: string;
-  // Kode stabil dari mesin (docs/api.md). Kode bawaan sama dengan `type`. Item lama tidak punya.
   code?: string;
   loc: (string | number)[];
   msg: string;
@@ -11,13 +10,11 @@ export interface ApiIssue {
 }
 
 export interface TranslateOptions {
-  // Isian ditampilkan dalam persen, tetapi mesin menghitung dalam pecahan (0,1 = 10%).
   percent?: boolean;
 }
 
 const numberFormat = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 6 });
 
-// Pydantic menyerialkan batas sebagai angka JSON, atau string bila berupa Decimal.
 function formatLimit(value: unknown, percent: boolean): string | null {
   const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
   if (typeof n !== "number" || !Number.isFinite(n)) return null;
@@ -43,7 +40,6 @@ const LENGTHS: Record<string, { key: string; text: (n: string) => string }> = {
   string_too_long: { key: "max_length", text: (n) => `Maksimal ${n} karakter.` },
 };
 
-// Terjemahan untuk kode buatan mesin (lihat tabel kode di docs/api.md).
 const CODE_MESSAGES: Record<string, string> = {
   location_based_unavailable: "Mode berbasis lokasi (location_based) belum tersedia. Isi yield spesifik secara manual.",
   yield_required: "Yield spesifik wajib diisi untuk metode yield manual.",
@@ -51,29 +47,34 @@ const CODE_MESSAGES: Record<string, string> = {
     "Yield bersih sudah memperhitungkan loss, jadi performance loss harus 0 agar loss tidak terhitung dua kali.",
   unsupported_revenue_method: "Saat ini hanya pendapatan dengan tarif tetap (fixed_tariff) yang didukung.",
   non_finite_result: "Hasil perhitungan bukan angka yang terhingga. Periksa lagi nilai yang sangat ekstrem.",
-  // Endpoint sensitivitas.
   shift_out_of_range:
     "Sensitivitas tidak bisa dihitung: salah satu pergeseran membuat sebuah asumsi melewati batas yang diizinkan mesin. Biasanya nilai asumsi Anda sudah dekat batasnya, misalnya yield spesifik atau discount rate.",
   shift_out_of_bounds: "Pergeseran harus berada antara -90% dan +100%, dan tidak boleh 0%.",
   duplicate_variables: "Daftar asumsi yang digeser tidak boleh berulang.",
   duplicate_shifts: "Daftar pergeseran tidak boleh berulang.",
+  // Kode baru untuk lokasi
+  location_required: "Lintang dan bujur wajib diisi jika memilih metode berbasis lokasi.",
+  resource_source_unavailable: "Sumber data satelit yang dipilih belum tersedia. Gunakan PVGIS.",
+  out_of_coverage: "Lokasi yang Anda masukkan berada di luar cakupan data satelit (misalnya di tengah laut).",
+  provider_unavailable: "Layanan satelit sedang tidak dapat dihubungi. Coba beberapa saat lagi.",
+  provider_timeout: "Permintaan ke layanan satelit melebihi batas waktu. Coba lagi.",
+  provider_invalid_response: "Layanan satelit mengembalikan data yang tidak dapat dibaca.",
+  provider_error: "Terjadi kesalahan saat mengambil data satelit.",
 };
 
-// Terjemahan untuk peringatan (warning_codes) dari mesin.
 const WARNING_MESSAGES: Record<string, string> = {
   high_specific_yield: "Yield spesifik di atas 2.500 kWh/kWp/tahun tidak biasa. Periksa sumber data dan batas yield.",
   high_degradation: "Degradasi di atas 2% per tahun tidak biasa untuk modul PV.",
   high_performance_loss: "Loss kinerja di atas 35% tidak biasa. Periksa agar tidak terhitung dua kali.",
+  resource_data_fetched: "Data radiasi matahari berhasil diambil dari satelit. Hasil yield dihitung berdasarkan data ini.",
 };
 
-// Cadangan untuk item tanpa `code` (mesin lama): potongan teks huruf kecil menunjuk ke kode.
 const FRAGMENT_CODES: ReadonlyArray<{ fragment: string; code: string }> = [
   { fragment: "location_based needs a configured resource provider", code: "location_based_unavailable" },
   { fragment: "is required for manual_specific_yield", code: "yield_required" },
   { fragment: "losses count twice", code: "double_counted_loss" },
   { fragment: "only fixed_tariff is supported", code: "unsupported_revenue_method" },
   { fragment: "result is not a finite number", code: "non_finite_result" },
-  // Cadangan untuk peringatan bahasa Inggris dari mesin lama.
   { fragment: "specific yield above 2,500", code: "high_specific_yield" },
   { fragment: "degradation above 2%", code: "high_degradation" },
   { fragment: "performance loss above 35%", code: "high_performance_loss" },
@@ -94,12 +95,10 @@ function translatePattern(pattern: unknown): string {
 
 function translateLiteral(expected: unknown): string {
   if (typeof expected !== "string") return "Nilai tidak termasuk pilihan yang tersedia.";
-  // Contoh dari Pydantic: "'a', 'b' or 'c'"
   const options = expected.replace(/'/g, "").replace(/\s+or\s+/, ", ");
   return `Harus salah satu dari: ${options}.`;
 }
 
-// Mengembalikan alasan tanpa nama isian, karena nama isian dipasang oleh pemanggil.
 export function translateIssue(issue: ApiIssue, options: TranslateOptions = {}): string {
   const ctx = issue.ctx ?? {};
   const percent = options.percent ?? false;
@@ -125,12 +124,10 @@ export function translateIssue(issue: ApiIssue, options: TranslateOptions = {}):
   return issue.msg;
 }
 
-// Untuk `detail` berupa teks biasa (HTTPException dari mesin, bukan galat validasi).
 export function translateDetailText(text: string): string {
   return matchFragment(text) ?? text;
 }
 
-// Fungsi baru untuk menerjemahkan kode peringatan (warning_codes).
 export function translateWarning(code: string): string {
   return WARNING_MESSAGES[code] ?? code;
 }
