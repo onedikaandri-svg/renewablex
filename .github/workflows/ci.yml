@@ -1,17 +1,9 @@
 name: Calculation Engine CI
 on:
   push:
-    paths:
-      - "services/calculation-engine/**"
-      - "apps/web/**"
-      - "examples/**"
-      - ".github/workflows/ci.yml"
+    branches: [ "main" ]
   pull_request:
-    paths:
-      - "services/calculation-engine/**"
-      - "apps/web/**"
-      - "examples/**"
-      - ".github/workflows/ci.yml"
+    branches: [ "main" ]
 
 jobs:
   test:
@@ -42,4 +34,5 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
