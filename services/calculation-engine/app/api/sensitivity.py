@@ -44,6 +44,7 @@ def _variant(base: PVRequest, variable: str, shift: float) -> PVRequest:
             "code": "shift_out_of_range",
             "loc": ["body", "shifts"],
             "msg": f"A shift of {shift:+.0%} moves {variable} outside its allowed range.",
+            "ctx": {"variable": variable, "shift_fraction": shift},
         }])
 
 
