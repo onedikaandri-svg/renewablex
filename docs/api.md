@@ -21,6 +21,8 @@ curl -X POST http://127.0.0.1:8000/v1/pv/preliminary \
 
 Interactive docs: `http://127.0.0.1:8000/docs`. The expected response for the sample is in `examples/sample-pv-response.json` (`calculated_at` differs on every run).
 
+To run the tests, install the test tools as well: `pip install -r requirements-dev.txt`, then `pytest`.
+
 ## Endpoints
 
 | Method | Path | Purpose |
@@ -32,6 +34,8 @@ Interactive docs: `http://127.0.0.1:8000/docs`. The expected response for the sa
 ## Request
 
 The body has `project`, `technical`, `financial`, and optional `notes`. Every field is required unless a default is shown. Unknown fields are rejected, so an assumption is never ignored silently. The reference is `examples/sample-pv-project.json`. `app/models/schemas.py` is the source of truth: when this table and the code differ, the code is right and this file gets fixed.
+
+A request body larger than 65,536 bytes is rejected with HTTP 413 (see Errors). A normal request is about 1 KB.
 
 | Field | Type or unit | Allowed values |
 |---|---|---|
@@ -97,6 +101,7 @@ For built-in checks, `code` equals `type` (`missing`, `greater_than`, `greater_t
 | `duplicate_variables`, `duplicate_shifts` | `/v1/pv/sensitivity` lists contain repeats |
 | `shift_out_of_bounds` | A shift is 0, below -0.9, or above 1.0 |
 | `shift_out_of_range` | A shift moves a variable outside its allowed range, for example yield above 10,000 |
+| `request_too_large` | The request body is larger than 65,536 bytes. Returned with HTTP 413 instead of 422, in the same `detail` shape |
 
 The submitted input is not echoed back in error items.
 
@@ -125,6 +130,11 @@ Response:
 | `variables[].cases` | One entry per shift, sorted by shift: `shift_fraction`, `input_value` (the shifted value), `npv_amount`, `npv_delta` (versus the base), IRR and payback with their statuses |
 
 A shift that would break a limit of the request (for example yield above 10,000) returns 422 with `shift_out_of_range`. Every case is a full engine run, so results match `/v1/pv/preliminary` for the same inputs.
+
+## Operations
+
+- Each request writes one JSON log line with `method`, `path`, `status`, `duration_ms`, and `engine_version`. The request body and query string are never logged, because assumptions can be commercially sensitive.
+- `/docs` and `/openapi.json` stay open. Revisit this when user accounts exist.
 
 ## Conventions
 

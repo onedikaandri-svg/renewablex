@@ -1,5 +1,4 @@
 name: Calculation Engine CI
-
 on:
   push:
     paths:
@@ -16,7 +15,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     defaults:
       run:
         working-directory: services/calculation-engine
@@ -26,6 +25,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - run: pip install -r requirements-dev.txt
       - run: pytest
 
   web:
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
+          cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run typecheck
