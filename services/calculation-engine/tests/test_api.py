@@ -11,7 +11,7 @@ from app.providers.base import ResourceResult, ResourceError, ResourceErrorKind
 
 client = TestClient(app)
 
-EXAMPLES = Path(__file__).parent.parent.parent / "examples"
+EEXAMPLES = Path(__file__).parent.parent.parent.parent / "examples"
 SAMPLE = json.loads((EXAMPLES / "sample-pv-project.json").read_text())
 
 
