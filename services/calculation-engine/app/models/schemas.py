@@ -25,13 +25,11 @@ class Technical(Strict):
     energy_method: Literal["manual_specific_yield", "location_based"]
     resource_source: Literal["pvgis", "nasa"] = "pvgis"
     
-    # Field untuk manual
     specific_yield_kwh_per_kwp_year: float | None = Field(default=None, gt=0, le=10000)
     yield_boundary: Literal["net_ac_at_delivery", "gross_pre_loss"] = "net_ac_at_delivery"
     performance_loss_fraction: float = Field(default=0, ge=0, lt=1)
     degradation_fraction_per_year: float = Field(ge=0, lt=1)
 
-    # Field untuk location_based
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     tilt_degrees: float = Field(default=0, ge=0, le=90)
@@ -53,8 +51,17 @@ class Technical(Strict):
 class Financial(Strict):
     capex_amount: float = Field(ge=0, le=1e18)
     annual_opex_amount: float = Field(ge=0, le=1e18)
+    
     revenue_method: Literal["fixed_tariff", "self_consumption_savings"]
-    tariff_per_kwh: float = Field(ge=0, le=1e9)
+    
+    # Field untuk fixed_tariff (wajib jika mode fixed)
+    tariff_per_kwh: float | None = Field(default=None, ge=0, le=1e9)
+    
+    # Field untuk self_consumption_savings (wajib jika mode self-consumption)
+    annual_consumption_kwh: float | None = Field(default=None, gt=0)
+    self_consumption_tariff: float | None = Field(default=None, ge=0)
+    feed_in_tariff: float | None = Field(default=None, ge=0)
+
     discount_rate_fraction: float = Field(gt=-1, le=1)
     annual_tariff_escalation_fraction: float = Field(default=0, gt=-1, le=1)
     annual_opex_escalation_fraction: float = Field(default=0, gt=-1, le=1)
@@ -62,8 +69,16 @@ class Financial(Strict):
 
     @model_validator(mode="after")
     def check_revenue_method(self):
-        if self.revenue_method != "fixed_tariff":
-            raise EngineError("unsupported_revenue_method", "Only fixed_tariff is supported in this version.")
+        if self.revenue_method == "fixed_tariff":
+            if self.tariff_per_kwh is None:
+                raise EngineError("tariff_required", "tariff_per_kwh is required for fixed_tariff.")
+        elif self.revenue_method == "self_consumption_savings":
+            if self.annual_consumption_kwh is None:
+                raise EngineError("consumption_required", "annual_consumption_kwh is required for self_consumption_savings.")
+            if self.self_consumption_tariff is None:
+                raise EngineError("self_consumption_tariff_required", "self_consumption_tariff is required for self_consumption_savings.")
+            if self.feed_in_tariff is None:
+                raise EngineError("feed_in_tariff_required", "feed_in_tariff is required for self_consumption_savings.")
         return self
 
 

@@ -31,10 +31,20 @@ def calculate(req: PVRequest) -> Calculation:
         t.specific_yield_kwh_per_kwp_year, t.yield_boundary, t.performance_loss_fraction
     )
     kwh = energy.annual_energy_kwh(p.capacity_kwp, net_yield, t.degradation_fraction_per_year, p.lifetime_years)
+    
     cf = finance.cash_flows(
-        f.capex_amount, kwh, f.tariff_per_kwh, f.annual_tariff_escalation_fraction,
-        f.annual_opex_amount, f.annual_opex_escalation_fraction,
+        capex=f.capex_amount,
+        energy_kwh=kwh,
+        revenue_method=f.revenue_method,
+        tariff=f.tariff_per_kwh,
+        tariff_esc=f.annual_tariff_escalation_fraction,
+        annual_consumption_kwh=f.annual_consumption_kwh,
+        self_consumption_tariff=f.self_consumption_tariff,
+        feed_in_tariff=f.feed_in_tariff,
+        opex=f.annual_opex_amount,
+        opex_esc=f.annual_opex_escalation_fraction,
     )
+    
     cumulative = list(accumulate(cf.flows))
     try:
         npv = finance.npv(f.discount_rate_fraction, cf.flows)
