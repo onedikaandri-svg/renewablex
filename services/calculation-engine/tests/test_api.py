@@ -192,3 +192,94 @@ def test_warning_codes():
     assert "high_degradation" in data["warning_codes"]
     assert "high_performance_loss" in data["warning_codes"]
     assert len(data["warnings"]) == 3
+from unittest.mock import patch
+from app.providers.base import ResourceResult, ResourceError, ResourceErrorKind
+
+# ... (biarkan tes lama Anda di atas) ...
+
+@patch("app.api.pv.PVGISProvider.get_resource")
+def test_location_based_pvgis_success(mock_get_resource):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    client = TestClient(app)
+
+    # Mock respons PVGIS
+    mock_get_resource.return_value = ResourceResult(
+        specific_yield_kwh_per_kwp_year=1500.0,
+        yield_boundary="net_ac_at_delivery",
+        provider_name="pvgis",
+        dataset="PVGIS-ERA5",
+        dataset_version="v5_3",
+        period="2005-2023",
+        retrieval_timestamp="2026-11-25T12:00:00Z"
+    )
+
+    payload = {
+        "project": {"project_name": "Test PVGIS", "technology": "solar_pv", "project_type": "ground_mounted", "country_code": "ID", "capacity_kwp": 1000, "lifetime_years": 20, "currency_code": "IDR"},
+        "technical": {
+            "energy_method": "location_based", 
+            "resource_source": "pvgis",
+            "latitude": -6.2, 
+            "longitude": 106.8,
+            "tilt_degrees": 10,
+            "azimuth_degrees": 180,
+            "degradation_fraction_per_year": 0.005
+        },
+        "financial": {"capex_amount": 1000000, "annual_opex_amount": 10000, "revenue_method": "fixed_tariff", "tariff_per_kwh": 1000, "discount_rate_fraction": 0.1, "tax_model": "pre_tax"}
+    }
+    response = client.post("/v1/pv/preliminary", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["net_specific_yield_kwh_per_kwp_year"] == 1500.0
+    assert data["resource_metadata"]["dataset"] == "PVGIS-ERA5"
+    assert "resource_data_fetched" in data["warning_codes"]
+    mock_get_resource.assert_called_once()
+
+
+def test_location_based_nasa_rejected():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    client = TestClient(app)
+
+    payload = {
+        "project": {"project_name": "Test NASA", "technology": "solar_pv", "project_type": "ground_mounted", "country_code": "ID", "capacity_kwp": 1000, "lifetime_years": 20, "currency_code": "IDR"},
+        "technical": {
+            "energy_method": "location_based", 
+            "resource_source": "nasa",
+            "latitude": -6.2, 
+            "longitude": 106.8,
+            "degradation_fraction_per_year": 0.005
+        },
+        "financial": {"capex_amount": 1000000, "annual_opex_amount": 10000, "revenue_method": "fixed_tariff", "tariff_per_kwh": 1000, "discount_rate_fraction": 0.1, "tax_model": "pre_tax"}
+    }
+    response = client.post("/v1/pv/preliminary", json=payload)
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["code"] == "resource_source_unavailable"
+
+
+@patch("app.api.pv.PVGISProvider.get_resource")
+def test_location_based_pvgis_out_of_coverage(mock_get_resource):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    client = TestClient(app)
+
+    # Mock PVGIS melempar error lokasi di luar cakupan
+    mock_get_resource.side_effect = ResourceError(
+        ResourceErrorKind.OUT_OF_COVERAGE, 
+        "Lokasi di luar cakupan data PVGIS."
+    )
+
+    payload = {
+        "project": {"project_name": "Test Sea", "technology": "solar_pv", "project_type": "ground_mounted", "country_code": "ID", "capacity_kwp": 1000, "lifetime_years": 20, "currency_code": "IDR"},
+        "technical": {
+            "energy_method": "location_based", 
+            "resource_source": "pvgis",
+            "latitude": -6.2, 
+            "longitude": 106.8,
+            "degradation_fraction_per_year": 0.005
+        },
+        "financial": {"capex_amount": 1000000, "annual_opex_amount": 10000, "revenue_method": "fixed_tariff", "tariff_per_kwh": 1000, "discount_rate_fraction": 0.1, "tax_model": "pre_tax"}
+    }
+    response = client.post("/v1/pv/preliminary", json=payload)
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["code"] == "out_of_coverage"
