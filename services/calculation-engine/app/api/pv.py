@@ -20,15 +20,23 @@ def non_finite() -> HTTPException:
 DISCLAIMER = "Preliminary, pre-tax, unlevered estimate. Validate all assumptions independently."
 
 
-def _warnings(req: PVRequest) -> list[str]:
-    t, out = req.technical, []
+def _warnings(req: PVRequest) -> tuple[list[str], list[str]]:
+    t = req.technical
+    warnings, codes = [], []
+    
     if t.specific_yield_kwh_per_kwp_year and t.specific_yield_kwh_per_kwp_year > 2500:
-        out.append("Specific yield above 2,500 kWh/kWp/year is unusual. Check the source and the yield boundary.")
+        warnings.append("Specific yield above 2,500 kWh/kWp/year is unusual. Check the source and the yield boundary.")
+        codes.append("high_specific_yield")
+        
     if t.degradation_fraction_per_year > 0.02:
-        out.append("Degradation above 2% per year is unusual for PV modules.")
+        warnings.append("Degradation above 2% per year is unusual for PV modules.")
+        codes.append("high_degradation")
+        
     if t.performance_loss_fraction > 0.35:
-        out.append("Performance loss above 35% is unusual. Check that it is not counted elsewhere.")
-    return out
+        warnings.append("Performance loss above 35% is unusual. Check that it is not counted elsewhere.")
+        codes.append("high_performance_loss")
+        
+    return warnings, codes
 
 
 @router.post("/preliminary", response_model=PVResponse)
@@ -48,6 +56,8 @@ def preliminary(req: PVRequest) -> PVResponse:
             cumulative_cash_flow=round(c.cumulative[i + 1], 2),
         ))
 
+    warnings, warning_codes = _warnings(req)
+
     return PVResponse(
         engine_version=ENGINE_VERSION,
         methodology_version=METHODOLOGY_VERSION,
@@ -63,7 +73,8 @@ def preliminary(req: PVRequest) -> PVResponse:
         simple_payback_years=None if c.payback is None else round(c.payback, 4),
         payback_status=c.payback_status,
         annual_results=rows,
-        warnings=_warnings(req),
+        warnings=warnings,
+        warning_codes=warning_codes,
         inputs=req,
         disclaimer=DISCLAIMER,
     )
