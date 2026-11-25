@@ -44,12 +44,12 @@
     --navy: #0F2D4F;
     --navytext: #FFFFFF;
     --onnavy: #FFFFFF;
-    --accent: #8E5CFF;
+    --accent: #A78BFA;     /* Diperbarui: lebih terang untuk kontras */
     --accent-soft: #B9B9F9;
     --secondary: #6D5CE7;
     --tertiary: #1B365D;
     --btn: #6C55FF;
-    --btnhover: #533AFD;
+    --btnhover: #8A75FF;   /* Diperbarui: lebih terang untuk kontras */
     --btntext: #FFFFFF;
     --border: #1E3A5F;
     --field: #7F8EA6;
