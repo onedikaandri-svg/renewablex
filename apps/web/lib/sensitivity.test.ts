@@ -1,31 +1,27 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, NetworkError, parseProblems } from "./api";
+import { 
+  ApiError, 
+  NetworkError, 
+  parseProblems, 
+  runSensitivity, 
+  type SensitivityResponse, 
+  type SensitivityVariableResult, 
+  type SensitivityCase 
+} from "./api";
 import sampleJson from "./fixtures/sensitivity-sample.json";
 import {
-  buildSensitivityRequest,
   buildSensitivityView,
   formatInput,
   irrText,
   paybackText,
   problemMessages,
-  runSensitivity,
   shiftLabel,
   signed,
-  type SensitivityResponse,
 } from "./sensitivity";
 
 // Respons asli mesin 0.3.0 untuk examples/sample-pv-project.json.
 const sample = sampleJson as unknown as SensitivityResponse;
 const clone = (): SensitivityResponse => structuredClone(sample);
-
-describe("buildSensitivityRequest", () => {
-  it("hanya mengirim base, tanpa variables dan shifts (pakai bawaan mesin)", () => {
-    const base = { project: { capacity_kwp: 1000 } };
-    const req = buildSensitivityRequest(base);
-    expect(Object.keys(req)).toEqual(["base"]);
-    expect(req.base).toBe(base);
-  });
-});
 
 describe("buildSensitivityView: respons asli", () => {
   const view = buildSensitivityView(sample);
@@ -83,9 +79,9 @@ describe("buildSensitivityView: respons asli", () => {
 describe("buildSensitivityView: kasus khusus", () => {
   it("nilai dasar 0 (discount rate 0) ditandai dengan catatan, deltanya 0", () => {
     const res = clone();
-    const v = res.variables.find((x) => x.variable === "discount_rate")!;
+    const v = res.variables.find((x: SensitivityVariableResult) => x.variable === "discount_rate")!;
     v.base_value = 0;
-    v.cases.forEach((c) => { c.npv_delta = 0; c.input_value = 0; });
+    v.cases.forEach((c: SensitivityCase) => { c.npv_delta = 0; c.input_value = 0; });
     const view = buildSensitivityView(res);
     expect(view.zeroBaseLabels).toEqual(["Discount rate"]);
     expect(view.rows.find((r) => r.variable === "discount_rate")?.deltas).toEqual(["0,00", "0,00", "0,00", "0,00"]);
@@ -94,7 +90,7 @@ describe("buildSensitivityView: kasus khusus", () => {
 
   it("selisih kecil memakai satuan juta", () => {
     const res = clone();
-    res.variables = res.variables.filter((v) => v.variable === "opex");
+    res.variables = res.variables.filter((v: SensitivityVariableResult) => v.variable === "opex");
     const view = buildSensitivityView(res);
     expect(view.unit).toBe("juta");
     expect(view.rows[0].deltas).toEqual(["+272,3", "+136,2", "-136,2", "-272,3"]);
