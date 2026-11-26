@@ -1,6 +1,6 @@
 # Kontrak Tahap 6A: Kanvas Skema Sistem Interaktif dan Skema Aliran SVG
 
-**Status dokumen:** Usulan untuk persetujuan pemilik proyek (belum ada perubahan kode implementasi maupun dependensi).
+**Status dokumen:** Disetujui pemilik proyek (keputusan Bagian 9 telah dikonfirmasi pada 2026-11-26).
 **Cabang usulan kontrak:** `docs/stage-6a-contract` (berbasis `main` setelah penggabungan Tahap 5, commit `3a995e6`).
 **Cakupan:** Kanvas skema sistem interaktif di Halaman 4 (`/hybrid/[projectId]/system`), kesetaraan 100% konfigurasi kanvas terhadap payload JSON simulasi, kompatibilitas mundur proyek Tahap 5, serta peningkatan Skema SVG dengan angka aliran energi nyata di Dasbor Hasil Halaman 8.
 
@@ -265,19 +265,11 @@ PR implementasi kode Tahap 6A (setelah kontrak ini disetujui) baru boleh dinyata
 
 ---
 
-## 9. Pertanyaan Keputusan untuk Pemilik Proyek
+## 9. Keputusan Pemilik Proyek yang Telah Dikonfirmasi
 
-Sebelum masuk ke pembuatan PR implementasi Tahap 6A (atau PR dependensi jika memilih Opsi B), mohon konfirmasi pemilik proyek untuk 4 keputusan berikut:
+Seluruh 4 keputusan desain dan arsitektur Tahap 6A telah dikonfirmasi oleh pemilik proyek pada 2026-11-26:
 
-1. **Pilihan implementasi kanvas (Evaluasi Bagian 5):**
-   - **Opsi A (Direkomendasikan):** Kanvas SVG + Web Pointer Events buatan sendiri tanpa dependensi baru, sehingga berbagi satu mesin renderer SVG dengan Skema Aliran Halaman 8 dan ekspor PDF Tahap 7.
-   - **Opsi B:** Memakai pustaka eksternal `@xyflow/react` melalui PR dependensi terpisah terlebih dahulu (dengan konsekuensi tetap membangun renderer SVG terpisah untuk Halaman 8 dan PDF Tahap 7).
-2. **Perlakuan node opsional (`BESS`, `Biomass`, `Grid`) yang ada di kanvas tetapi kabelnya belum dihubungkan ke `AC Bus`:**
-   - **Pilihan 2a (Direkomendasikan):** Tampilkan **peringatan kuning (non-blokir)** yang menjelaskan bahwa komponen belum terhubung sehingga diperlakukan nonaktif saat simulasi, namun simulasi tetap boleh dijalankan.
-   - **Pilihan 2b:** Tampilkan **galat merah (memblokir simulasi)** sampai pengguna menghubungkan kabelnya ke `AC Bus` atau menghapus komponen tersebut dari kanvas.
-3. **Penghapusan komponen wajib (`AC Bus`, `Solar PV`, `Beban Listrik`) di kanvas:**
-   - **Pilihan 3a (Direkomendasikan):** Komponen wajib **dikunci agar tidak bisa dihapus** dari kanvas (hanya bisa dipindah dan diatur parameternya), sementara kabel koneksinya tetap bisa diputus untuk menguji dan melihat validasi topologi.
-   - **Pilihan 3b:** Semua komponen termasuk `PV` dan `Beban` **boleh dihapus** dari kanvas, lalu memicu galat validasi pemblokir sampai pengguna menambahkannya kembali lewat palet.
-4. **Periode angka aliran energi pada Skema SVG di Dasbor Hasil (Halaman 8):**
-   - **Pilihan 4a (Direkomendasikan):** Menampilkan total energi **Tahun 1 (`MWh/thn`)** agar konsisten langsung dengan grafik energi bulanan dan diagram waterfall rugi PV di tab yang sama.
-   - **Pilihan 4b:** Menyediakan tombol pilih ringkas (**Tahun 1** vs **Akumulasi Umur Proyek 25 Tahun**) langsung di header kartu Skema SVG Halaman 8.
+1. **Pilihan implementasi kanvas:** **Opsi A** disetujui (kanvas SVG + Web Pointer Events buatan sendiri tanpa dependensi baru, sehingga berbagi satu mesin renderer SVG dengan Skema Aliran Halaman 8 dan ekspor PDF Tahap 7).
+2. **Perlakuan node opsional (`BESS`, `Biomass`, `Grid`) di kanvas yang kabelnya belum dihubungkan ke `AC Bus`:** **Pilihan 2a** disetujui (tampilkan peringatan kuning non-blokir; komponen diperlakukan nonaktif saat simulasi sampai kabelnya disambungkan ke `AC Bus`).
+3. **Penghapusan komponen wajib (`AC Bus`, `Solar PV`, `Beban Listrik`) di kanvas:** **Pilihan 3a** disetujui (komponen wajib dikunci agar tidak bisa dihapus dari kanvas, hanya dapat dipindah dan diatur parameternya, sementara kabel koneksinya tetap bisa diputus untuk memicu validasi).
+4. **Periode angka aliran energi pada Skema SVG di Dasbor Hasil (Halaman 8):** **Pilihan 4a** disetujui (menampilkan total energi Tahun 1 dalam `MWh/thn`, selaras dengan grafik energi bulanan dan diagram waterfall rugi PV di tab yang sama).
