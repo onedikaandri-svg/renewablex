@@ -1,0 +1,1821 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RenewableX — Solar PV Screening & Financial Modeler</title>
+
+  <!-- Google Fonts: Inter (weights 300, 400, 500, 600) as fallback for Sohne Var -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Sohne Var"', 'Inter', '-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', 'sans-serif'],
+          },
+          colors: {
+            stripe: {
+              primary: '#533AFD',
+              secondary: '#B9B9F9',
+              tertiary: '#E5EDF5',
+              surface: '#FFFFFF',
+              onSurface: '#061B31',
+              text: '#0B1F3A',
+              muted: '#6B7A90',
+              accent: '#8E5CFF',
+              success: '#16A34A',
+              error: '#D92D20',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* Stripe Modern Base Typography & Flat Aesthetics */
+    body {
+      background-color: #FFFFFF;
+      color: #0B1F3A;
+      font-family: "Sohne Var", "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Flat, disciplined range slider in Stripe Violet (#533AFD) */
+    input[type="range"].stripe-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      border-radius: 9999px;
+      background: #E5EDF5;
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"].stripe-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+      background: #533AFD;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 0 0 1px #533AFD;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+    input[type="range"].stripe-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      background: #8E5CFF;
+    }
+    input[type="range"].stripe-slider::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+      background: #533AFD;
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 0 0 1px #533AFD;
+      transition: transform 0.12s ease, background-color 0.12s ease;
+    }
+
+    /* Subtle flat scrollbars */
+    .stripe-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .stripe-scroll::-webkit-scrollbar-track {
+      background: #FFFFFF;
+    }
+    .stripe-scroll::-webkit-scrollbar-thumb {
+      background: #E5EDF5;
+      border-radius: 9999px;
+    }
+    .stripe-scroll::-webkit-scrollbar-thumb:hover {
+      background: #B9B9F9;
+    }
+
+    /* Remove number input spinners for clean financial inputs */
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body class="bg-white text-stripe-text min-h-full overflow-x-hidden">
+
+  <!-- Flat Toast Notification Container (No alert() used) -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ==================== TOP NAVIGATION BAR ==================== -->
+  <header class="sticky top-0 z-30 bg-white border-b border-stripe-tertiary">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+
+      <!-- Left: Brand Mark & Subtitle Chip -->
+      <div class="flex items-center gap-3 min-w-0">
+        <!-- Subtle Violet Geometric Sun/Grid Icon -->
+        <div class="w-8 h-8 rounded-[4px] border border-stripe-secondary bg-white flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-stripe-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="3" y="3" width="18" height="18" rx="2" stroke="#B9B9F9" />
+            <path d="M3 12h18M12 3v18" stroke="#E5EDF5" />
+            <circle cx="12" cy="12" r="4" stroke="#533AFD" stroke-width="2" />
+            <path d="M12 5.5v1.5M12 17v1.5M5.5 12H7M17 12h1.5" stroke="#533AFD" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="text-lg font-medium tracking-[-0.02em] text-stripe-onSurface truncate">RenewableX</span>
+          <span class="hidden sm:inline-flex items-center px-3 py-1 rounded-full bg-stripe-tertiary text-stripe-onSurface text-xs font-normal whitespace-nowrap">
+            PV Screening v0.2
+          </span>
+        </div>
+      </div>
+
+      <!-- Right: Controls -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+        <!-- Currency Toggle (IDR / USD) -->
+        <div class="inline-flex items-center border border-stripe-tertiary rounded-[4px] p-0.5 bg-white" role="group" aria-label="Currency">
+          <button type="button" id="curr-idr" class="px-2.5 py-1 text-xs font-medium rounded-[3px] transition bg-stripe-primary text-white">IDR</button>
+          <button type="button" id="curr-usd" class="px-2.5 py-1 text-xs font-medium rounded-[3px] transition text-stripe-muted hover:text-stripe-onSurface">USD</button>
+        </div>
+
+        <!-- Language Toggle (EN / ID) -->
+        <div class="inline-flex items-center border border-stripe-tertiary rounded-[4px] p-0.5 bg-white" role="group" aria-label="Language">
+          <button type="button" id="lang-en" class="px-2.5 py-1 text-xs font-medium rounded-[3px] transition bg-stripe-tertiary text-stripe-onSurface">EN</button>
+          <button type="button" id="lang-id" class="px-2.5 py-1 text-xs font-medium rounded-[3px] transition text-stripe-muted hover:text-stripe-onSurface">ID</button>
+        </div>
+
+        <div class="hidden md:block h-5 w-px bg-stripe-tertiary mx-1"></div>
+
+        <!-- Reset Defaults Link-Button -->
+        <button id="btn-reset" type="button" class="text-sm font-normal text-stripe-primary hover:text-stripe-accent transition px-1 py-1 whitespace-nowrap" data-i18n="btnReset">
+          Reset Defaults
+        </button>
+
+        <!-- Secondary Buttons: Export JSON / CSV -->
+        <button id="btn-export-json" type="button" class="px-3 py-1.5 text-xs sm:text-sm font-normal bg-white text-stripe-primary border border-stripe-secondary hover:border-stripe-primary rounded-[4px] transition whitespace-nowrap">
+          Export JSON
+        </button>
+        <button id="btn-export-csv" type="button" class="px-3 py-1.5 text-xs sm:text-sm font-normal bg-white text-stripe-primary border border-stripe-secondary hover:border-stripe-primary rounded-[4px] transition whitespace-nowrap">
+          Export CSV
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN TWO-COLUMN CONTAINER (1400px) ==================== -->
+  <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Editorial Page Header -->
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 pb-8 border-b border-stripe-tertiary">
+      <div>
+        <h1 class="text-[28px] sm:text-[32px] font-light leading-[1.15] tracking-[-0.02em] text-stripe-onSurface" data-i18n="pageTitle">
+          Solar PV Screening & Financial Modeler
+        </h1>
+        <p id="project-summary-line" class="text-sm font-light text-stripe-muted mt-2 tabular-nums">
+          500 kWp · Jakarta (1,450 kWh/kWp) · 25 years · Total CAPEX: Rp 5.75B
+        </p>
+      </div>
+
+      <!-- Viability Status Chip + Total CAPEX -->
+      <div class="flex items-center gap-4 self-start md:self-auto">
+        <div class="text-right">
+          <div class="text-xs text-stripe-muted" data-i18n="totalCapexLabel">Total CAPEX</div>
+          <div id="header-total-capex" class="text-base font-medium text-stripe-onSurface tabular-nums">—</div>
+        </div>
+        <div class="h-8 w-px bg-stripe-tertiary"></div>
+        <span id="viability-chip" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-stripe-tertiary text-stripe-onSurface">
+          <span id="viability-dot" class="w-2 h-2 rounded-full bg-stripe-success"></span>
+          <span id="viability-text">Viable</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Validation Notice (Hidden when valid) -->
+    <div id="validation-banner" class="hidden mt-6 rounded-[6px] border border-stripe-error/40 bg-white px-4 py-3 text-sm text-stripe-error flex items-start gap-3">
+      <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="font-medium" data-i18n="valTitle">Input Validation Notice</div>
+        <ul id="validation-list" class="list-disc list-inside mt-1 text-xs space-y-0.5"></ul>
+      </div>
+    </div>
+
+    <!-- Two-Column Grid -->
+    <div class="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+      <!-- ==================== LEFT SIDEBAR: SCREENING INPUTS ==================== -->
+      <aside class="lg:col-span-4 xl:col-span-3 bg-white border border-stripe-tertiary rounded-[6px] p-5 space-y-6">
+        <div class="pb-4 border-b border-stripe-tertiary flex items-center justify-between">
+          <h2 class="text-base font-light tracking-[-0.01em] text-stripe-onSurface" data-i18n="inputsTitle">Screening Inputs</h2>
+          <span class="px-2.5 py-0.5 rounded-full bg-stripe-tertiary text-stripe-onSurface text-xs" id="active-currency-chip">IDR</span>
+        </div>
+
+        <!-- Location Preset -->
+        <div class="space-y-1.5">
+          <label for="location-preset" class="block text-sm font-normal text-stripe-onSurface" data-i18n="lblLocation">Indonesian Location Preset</label>
+          <select id="location-preset" class="w-full bg-white border border-stripe-tertiary focus:border-stripe-primary rounded-[4px] px-3 py-2.5 text-sm text-stripe-onSurface focus:outline-none transition">
+            <option value="jakarta">Jakarta — 1,450 kWh/kWp</option>
+            <option value="surabaya">Surabaya — 1,580 kWh/kWp</option>
+            <option value="bandung">Bandung — 1,380 kWh/kWp</option>
+            <option value="makassar">Makassar — 1,620 kWh/kWp</option>
+            <option value="kupang">Kupang — 1,750 kWh/kWp</option>
+            <option value="medan">Medan — 1,420 kWh/kWp</option>
+            <option value="custom" data-i18n="optCustom">Custom Specific Yield</option>
+          </select>
+        </div>
+
+        <!-- Technical Parameters -->
+        <div class="space-y-4 pt-2 border-t border-stripe-tertiary">
+          <div class="text-xs font-medium text-stripe-muted" data-i18n="secTechnical">Technical Parameters</div>
+
+          <!-- System Capacity -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-capacity" class="text-sm text-stripe-text" data-i18n="lblCapacity">System Capacity</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <input id="num-capacity" type="number" min="50" max="10000" step="10" value="500" class="w-20 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1.5">kWp</span>
+              </div>
+            </div>
+            <input id="rng-capacity" type="range" min="50" max="10000" step="10" value="500" class="stripe-slider" />
+          </div>
+
+          <!-- Specific Yield -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-yield" class="text-sm text-stripe-text" data-i18n="lblYield">Specific Yield</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <input id="num-yield" type="number" min="1000" max="2100" step="10" value="1450" class="w-16 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1.5">kWh/kWp</span>
+              </div>
+            </div>
+            <input id="rng-yield" type="range" min="1000" max="2100" step="10" value="1450" class="stripe-slider" />
+          </div>
+
+          <!-- Annual Degradation -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-degrad" class="text-sm text-stripe-text" data-i18n="lblDegrad">Annual Degradation</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <input id="num-degrad" type="number" min="0.1" max="1.5" step="0.05" value="0.55" class="w-14 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1.5">%/yr</span>
+              </div>
+            </div>
+            <input id="rng-degrad" type="range" min="0.1" max="1.5" step="0.05" value="0.55" class="stripe-slider" />
+          </div>
+        </div>
+
+        <!-- Financial Parameters -->
+        <div class="space-y-4 pt-2 border-t border-stripe-tertiary">
+          <div class="text-xs font-medium text-stripe-muted" data-i18n="secFinancial">Financial & Tariff Assumptions</div>
+
+          <!-- CAPEX per kWp -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-capex" class="text-sm text-stripe-text" data-i18n="lblCapex">CAPEX per kWp</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <span id="unit-capex-prefix" class="text-xs text-stripe-muted mr-1">Rp</span>
+                <input id="num-capex" type="number" min="5000000" max="25000000" step="250000" value="11500000" class="w-24 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+              </div>
+            </div>
+            <input id="rng-capex" type="range" min="5000000" max="25000000" step="250000" value="11500000" class="stripe-slider" />
+          </div>
+
+          <!-- Annual O&M -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-om" class="text-sm text-stripe-text" data-i18n="lblOm">Annual O&M (% CAPEX)</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <input id="num-om" type="number" min="0.5" max="4.0" step="0.1" value="1.5" class="w-14 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1.5">%</span>
+              </div>
+            </div>
+            <input id="rng-om" type="range" min="0.5" max="4.0" step="0.1" value="1.5" class="stripe-slider" />
+          </div>
+
+          <!-- Electricity Tariff -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-tariff" class="text-sm text-stripe-text" data-i18n="lblTariff">Electricity Tariff</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <span id="unit-tariff-prefix" class="text-xs text-stripe-muted mr-1">Rp</span>
+                <input id="num-tariff" type="number" min="500" max="3500" step="15" value="1445" class="w-20 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1">/kWh</span>
+              </div>
+            </div>
+            <input id="rng-tariff" type="range" min="500" max="3500" step="15" value="1445" class="stripe-slider" />
+          </div>
+
+          <!-- Tariff Escalation -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-escalation" class="text-sm text-stripe-text" data-i18n="lblEscalation">Tariff Escalation</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <input id="num-escalation" type="number" min="0" max="8" step="0.25" value="2.0" class="w-14 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1.5">%/yr</span>
+              </div>
+            </div>
+            <input id="rng-escalation" type="range" min="0" max="8" step="0.25" value="2.0" class="stripe-slider" />
+          </div>
+
+          <!-- Discount Rate (WACC) -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-wacc" class="text-sm text-stripe-text" data-i18n="lblWacc">Discount Rate (WACC)</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <input id="num-wacc" type="number" min="3" max="20" step="0.25" value="9.5" class="w-14 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1.5">%</span>
+              </div>
+            </div>
+            <input id="rng-wacc" type="range" min="3" max="20" step="0.25" value="9.5" class="stripe-slider" />
+          </div>
+
+          <!-- Project Lifetime -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <label for="num-lifetime" class="text-sm text-stripe-text" data-i18n="lblLifetime">Project Lifetime</label>
+              <div class="flex items-center border border-stripe-tertiary focus-within:border-stripe-primary rounded-[4px] px-2.5 py-1 bg-white">
+                <input id="num-lifetime" type="number" min="10" max="30" step="1" value="25" class="w-14 text-right text-sm text-stripe-onSurface tabular-nums focus:outline-none bg-transparent" />
+                <span class="text-xs text-stripe-muted ml-1.5" data-i18n="unitYearsShort">yrs</span>
+              </div>
+            </div>
+            <input id="rng-lifetime" type="range" min="10" max="30" step="1" value="25" class="stripe-slider" />
+          </div>
+        </div>
+      </aside>
+
+      <!-- ==================== RIGHT MAIN WORKSPACE ==================== -->
+      <main class="lg:col-span-8 xl:col-span-9 space-y-8 min-w-0">
+
+        <!-- Executive KPI Strip (5 Flat Bordered Cards) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          <!-- KPI 1: NPV -->
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-normal text-stripe-muted" data-i18n="kpiNpv">Net Present Value</span>
+              <span id="dot-npv" class="w-2 h-2 rounded-full bg-stripe-success shrink-0"></span>
+            </div>
+            <div id="kpi-npv" class="text-[22px] font-light tracking-[-0.02em] text-stripe-onSurface mt-3 tabular-nums truncate">—</div>
+            <div id="kpi-npv-sub" class="text-xs text-stripe-muted mt-1.5 tabular-nums">at 9.5% WACC</div>
+          </div>
+
+          <!-- KPI 2: IRR -->
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-normal text-stripe-muted" data-i18n="kpiIrr">Internal Rate of Return</span>
+              <span id="dot-irr" class="w-2 h-2 rounded-full bg-stripe-success shrink-0"></span>
+            </div>
+            <div id="kpi-irr" class="text-[22px] font-light tracking-[-0.02em] text-stripe-success mt-3 tabular-nums">—</div>
+            <div id="kpi-irr-sub" class="text-xs text-stripe-muted mt-1.5 tabular-nums">vs 9.5% WACC</div>
+          </div>
+
+          <!-- KPI 3: Payback -->
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-normal text-stripe-muted" data-i18n="kpiPayback">Simple Payback</span>
+            </div>
+            <div id="kpi-payback" class="text-[22px] font-light tracking-[-0.02em] text-stripe-onSurface mt-3 tabular-nums">—</div>
+            <div id="kpi-payback-sub" class="text-xs text-stripe-muted mt-1.5 tabular-nums">Discounted: —</div>
+          </div>
+
+          <!-- KPI 4: LCOE -->
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-normal text-stripe-muted" data-i18n="kpiLcoe">LCOE</span>
+            </div>
+            <div id="kpi-lcoe" class="text-[22px] font-light tracking-[-0.02em] text-stripe-onSurface mt-3 tabular-nums">—</div>
+            <div id="kpi-lcoe-sub" class="text-xs text-stripe-muted mt-1.5 tabular-nums">vs Tariff —</div>
+          </div>
+
+          <!-- KPI 5: Lifetime CO2 Avoided -->
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] p-5 flex flex-col justify-between sm:col-span-2 xl:col-span-1">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-normal text-stripe-muted" data-i18n="kpiCo2">Lifetime CO₂ Avoided</span>
+            </div>
+            <div id="kpi-co2" class="text-[22px] font-light tracking-[-0.02em] text-stripe-onSurface mt-3 tabular-nums">—</div>
+            <div id="kpi-co2-sub" class="text-xs text-stripe-muted mt-1.5 tabular-nums">0.78 kg/kWh grid</div>
+          </div>
+        </section>
+
+        <!-- 3-Tab Navigation (Minimal Underline in #533AFD) -->
+        <nav class="border-b border-stripe-tertiary flex items-center gap-6 overflow-x-auto" aria-label="Workspace Tabs">
+          <button type="button" data-tab="charts" class="tab-btn pb-3 text-sm font-medium border-b-2 border-stripe-primary text-stripe-primary whitespace-nowrap transition" data-i18n="tabCharts">
+            Cash Flow & Energy
+          </button>
+          <button type="button" data-tab="sensitivity" class="tab-btn pb-3 text-sm font-normal border-b-2 border-transparent text-stripe-muted hover:text-stripe-onSurface whitespace-nowrap transition" data-i18n="tabSensitivity">
+            Sensitivity Analysis
+          </button>
+          <button type="button" data-tab="schedule" class="tab-btn pb-3 text-sm font-normal border-b-2 border-transparent text-stripe-muted hover:text-stripe-onSurface whitespace-nowrap transition" data-i18n="tabSchedule">
+            Financial Schedule
+          </button>
+        </nav>
+
+        <!-- ==================== TAB 1: CASH FLOW & ENERGY ==================== -->
+        <section id="panel-charts" class="tab-panel space-y-6">
+          <!-- Cash Flow Chart Card -->
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] p-5 sm:p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+              <div>
+                <h3 class="text-lg font-light tracking-[-0.01em] text-stripe-onSurface" data-i18n="chartCashflowTitle">Annual Net & Cumulative Cash Flow</h3>
+                <p class="text-xs text-stripe-muted mt-0.5" data-i18n="chartCashflowSub">Year 0 CAPEX outlay, escalating electricity savings, and 2% annual O&M inflation</p>
+              </div>
+              <span id="payback-chip" class="inline-flex items-center px-3 py-1 rounded-full bg-stripe-tertiary text-stripe-onSurface text-xs tabular-nums self-start sm:self-auto">
+                Payback: —
+              </span>
+            </div>
+            <div class="relative h-[320px] sm:h-[360px] w-full">
+              <canvas id="cashflow-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Energy Generation Chart Card -->
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] p-5 sm:p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+              <div>
+                <h3 class="text-lg font-light tracking-[-0.01em] text-stripe-onSurface" data-i18n="chartEnergyTitle">Annual Degraded Energy Generation</h3>
+                <p class="text-xs text-stripe-muted mt-0.5" data-i18n="chartEnergySub">Projected annual solar output (MWh) incorporating compound panel degradation</p>
+              </div>
+              <span id="lifetime-energy-chip" class="inline-flex items-center px-3 py-1 rounded-full bg-stripe-tertiary text-stripe-onSurface text-xs tabular-nums self-start sm:self-auto">
+                Lifetime: — MWh
+              </span>
+            </div>
+            <div class="relative h-[260px] sm:h-[300px] w-full">
+              <canvas id="energy-chart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== TAB 2: SENSITIVITY ANALYSIS ==================== -->
+        <section id="panel-sensitivity" class="tab-panel hidden space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+
+            <!-- Tornado Chart Card -->
+            <div class="xl:col-span-6 bg-white border border-stripe-tertiary rounded-[6px] p-5 sm:p-6 flex flex-col">
+              <div class="mb-4">
+                <h3 class="text-lg font-light tracking-[-0.01em] text-stripe-onSurface" data-i18n="tornadoTitle">NPV Sensitivity — Tornado (±15%)</h3>
+                <p class="text-xs text-stripe-muted mt-0.5" data-i18n="tornadoSub">Single-variable ±15% impact on Net Present Value, ranked by magnitude</p>
+              </div>
+              <div class="flex items-center gap-4 text-xs text-stripe-muted mb-4">
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-[2px] bg-stripe-error inline-block"></span>
+                  <span data-i18n="tornadoDown">Downside (Lower NPV)</span>
+                </span>
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-[2px] bg-stripe-primary inline-block"></span>
+                  <span data-i18n="tornadoUp">Upside (Higher NPV)</span>
+                </span>
+              </div>
+              <div class="relative h-[320px] w-full flex-1">
+                <canvas id="tornado-chart"></canvas>
+              </div>
+            </div>
+
+            <!-- 5x5 IRR Heatmap Card -->
+            <div class="xl:col-span-6 bg-white border border-stripe-tertiary rounded-[6px] p-5 sm:p-6 flex flex-col">
+              <div class="mb-4">
+                <h3 class="text-lg font-light tracking-[-0.01em] text-stripe-onSurface" data-i18n="heatmapTitle">IRR Sensitivity Matrix (CAPEX vs. Tariff)</h3>
+                <p class="text-xs text-stripe-muted mt-0.5" data-i18n="heatmapSub">5×5 scenario grid showing Project IRR (%) across −20% to +20% shifts</p>
+              </div>
+
+              <div class="overflow-x-auto flex-1 flex flex-col justify-center">
+                <div class="min-w-[380px]">
+                  <div class="text-center text-xs text-stripe-muted mb-2" data-i18n="heatmapXAxis">Electricity Tariff Variation →</div>
+                  <div id="heatmap-grid" class="grid grid-cols-6 gap-1.5 text-center text-xs"></div>
+                </div>
+              </div>
+
+              <!-- Scenario Inspector -->
+              <div class="mt-4 p-3 rounded-[4px] border border-stripe-tertiary bg-white flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span class="font-medium text-stripe-onSurface" id="hm-scenario-label">Base Case (CAPEX 0% · Tariff 0%)</span>
+                <div class="flex items-center gap-3 tabular-nums">
+                  <span class="text-stripe-muted">IRR: <strong id="hm-irr" class="text-stripe-onSurface font-medium">—</strong></span>
+                  <span class="text-stripe-muted">NPV: <strong id="hm-npv" class="text-stripe-onSurface font-medium">—</strong></span>
+                  <span class="text-stripe-muted">PB: <strong id="hm-pb" class="text-stripe-onSurface font-medium">—</strong></span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- ==================== TAB 3: FINANCIAL SCHEDULE ==================== -->
+        <section id="panel-schedule" class="tab-panel hidden">
+          <div class="bg-white border border-stripe-tertiary rounded-[6px] overflow-hidden">
+            <div class="p-5 border-b border-stripe-tertiary flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h3 class="text-lg font-light tracking-[-0.01em] text-stripe-onSurface" data-i18n="tableTitle">Year-by-Year Financial Schedule</h3>
+                <p class="text-xs text-stripe-muted mt-0.5" data-i18n="tableSub">Complete cash flow projection from Year 0 investment through end of project life</p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stripe-tertiary text-stripe-onSurface text-xs self-start sm:self-auto">
+                <span class="w-2 h-2 rounded-full bg-stripe-primary"></span>
+                <span data-i18n="tablePaybackLegend">Highlighted row = Payback year</span>
+              </span>
+            </div>
+
+            <div class="overflow-x-auto max-h-[540px] stripe-scroll">
+              <table class="w-full text-right border-collapse text-xs sm:text-sm tabular-nums">
+                <thead class="bg-white text-stripe-muted font-normal sticky top-0 z-10 border-b border-stripe-tertiary">
+                  <tr>
+                    <th class="py-3 px-4 text-left font-medium" data-i18n="colYear">Year</th>
+                    <th class="py-3 px-4 font-medium" data-i18n="colEnergy">Energy (kWh)</th>
+                    <th class="py-3 px-4 font-medium" data-i18n="colTariff">Tariff (/kWh)</th>
+                    <th class="py-3 px-4 font-medium" data-i18n="colSavings">Gross Savings</th>
+                    <th class="py-3 px-4 font-medium" data-i18n="colOm">O&M Cost</th>
+                    <th class="py-3 px-4 font-medium" data-i18n="colNetCf">Net Cash Flow</th>
+                    <th class="py-3 px-4 font-medium" data-i18n="colDcf">Discounted CF</th>
+                    <th class="py-3 px-4 font-medium" data-i18n="colCumCf">Cumulative CF</th>
+                  </tr>
+                </thead>
+                <tbody id="schedule-tbody" class="divide-y divide-stripe-tertiary text-stripe-text"></tbody>
+                <tfoot id="schedule-tfoot" class="bg-white border-t-2 border-stripe-onSurface text-stripe-onSurface font-medium sticky bottom-0 z-10"></tfoot>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Minimal Footer -->
+        <footer class="pt-6 border-t border-stripe-tertiary flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-stripe-muted">
+          <span data-i18n="footerLeft">RenewableX Financial Engine · Indonesian Grid Emission Factor: 0.78 kg CO₂/kWh</span>
+          <span data-i18n="footerRight">O&M Inflation: 2.0%/yr · Client-Side Model</span>
+        </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ==================== APPLICATION SCRIPT ==================== -->
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. CONSTANTS, PRESETS & BILINGUAL DICTIONARY
+      // =========================================================================
+      const GRID_EMISSION_FACTOR = 0.78; // kg CO2 / kWh (Indonesian grid factor)
+      const OM_INFLATION = 0.02;         // 2% annual O&M inflation
+
+      const LOCATION_PRESETS = {
+        jakarta:  { yield: 1450, labelEn: 'Jakarta',  labelId: 'Jakarta' },
+        surabaya: { yield: 1580, labelEn: 'Surabaya', labelId: 'Surabaya' },
+        bandung:  { yield: 1380, labelEn: 'Bandung',  labelId: 'Bandung' },
+        makassar: { yield: 1620, labelEn: 'Makassar', labelId: 'Makassar' },
+        kupang:   { yield: 1750, labelEn: 'Kupang',   labelId: 'Kupang' },
+        medan:    { yield: 1420, labelEn: 'Medan',    labelId: 'Medan' },
+        custom:   { yield: null, labelEn: 'Custom',   labelId: 'Kustom' }
+      };
+
+      const CURRENCY_CONFIG = {
+        IDR: {
+          symbol: 'Rp',
+          capexDefault: 11500000,
+          capexMin: 5000000,
+          capexMax: 25000000,
+          capexStep: 250000,
+          tariffDefault: 1445,
+          tariffMin: 500,
+          tariffMax: 3500,
+          tariffStep: 15
+        },
+        USD: {
+          symbol: '$',
+          capexDefault: 750,
+          capexMin: 350,
+          capexMax: 1800,
+          capexStep: 10,
+          tariffDefault: 0.095,
+          tariffMin: 0.03,
+          tariffMax: 0.30,
+          tariffStep: 0.005
+        }
+      };
+
+      const I18N = {
+        en: {
+          pageTitle: 'Solar PV Screening & Financial Modeler',
+          btnReset: 'Reset Defaults',
+          totalCapexLabel: 'Total CAPEX',
+          valTitle: 'Input Validation Notice',
+          inputsTitle: 'Screening Inputs',
+          lblLocation: 'Indonesian Location Preset',
+          optCustom: 'Custom Specific Yield',
+          secTechnical: 'Technical Parameters',
+          secFinancial: 'Financial & Tariff Assumptions',
+          lblCapacity: 'System Capacity',
+          lblYield: 'Specific Yield',
+          lblDegrad: 'Annual Degradation',
+          lblCapex: 'CAPEX per kWp',
+          lblOm: 'Annual O&M (% CAPEX)',
+          lblTariff: 'Electricity Tariff',
+          lblEscalation: 'Tariff Escalation',
+          lblWacc: 'Discount Rate (WACC)',
+          lblLifetime: 'Project Lifetime',
+          unitYearsShort: 'yrs',
+          kpiNpv: 'Net Present Value',
+          kpiIrr: 'Internal Rate of Return',
+          kpiPayback: 'Simple Payback',
+          kpiLcoe: 'LCOE',
+          kpiCo2: 'Lifetime CO₂ Avoided',
+          tabCharts: 'Cash Flow & Energy',
+          tabSensitivity: 'Sensitivity Analysis',
+          tabSchedule: 'Financial Schedule',
+          chartCashflowTitle: 'Annual Net & Cumulative Cash Flow',
+          chartCashflowSub: 'Year 0 CAPEX outlay, escalating electricity savings, and 2% annual O&M inflation',
+          chartEnergyTitle: 'Annual Degraded Energy Generation',
+          chartEnergySub: 'Projected annual solar output (MWh) incorporating compound panel degradation',
+          tornadoTitle: 'NPV Sensitivity — Tornado (±15%)',
+          tornadoSub: 'Single-variable ±15% impact on Net Present Value, ranked by magnitude',
+          tornadoDown: 'Downside (Lower NPV)',
+          tornadoUp: 'Upside (Higher NPV)',
+          heatmapTitle: 'IRR Sensitivity Matrix (CAPEX vs. Tariff)',
+          heatmapSub: '5×5 scenario grid showing Project IRR (%) across −20% to +20% shifts',
+          heatmapXAxis: 'Electricity Tariff Variation →',
+          tableTitle: 'Year-by-Year Financial Schedule',
+          tableSub: 'Complete cash flow projection from Year 0 investment through end of project life',
+          tablePaybackLegend: 'Highlighted row = Payback year',
+          colYear: 'Year',
+          colEnergy: 'Energy (kWh)',
+          colTariff: 'Tariff (/kWh)',
+          colSavings: 'Gross Savings',
+          colOm: 'O&M Cost',
+          colNetCf: 'Net Cash Flow',
+          colDcf: 'Discounted CF',
+          colCumCf: 'Cumulative CF',
+          footerLeft: 'RenewableX Financial Engine · Indonesian Grid Emission Factor: 0.78 kg CO₂/kWh',
+          footerRight: 'O&M Inflation: 2.0%/yr · Client-Side Model',
+          badgeViable: 'Viable',
+          badgeMarginal: 'Marginal',
+          badgeUnviable: 'Unviable',
+          atWacc: 'at {v}% WACC',
+          vsWacc: 'vs {v}% WACC',
+          discPayback: 'Discounted: {v}',
+          vsTariff: 'vs Tariff {v}',
+          gridFactor: '0.78 kg/kWh grid',
+          paybackPrefix: 'Payback: {v}',
+          lifetimeEnergyPrefix: 'Lifetime: {v} MWh',
+          yrPrefix: 'Yr',
+          totalRow: 'Total / Lifetime',
+          dsNetCf: 'Annual Net Cash Flow',
+          dsCumCf: 'Cumulative Cash Flow',
+          dsEnergy: 'Annual Generation (MWh)',
+          sensTariff: 'Electricity Tariff',
+          sensYield: 'Specific Yield',
+          sensCapex: 'CAPEX per kWp',
+          sensWacc: 'Discount Rate (WACC)',
+          sensOm: 'Annual O&M Cost',
+          capexLabel: 'CAPEX',
+          tariffLabel: 'Tariff',
+          baseCase: 'Base Case',
+          toastReset: 'Parameters reset to defaults.',
+          toastJson: 'Exported RenewableX model as JSON.',
+          toastCsv: 'Exported financial schedule as CSV.',
+          valBounds: '{field} must be between {min} and {max}. Clamped for calculation.'
+        },
+        id: {
+          pageTitle: 'Skrining & Pemodelan Finansial PLTS',
+          btnReset: 'Reset Default',
+          totalCapexLabel: 'Total CAPEX',
+          valTitle: 'Peringatan Validasi Input',
+          inputsTitle: 'Parameter Skrining',
+          lblLocation: 'Preset Lokasi Indonesia',
+          optCustom: 'Specific Yield Kustom',
+          secTechnical: 'Parameter Teknis',
+          secFinancial: 'Asumsi Finansial & Tarif',
+          lblCapacity: 'Kapasitas Sistem',
+          lblYield: 'Specific Yield',
+          lblDegrad: 'Degradasi Tahunan',
+          lblCapex: 'CAPEX per kWp',
+          lblOm: 'O&M Tahunan (% CAPEX)',
+          lblTariff: 'Tarif Listrik',
+          lblEscalation: 'Eskalasi Tarif',
+          lblWacc: 'Tingkat Diskonto (WACC)',
+          lblLifetime: 'Umur Proyek',
+          unitYearsShort: 'thn',
+          kpiNpv: 'Net Present Value',
+          kpiIrr: 'Internal Rate of Return',
+          kpiPayback: 'Payback Sederhana',
+          kpiLcoe: 'LCOE',
+          kpiCo2: 'CO₂ Dihindari (Total)',
+          tabCharts: 'Arus Kas & Energi',
+          tabSensitivity: 'Analisis Sensitivitas',
+          tabSchedule: 'Jadwal Finansial',
+          chartCashflowTitle: 'Arus Kas Bersih Tahunan & Kumulatif',
+          chartCashflowSub: 'Investasi CAPEX Tahun 0, penghematan tarif bereskalasi, dan inflasi O&M 2%/thn',
+          chartEnergyTitle: 'Produksi Energi Surya Tahunan',
+          chartEnergySub: 'Proyeksi output surya tahunan (MWh) dengan degradasi panel majemuk',
+          tornadoTitle: 'Sensitivitas NPV — Tornado (±15%)',
+          tornadoSub: 'Dampak perubahan ±15% per variabel terhadap NPV, diurutkan dari dampak terbesar',
+          tornadoDown: 'Skenario Turun (NPV Lebih Rendah)',
+          tornadoUp: 'Skenario Naik (NPV Lebih Tinggi)',
+          heatmapTitle: 'Matriks Sensitivitas IRR (CAPEX vs. Tarif)',
+          heatmapSub: 'Matriks 5×5 menampilkan IRR Proyek (%) pada variasi −20% hingga +20%',
+          heatmapXAxis: 'Variasi Tarif Listrik →',
+          tableTitle: 'Jadwal Finansial Tahunan',
+          tableSub: 'Proyeksi arus kas lengkap dari investasi Tahun 0 hingga akhir umur proyek',
+          tablePaybackLegend: 'Baris tersorot = Tahun balik modal',
+          colYear: 'Tahun',
+          colEnergy: 'Energi (kWh)',
+          colTariff: 'Tarif (/kWh)',
+          colSavings: 'Penghematan',
+          colOm: 'Biaya O&M',
+          colNetCf: 'Arus Kas Bersih',
+          colDcf: 'Arus Kas Diskonto',
+          colCumCf: 'Arus Kas Kumulatif',
+          footerLeft: 'Mesin Finansial RenewableX · Faktor Emisi Grid Indonesia: 0,78 kg CO₂/kWh',
+          footerRight: 'Inflasi O&M: 2,0%/thn · Model Sisi Klien',
+          badgeViable: 'Layak',
+          badgeMarginal: 'Marjinal',
+          badgeUnviable: 'Tidak Layak',
+          atWacc: 'pada WACC {v}%',
+          vsWacc: 'vs WACC {v}%',
+          discPayback: 'Diskonto: {v}',
+          vsTariff: 'vs Tarif {v}',
+          gridFactor: '0,78 kg/kWh grid',
+          paybackPrefix: 'Balik Modal: {v}',
+          lifetimeEnergyPrefix: 'Total: {v} MWh',
+          yrPrefix: 'Thn',
+          totalRow: 'Total / Umur Proyek',
+          dsNetCf: 'Arus Kas Bersih Tahunan',
+          dsCumCf: 'Arus Kas Kumulatif',
+          dsEnergy: 'Produksi Tahunan (MWh)',
+          sensTariff: 'Tarif Listrik',
+          sensYield: 'Specific Yield',
+          sensCapex: 'CAPEX per kWp',
+          sensWacc: 'Tingkat Diskonto (WACC)',
+          sensOm: 'Biaya O&M Tahunan',
+          capexLabel: 'CAPEX',
+          tariffLabel: 'Tarif',
+          baseCase: 'Kasus Dasar',
+          toastReset: 'Parameter dikembalikan ke nilai default.',
+          toastJson: 'Model RenewableX berhasil diekspor ke JSON.',
+          toastCsv: 'Jadwal finansial berhasil diekspor ke CSV.',
+          valBounds: '{field} harus antara {min} dan {max}. Nilai disesuaikan.'
+        }
+      };
+
+      // =========================================================================
+      // 2. STATE
+      // =========================================================================
+      const state = {
+        lang: 'en',
+        currency: 'IDR',
+        activeTab: 'charts',
+        location: 'jakarta',
+        inputs: {
+          capacity: 500,
+          specificYield: 1450,
+          capexPerKwp: 11500000,
+          omPct: 1.5,
+          tariff: 1445,
+          escalation: 2.0,
+          degradation: 0.55,
+          wacc: 9.5,
+          lifetime: 25
+        },
+        lastModel: null,
+        lastSensitivity: null
+      };
+
+      let cashflowChart = null;
+      let energyChart = null;
+      let tornadoChart = null;
+
+      // =========================================================================
+      // 3. FORMATTERS & HELPERS
+      // =========================================================================
+      function t(key, vars = {}) {
+        let str = (I18N[state.lang] && I18N[state.lang][key]) || I18N.en[key] || key;
+        Object.keys(vars).forEach(k => {
+          str = str.replace(`{${k}}`, vars[k]);
+        });
+        return str;
+      }
+
+      function getLocale() {
+        return state.lang === 'id' ? 'id-ID' : 'en-US';
+      }
+
+      function formatNumber(val, decimals = 0) {
+        if (val === null || val === undefined || isNaN(val)) return '—';
+        return new Intl.NumberFormat(getLocale(), {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        }).format(val);
+      }
+
+      function formatCurrencyCompact(value) {
+        if (value === null || value === undefined || isNaN(value)) return '—';
+        const sign = value < 0 ? '-' : '';
+        const abs = Math.abs(value);
+
+        if (state.currency === 'IDR') {
+          if (abs >= 1e12) return `${sign}Rp ${formatNumber(abs / 1e12, 2)}T`;
+          if (abs >= 1e9)  return `${sign}Rp ${formatNumber(abs / 1e9, 2)}${state.lang === 'id' ? ' M' : 'B'}`;
+          if (abs >= 1e6)  return `${sign}Rp ${formatNumber(abs / 1e6, 1)}${state.lang === 'id' ? ' Jt' : 'M'}`;
+          if (abs >= 1e3)  return `${sign}Rp ${formatNumber(abs / 1e3, 0)}K`;
+          return `${sign}Rp ${formatNumber(abs, 0)}`;
+        } else {
+          if (abs >= 1e9) return `${sign}$${formatNumber(abs / 1e9, 2)}B`;
+          if (abs >= 1e6) return `${sign}$${formatNumber(abs / 1e6, 2)}M`;
+          if (abs >= 1e3) return `${sign}$${formatNumber(abs / 1e3, 1)}K`;
+          return `${sign}$${formatNumber(abs, 2)}`;
+        }
+      }
+
+      function formatCurrencyExact(value) {
+        if (value === null || value === undefined || isNaN(value)) return '—';
+        const sign = value < 0 ? '-' : '';
+        const abs = Math.abs(value);
+        if (state.currency === 'IDR') return `${sign}Rp ${formatNumber(abs, 0)}`;
+        return `${sign}$${formatNumber(abs, 0)}`;
+      }
+
+      function formatPerKwh(value) {
+        if (value === null || value === undefined || isNaN(value)) return '—';
+        if (state.currency === 'IDR') return `Rp ${formatNumber(value, 0)}/kWh`;
+        return `$${formatNumber(value, 3)}/kWh`;
+      }
+
+      function formatYears(val, lifetime) {
+        if (val === null || val === undefined || isNaN(val)) {
+          return `> ${lifetime} ${t('unitYearsShort')}`;
+        }
+        return `${formatNumber(val, 1)} ${t('unitYearsShort')}`;
+      }
+
+      function showToast(message) {
+        const container = document.getElementById('toast-container');
+        const el = document.createElement('div');
+        el.className = 'pointer-events-auto bg-white text-stripe-onSurface text-xs font-normal px-4 py-3 rounded-[4px] border border-stripe-secondary flex items-center gap-2 transition-all duration-200 opacity-0 translate-y-2';
+        el.innerHTML = `<span class="w-2 h-2 rounded-full bg-stripe-primary"></span><span>${message}</span>`;
+        container.appendChild(el);
+        requestAnimationFrame(() => el.classList.remove('opacity-0', 'translate-y-2'));
+        setTimeout(() => {
+          el.classList.add('opacity-0', 'translate-y-2');
+          setTimeout(() => el.remove(), 220);
+        }, 2600);
+      }
+
+      // =========================================================================
+      // 4. FINANCIAL ENGINE (HYBRID NEWTON-RAPHSON + BISECTION IRR)
+      // =========================================================================
+      function computeIRR(cashFlows) {
+        const hasPos = cashFlows.some(cf => cf > 0);
+        const hasNeg = cashFlows.some(cf => cf < 0);
+        if (!hasPos || !hasNeg) return null;
+
+        const npvAt = (r) => {
+          let sum = 0;
+          for (let t = 0; t < cashFlows.length; t++) {
+            sum += cashFlows[t] / Math.pow(1 + r, t);
+          }
+          return sum;
+        };
+
+        const dNpvAt = (r) => {
+          let sum = 0;
+          for (let t = 1; t < cashFlows.length; t++) {
+            sum -= (t * cashFlows[t]) / Math.pow(1 + r, t + 1);
+          }
+          return sum;
+        };
+
+        // Newton-Raphson pass
+        let r = 0.12;
+        for (let iter = 0; iter < 50; iter++) {
+          const f = npvAt(r);
+          if (Math.abs(f) < 1e-6) {
+            if (r > -0.95 && r < 10) return r;
+            break;
+          }
+          const df = dNpvAt(r);
+          if (Math.abs(df) < 1e-10) break;
+          const nextR = r - f / df;
+          if (!isFinite(nextR) || nextR <= -0.99 || nextR > 10) break;
+          if (Math.abs(nextR - r) < 1e-7) return nextR;
+          r = nextR;
+        }
+
+        // Bisection fallback
+        let low = -0.90;
+        let high = 5.0;
+        let fLow = npvAt(low);
+        let fHigh = npvAt(high);
+        if (fLow * fHigh > 0) return null;
+
+        for (let iter = 0; iter < 80; iter++) {
+          const mid = (low + high) / 2;
+          const fMid = npvAt(mid);
+          if (Math.abs(fMid) < 1e-6 || (high - low) < 1e-7) return mid;
+          if (fLow * fMid <= 0) {
+            high = mid;
+            fHigh = fMid;
+          } else {
+            low = mid;
+            fLow = fMid;
+          }
+        }
+        return (low + high) / 2;
+      }
+
+      function runFinancialModel(params) {
+        const {
+          capacity,
+          specificYield,
+          capexPerKwp,
+          omPct,
+          tariff,
+          escalation,
+          degradation,
+          wacc,
+          lifetime
+        } = params;
+
+        const totalCapex = capacity * capexPerKwp;
+        const waccDec = wacc / 100;
+        const escDec = escalation / 100;
+        const degDec = degradation / 100;
+        const omDec = omPct / 100;
+
+        const schedule = [];
+        const cashFlows = [];
+
+        let cumCf = -totalCapex;
+        let cumDcf = -totalCapex;
+        cashFlows.push(-totalCapex);
+
+        schedule.push({
+          year: 0,
+          energyKwh: 0,
+          energyMwh: 0,
+          tariff: tariff,
+          savings: 0,
+          om: 0,
+          netCf: -totalCapex,
+          dcf: -totalCapex,
+          cumCf: cumCf
+        });
+
+        let totalEnergyKwh = 0;
+        let discountedCosts = totalCapex;
+        let discountedEnergyKwh = 0;
+        let totalSavings = 0;
+        let totalOm = 0;
+        let totalNetCf = -totalCapex;
+
+        let simplePayback = null;
+        let simplePaybackYear = null;
+        let discountedPayback = null;
+
+        for (let yr = 1; yr <= lifetime; yr++) {
+          const energyKwh = capacity * specificYield * Math.pow(1 - degDec, yr - 1);
+          const yrTariff = tariff * Math.pow(1 + escDec, yr - 1);
+          const savings = energyKwh * yrTariff;
+          const om = (totalCapex * omDec) * Math.pow(1 + OM_INFLATION, yr - 1);
+          const netCf = savings - om;
+
+          const prevCumCf = cumCf;
+          cumCf += netCf;
+
+          const discFactor = 1 / Math.pow(1 + waccDec, yr);
+          const dcf = netCf * discFactor;
+          const prevCumDcf = cumDcf;
+          cumDcf += dcf;
+
+          if (simplePayback === null && cumCf >= 0 && netCf > 0) {
+            simplePayback = (yr - 1) + (-prevCumCf / netCf);
+            simplePaybackYear = yr;
+          }
+          if (discountedPayback === null && cumDcf >= 0 && dcf > 0) {
+            discountedPayback = (yr - 1) + (-prevCumDcf / dcf);
+          }
+
+          totalEnergyKwh += energyKwh;
+          discountedCosts += om * discFactor;
+          discountedEnergyKwh += energyKwh * discFactor;
+          totalSavings += savings;
+          totalOm += om;
+          totalNetCf += netCf;
+
+          cashFlows.push(netCf);
+          schedule.push({
+            year: yr,
+            energyKwh,
+            energyMwh: energyKwh / 1000,
+            tariff: yrTariff,
+            savings,
+            om,
+            netCf,
+            dcf,
+            cumCf
+          });
+        }
+
+        const npv = cumDcf;
+        const irr = computeIRR(cashFlows);
+        const lcoe = discountedEnergyKwh > 0 ? discountedCosts / discountedEnergyKwh : 0;
+        const lifetimeMwh = totalEnergyKwh / 1000;
+        const co2AvoidedTonnes = (totalEnergyKwh * GRID_EMISSION_FACTOR) / 1000;
+
+        let viability = 'unviable';
+        if (npv > 0 && irr !== null && irr >= waccDec + 0.02) {
+          viability = 'viable';
+        } else if (npv >= 0 && irr !== null && irr >= waccDec) {
+          viability = 'marginal';
+        }
+
+        return {
+          totalCapex,
+          npv,
+          irr,
+          simplePayback,
+          simplePaybackYear,
+          discountedPayback,
+          lcoe,
+          totalEnergyKwh,
+          lifetimeMwh,
+          co2AvoidedTonnes,
+          totalSavings,
+          totalOm,
+          totalNetCf,
+          viability,
+          schedule
+        };
+      }
+
+      function runSensitivityAnalysis(baseParams, baseModel) {
+        const factors = [
+          { key: 'tariff',        i18n: 'sensTariff' },
+          { key: 'specificYield', i18n: 'sensYield' },
+          { key: 'capexPerKwp',   i18n: 'sensCapex' },
+          { key: 'wacc',          i18n: 'sensWacc' },
+          { key: 'omPct',         i18n: 'sensOm' }
+        ];
+
+        const tornado = factors.map(f => {
+          const lowNpv = runFinancialModel({ ...baseParams, [f.key]: baseParams[f.key] * 0.85 }).npv;
+          const highNpv = runFinancialModel({ ...baseParams, [f.key]: baseParams[f.key] * 1.15 }).npv;
+          const minNpv = Math.min(lowNpv, highNpv);
+          const maxNpv = Math.max(lowNpv, highNpv);
+          return { key: f.key, i18n: f.i18n, minNpv, maxNpv, swing: maxNpv - minNpv };
+        }).sort((a, b) => b.swing - a.swing);
+
+        const steps = [-0.20, -0.10, 0, 0.10, 0.20];
+        const heatmap = steps.map(capexShift =>
+          steps.map(tariffShift => {
+            const res = runFinancialModel({
+              ...baseParams,
+              capexPerKwp: baseParams.capexPerKwp * (1 + capexShift),
+              tariff: baseParams.tariff * (1 + tariffShift)
+            });
+            return { capexShift, tariffShift, irr: res.irr, npv: res.npv, simplePayback: res.simplePayback };
+          })
+        );
+
+        return { baseNpv: baseModel.npv, tornado, steps, heatmap };
+      }
+
+      // =========================================================================
+      // 5. VALIDATION
+      // =========================================================================
+      function getBounds() {
+        const cfg = CURRENCY_CONFIG[state.currency];
+        return {
+          capacity:      { min: 50, max: 10000, i18n: 'lblCapacity' },
+          specificYield: { min: 1000, max: 2100, i18n: 'lblYield' },
+          capexPerKwp:   { min: cfg.capexMin, max: cfg.capexMax, i18n: 'lblCapex' },
+          omPct:         { min: 0.5, max: 4.0, i18n: 'lblOm' },
+          tariff:        { min: cfg.tariffMin, max: cfg.tariffMax, i18n: 'lblTariff' },
+          escalation:    { min: 0, max: 8, i18n: 'lblEscalation' },
+          degradation:   { min: 0.1, max: 1.5, i18n: 'lblDegrad' },
+          wacc:          { min: 3, max: 20, i18n: 'lblWacc' },
+          lifetime:      { min: 10, max: 30, i18n: 'lblLifetime' }
+        };
+      }
+
+      function validateAndSanitizeInputs() {
+        const bounds = getBounds();
+        const sanitized = {};
+        const warnings = [];
+
+        Object.keys(bounds).forEach(key => {
+          const b = bounds[key];
+          let raw = Number(state.inputs[key]);
+          if (isNaN(raw) || raw < b.min || raw > b.max) {
+            warnings.push(t('valBounds', {
+              field: t(b.i18n),
+              min: formatNumber(b.min, b.min < 1 ? 3 : 0),
+              max: formatNumber(b.max, b.max < 1 ? 2 : 0)
+            }));
+            raw = isNaN(raw) ? b.min : Math.min(b.max, Math.max(b.min, raw));
+          }
+          if (key === 'lifetime') raw = Math.round(raw);
+          sanitized[key] = raw;
+        });
+
+        const banner = document.getElementById('validation-banner');
+        const list = document.getElementById('validation-list');
+        if (warnings.length > 0) {
+          list.innerHTML = warnings.map(w => `<li>${w}</li>`).join('');
+          banner.classList.remove('hidden');
+        } else {
+          banner.classList.add('hidden');
+          list.innerHTML = '';
+        }
+        return sanitized;
+      }
+
+      // =========================================================================
+      // 6. CHART.JS RENDERING (STRIPE MODERN PALETTE)
+      // =========================================================================
+      const baseNpvLinePlugin = {
+        id: 'baseNpvLine',
+        afterDatasetsDraw(chart) {
+          const baseVal = chart.options.plugins.baseNpvLine?.baseNpv;
+          if (baseVal === undefined || baseVal === null || isNaN(baseVal)) return;
+          const xScale = chart.scales.x;
+          const yScale = chart.scales.y;
+          if (!xScale || !yScale) return;
+          const xPos = xScale.getPixelForValue(baseVal);
+          if (xPos < xScale.left || xPos > xScale.right) return;
+
+          const ctx = chart.ctx;
+          ctx.save();
+          ctx.beginPath();
+          ctx.setLineDash([4, 4]);
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#061B31';
+          ctx.moveTo(xPos, yScale.top);
+          ctx.lineTo(xPos, yScale.bottom);
+          ctx.stroke();
+          ctx.restore();
+        }
+      };
+
+      function renderCashflowChart(model) {
+        const ctx = document.getElementById('cashflow-chart').getContext('2d');
+        const labels = model.schedule.map(r => `${t('yrPrefix')} ${r.year}`);
+        const netCfs = model.schedule.map(r => r.netCf);
+        const cumCfs = model.schedule.map(r => r.cumCf);
+        const barColors = netCfs.map(v => v < 0 ? '#D92D20' : '#B9B9F9');
+
+        const data = {
+          labels,
+          datasets: [
+            {
+              type: 'line',
+              label: t('dsCumCf'),
+              data: cumCfs,
+              borderColor: '#533AFD',
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              pointRadius: 2,
+              pointHoverRadius: 5,
+              pointBackgroundColor: '#533AFD',
+              tension: 0.15,
+              order: 1
+            },
+            {
+              type: 'bar',
+              label: t('dsNetCf'),
+              data: netCfs,
+              backgroundColor: barColors,
+              borderRadius: 3,
+              maxBarThickness: 24,
+              order: 2
+            }
+          ]
+        };
+
+        const options = {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'top',
+              align: 'end',
+              labels: { boxWidth: 10, usePointStyle: true, color: '#6B7A90', font: { family: 'Inter', size: 12, weight: '400' } }
+            },
+            tooltip: {
+              backgroundColor: '#061B31',
+              padding: 10,
+              cornerRadius: 4,
+              titleFont: { family: 'Inter', size: 12, weight: '500' },
+              bodyFont: { family: 'Inter', size: 12 },
+              callbacks: {
+                label: (c) => `${c.dataset.label}: ${formatCurrencyExact(c.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              border: { color: '#E5EDF5' },
+              ticks: { font: { family: 'Inter', size: 11 }, color: '#6B7A90', maxRotation: 0, autoSkip: true }
+            },
+            y: {
+              grid: { color: '#E5EDF5' },
+              border: { display: false },
+              ticks: {
+                font: { family: 'Inter', size: 11 },
+                color: '#6B7A90',
+                callback: (v) => formatCurrencyCompact(v)
+              }
+            }
+          }
+        };
+
+        if (!cashflowChart) {
+          cashflowChart = new Chart(ctx, { type: 'bar', data, options });
+        } else {
+          cashflowChart.data = data;
+          cashflowChart.options = options;
+          cashflowChart.update('none');
+        }
+      }
+
+      function renderEnergyChart(model) {
+        const ctx = document.getElementById('energy-chart').getContext('2d');
+        const rows = model.schedule.slice(1);
+        const labels = rows.map(r => `${t('yrPrefix')} ${r.year}`);
+        const energyData = rows.map(r => Number(r.energyMwh.toFixed(2)));
+
+        const data = {
+          labels,
+          datasets: [
+            {
+              label: t('dsEnergy'),
+              data: energyData,
+              backgroundColor: '#8E5CFF',
+              borderRadius: 3,
+              maxBarThickness: 24
+            }
+          ]
+        };
+
+        const options = {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              align: 'end',
+              labels: { boxWidth: 10, usePointStyle: true, color: '#6B7A90', font: { family: 'Inter', size: 12 } }
+            },
+            tooltip: {
+              backgroundColor: '#061B31',
+              padding: 10,
+              cornerRadius: 4,
+              callbacks: {
+                label: (c) => `${c.dataset.label}: ${formatNumber(c.parsed.y, 1)} MWh`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              border: { color: '#E5EDF5' },
+              ticks: { font: { family: 'Inter', size: 11 }, color: '#6B7A90', maxRotation: 0, autoSkip: true }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: '#E5EDF5' },
+              border: { display: false },
+              ticks: {
+                font: { family: 'Inter', size: 11 },
+                color: '#6B7A90',
+                callback: (v) => `${formatNumber(v, 0)} MWh`
+              }
+            }
+          }
+        };
+
+        if (!energyChart) {
+          energyChart = new Chart(ctx, { type: 'bar', data, options });
+        } else {
+          energyChart.data = data;
+          energyChart.options = options;
+          energyChart.update('none');
+        }
+      }
+
+      function renderTornadoChart(sensitivity) {
+        const ctx = document.getElementById('tornado-chart').getContext('2d');
+        const baseNpv = sensitivity.baseNpv;
+        const labels = sensitivity.tornado.map(item => t(item.i18n));
+
+        const data = {
+          labels,
+          datasets: [
+            {
+              label: t('tornadoDown'),
+              data: sensitivity.tornado.map(item => [item.minNpv, baseNpv]),
+              backgroundColor: '#D92D20',
+              borderRadius: 3,
+              barPercentage: 0.6
+            },
+            {
+              label: t('tornadoUp'),
+              data: sensitivity.tornado.map(item => [baseNpv, item.maxNpv]),
+              backgroundColor: '#533AFD',
+              borderRadius: 3,
+              barPercentage: 0.6
+            }
+          ]
+        };
+
+        const options = {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            baseNpvLine: { baseNpv },
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#061B31',
+              padding: 10,
+              cornerRadius: 4,
+              callbacks: {
+                label: (c) => {
+                  const [v0, v1] = c.raw;
+                  const target = c.datasetIndex === 0 ? v0 : v1;
+                  const delta = target - baseNpv;
+                  const sign = delta >= 0 ? '+' : '';
+                  return `${c.dataset.label}: ${formatCurrencyCompact(target)} (${sign}${formatCurrencyCompact(delta)})`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#E5EDF5' },
+              border: { display: false },
+              ticks: {
+                font: { family: 'Inter', size: 11 },
+                color: '#6B7A90',
+                callback: (v) => formatCurrencyCompact(v)
+              }
+            },
+            y: {
+              stacked: true,
+              grid: { display: false },
+              border: { color: '#E5EDF5' },
+              ticks: { font: { family: 'Inter', size: 12 }, color: '#0B1F3A' }
+            }
+          }
+        };
+
+        if (!tornadoChart) {
+          tornadoChart = new Chart(ctx, { type: 'bar', data, options, plugins: [baseNpvLinePlugin] });
+        } else {
+          tornadoChart.data = data;
+          tornadoChart.options = options;
+          tornadoChart.update('none');
+        }
+      }
+
+      // =========================================================================
+      // 7. HEATMAP & SCHEDULE TABLE
+      // =========================================================================
+      function renderHeatmap(sensitivity, waccPct, lifetime) {
+        const grid = document.getElementById('heatmap-grid');
+        const steps = sensitivity.steps;
+        const waccDec = waccPct / 100;
+        const fmtShift = (s) => (s > 0 ? `+${Math.round(s * 100)}%` : `${Math.round(s * 100)}%`);
+
+        let html = `<div class="py-2 text-xs text-stripe-muted flex items-center justify-center">${t('capexLabel')} ↓</div>`;
+        steps.forEach(s => {
+          html += `<div class="py-2 font-medium text-stripe-onSurface bg-stripe-tertiary/60 rounded-[4px] tabular-nums">${fmtShift(s)}</div>`;
+        });
+
+        sensitivity.heatmap.forEach((row, rIdx) => {
+          const capexShift = steps[rIdx];
+          html += `<div class="py-2.5 px-1 font-medium text-stripe-onSurface bg-stripe-tertiary/60 rounded-[4px] flex items-center justify-center tabular-nums">${fmtShift(capexShift)}</div>`;
+
+          row.forEach((cell, cIdx) => {
+            const isBase = capexShift === 0 && cell.tariffShift === 0;
+            // Clean flat tonal cell styling aligned with Stripe Modern
+            let styleClass = 'bg-[#FEF2F2] text-stripe-error border-[#FECACA]';
+            if (cell.irr !== null) {
+              const spread = cell.irr - waccDec;
+              if (spread >= 0.05) {
+                styleClass = 'bg-[#DCFCE7] text-[#15803D] border-[#86EFAC]';
+              } else if (spread >= 0.02) {
+                styleClass = 'bg-[#F0FDF4] text-stripe-success border-[#BBF7D0]';
+              } else if (spread >= 0) {
+                styleClass = 'bg-[#F5F3FF] text-stripe-primary border-stripe-secondary';
+              } else if (spread >= -0.02) {
+                styleClass = 'bg-stripe-tertiary/50 text-stripe-muted border-stripe-tertiary';
+              }
+            }
+
+            const baseRing = isBase ? 'ring-1 ring-stripe-primary font-semibold' : 'font-normal';
+            const irrLabel = cell.irr !== null ? `${formatNumber(cell.irr * 100, 1)}%` : 'N/A';
+
+            html += `
+              <button type="button" data-r="${rIdx}" data-c="${cIdx}"
+                class="hm-cell py-2.5 px-1 rounded-[4px] border ${styleClass} ${baseRing} tabular-nums transition hover:border-stripe-primary cursor-pointer focus:outline-none">
+                ${irrLabel}
+              </button>`;
+          });
+        });
+
+        grid.innerHTML = html;
+
+        const updateInspector = (cell) => {
+          const isBase = cell.capexShift === 0 && cell.tariffShift === 0;
+          document.getElementById('hm-scenario-label').textContent = isBase
+            ? `${t('baseCase')} (${t('capexLabel')} 0% · ${t('tariffLabel')} 0%)`
+            : `${t('capexLabel')} ${fmtShift(cell.capexShift)} · ${t('tariffLabel')} ${fmtShift(cell.tariffShift)}`;
+          document.getElementById('hm-irr').textContent = cell.irr !== null ? `${formatNumber(cell.irr * 100, 1)}%` : 'N/A';
+          document.getElementById('hm-npv').textContent = formatCurrencyCompact(cell.npv);
+          document.getElementById('hm-pb').textContent = formatYears(cell.simplePayback, lifetime);
+        };
+
+        updateInspector(sensitivity.heatmap[2][2]);
+
+        grid.querySelectorAll('.hm-cell').forEach(btn => {
+          const show = () => updateInspector(sensitivity.heatmap[Number(btn.dataset.r)][Number(btn.dataset.c)]);
+          btn.addEventListener('mouseenter', show);
+          btn.addEventListener('click', show);
+        });
+      }
+
+      function renderScheduleTable(model) {
+        const tbody = document.getElementById('schedule-tbody');
+        const tfoot = document.getElementById('schedule-tfoot');
+
+        tbody.innerHTML = model.schedule.map(r => {
+          const isPayback = model.simplePaybackYear !== null && r.year === model.simplePaybackYear;
+          const rowClass = isPayback ? 'bg-[#F5F3FF] text-stripe-onSurface font-medium' : 'hover:bg-stripe-tertiary/25';
+          const netClass = r.netCf < 0 ? 'text-stripe-error' : 'text-stripe-success';
+          const cumClass = r.cumCf < 0 ? 'text-stripe-error' : 'text-stripe-onSurface';
+
+          return `
+            <tr class="${rowClass} transition-colors">
+              <td class="py-3 px-4 text-left font-medium text-stripe-onSurface">${t('yrPrefix')} ${r.year}</td>
+              <td class="py-3 px-4">${r.year === 0 ? '—' : formatNumber(r.energyKwh, 0)}</td>
+              <td class="py-3 px-4">${r.year === 0 ? '—' : formatPerKwh(r.tariff)}</td>
+              <td class="py-3 px-4">${r.year === 0 ? '—' : formatCurrencyExact(r.savings)}</td>
+              <td class="py-3 px-4 text-stripe-muted">${r.year === 0 ? '—' : formatCurrencyExact(r.om)}</td>
+              <td class="py-3 px-4 ${netClass}">${formatCurrencyExact(r.netCf)}</td>
+              <td class="py-3 px-4 text-stripe-muted">${formatCurrencyExact(r.dcf)}</td>
+              <td class="py-3 px-4 ${cumClass}">${formatCurrencyExact(r.cumCf)}</td>
+            </tr>
+          `;
+        }).join('');
+
+        tfoot.innerHTML = `
+          <tr>
+            <td class="py-3.5 px-4 text-left">${t('totalRow')}</td>
+            <td class="py-3.5 px-4">${formatNumber(model.totalEnergyKwh, 0)}</td>
+            <td class="py-3.5 px-4">—</td>
+            <td class="py-3.5 px-4">${formatCurrencyExact(model.totalSavings)}</td>
+            <td class="py-3.5 px-4 text-stripe-muted">${formatCurrencyExact(model.totalOm)}</td>
+            <td class="py-3.5 px-4 text-stripe-success">${formatCurrencyExact(model.totalNetCf)}</td>
+            <td class="py-3.5 px-4 text-stripe-primary">${formatCurrencyExact(model.npv)}</td>
+            <td class="py-3.5 px-4">—</td>
+          </tr>
+        `;
+      }
+
+      // =========================================================================
+      // 8. MAIN UPDATE PIPELINE
+      // =========================================================================
+      function updateAll() {
+        const params = validateAndSanitizeInputs();
+        const model = runFinancialModel(params);
+        const sensitivity = runSensitivityAnalysis(params, model);
+
+        state.lastModel = model;
+        state.lastSensitivity = sensitivity;
+
+        // Summary & Header
+        const locObj = LOCATION_PRESETS[state.location] || LOCATION_PRESETS.custom;
+        const locName = state.lang === 'id' ? locObj.labelId : locObj.labelEn;
+        document.getElementById('project-summary-line').textContent =
+          `${formatNumber(params.capacity, 0)} kWp · ${locName} (${formatNumber(params.specificYield, 0)} kWh/kWp) · ${params.lifetime} ${t('unitYearsShort')}`;
+        document.getElementById('header-total-capex').textContent = formatCurrencyCompact(model.totalCapex);
+        document.getElementById('header-total-capex').title = formatCurrencyExact(model.totalCapex);
+
+        // Viability Status Chip
+        const dot = document.getElementById('viability-dot');
+        const txt = document.getElementById('viability-text');
+        const chip = document.getElementById('viability-chip');
+        if (model.viability === 'viable') {
+          chip.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#F0FDF4] text-stripe-success border border-[#BBF7D0]';
+          dot.className = 'w-2 h-2 rounded-full bg-stripe-success';
+          txt.textContent = t('badgeViable');
+        } else if (model.viability === 'marginal') {
+          chip.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#F5F3FF] text-stripe-primary border border-stripe-secondary';
+          dot.className = 'w-2 h-2 rounded-full bg-stripe-primary';
+          txt.textContent = t('badgeMarginal');
+        } else {
+          chip.className = 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-stripe-error border border-[#FECACA]';
+          dot.className = 'w-2 h-2 rounded-full bg-stripe-error';
+          txt.textContent = t('badgeUnviable');
+        }
+
+        // KPI Cards
+        const npvEl = document.getElementById('kpi-npv');
+        npvEl.textContent = formatCurrencyCompact(model.npv);
+        npvEl.title = formatCurrencyExact(model.npv);
+        npvEl.className = `text-[22px] font-light tracking-[-0.02em] mt-3 tabular-nums truncate ${model.npv >= 0 ? 'text-stripe-onSurface' : 'text-stripe-error'}`;
+        document.getElementById('dot-npv').className = `w-2 h-2 rounded-full shrink-0 ${model.npv >= 0 ? 'bg-stripe-success' : 'bg-stripe-error'}`;
+        document.getElementById('kpi-npv-sub').textContent = t('atWacc', { v: formatNumber(params.wacc, 1) });
+
+        const irrEl = document.getElementById('kpi-irr');
+        const irrViable = model.irr !== null && model.irr * 100 >= params.wacc;
+        irrEl.textContent = model.irr !== null ? `${formatNumber(model.irr * 100, 1)}%` : 'N/A';
+        irrEl.className = `text-[22px] font-light tracking-[-0.02em] mt-3 tabular-nums ${irrViable ? 'text-stripe-success' : 'text-stripe-error'}`;
+        document.getElementById('dot-irr').className = `w-2 h-2 rounded-full shrink-0 ${irrViable ? 'bg-stripe-success' : 'bg-stripe-error'}`;
+        document.getElementById('kpi-irr-sub').textContent = t('vsWacc', { v: formatNumber(params.wacc, 1) });
+
+        document.getElementById('kpi-payback').textContent = formatYears(model.simplePayback, params.lifetime);
+        document.getElementById('kpi-payback-sub').textContent = t('discPayback', { v: formatYears(model.discountedPayback, params.lifetime) });
+
+        document.getElementById('kpi-lcoe').textContent = formatPerKwh(model.lcoe);
+        document.getElementById('kpi-lcoe-sub').textContent = t('vsTariff', { v: formatPerKwh(params.tariff) });
+
+        document.getElementById('kpi-co2').textContent = `${formatNumber(model.co2AvoidedTonnes, 0)} tCO₂`;
+        document.getElementById('kpi-co2-sub').textContent = t('gridFactor');
+
+        // Chart Chips
+        document.getElementById('payback-chip').textContent = t('paybackPrefix', { v: formatYears(model.simplePayback, params.lifetime) });
+        document.getElementById('lifetime-energy-chip').textContent = t('lifetimeEnergyPrefix', { v: formatNumber(model.lifetimeMwh, 0) });
+
+        // Render Visuals
+        renderCashflowChart(model);
+        renderEnergyChart(model);
+        renderTornadoChart(sensitivity);
+        renderHeatmap(sensitivity, params.wacc, params.lifetime);
+        renderScheduleTable(model);
+      }
+
+      // =========================================================================
+      // 9. CONTROLS, EVENTS & EXPORTS
+      // =========================================================================
+      const controlMap = [
+        { key: 'capacity',      num: 'num-capacity',   rng: 'rng-capacity' },
+        { key: 'specificYield', num: 'num-yield',      rng: 'rng-yield' },
+        { key: 'degradation',   num: 'num-degrad',     rng: 'rng-degrad' },
+        { key: 'capexPerKwp',   num: 'num-capex',      rng: 'rng-capex' },
+        { key: 'omPct',         num: 'num-om',         rng: 'rng-om' },
+        { key: 'tariff',        num: 'num-tariff',     rng: 'rng-tariff' },
+        { key: 'escalation',    num: 'num-escalation', rng: 'rng-escalation' },
+        { key: 'wacc',          num: 'num-wacc',       rng: 'rng-wacc' },
+        { key: 'lifetime',      num: 'num-lifetime',   rng: 'rng-lifetime' }
+      ];
+
+      function syncControlsFromState() {
+        const cfg = CURRENCY_CONFIG[state.currency];
+        document.getElementById('active-currency-chip').textContent = state.currency;
+        document.getElementById('unit-capex-prefix').textContent = cfg.symbol;
+        document.getElementById('unit-tariff-prefix').textContent = cfg.symbol;
+
+        ['num-capex', 'rng-capex'].forEach(id => {
+          const el = document.getElementById(id);
+          el.min = cfg.capexMin;
+          el.max = cfg.capexMax;
+          el.step = cfg.capexStep;
+        });
+        ['num-tariff', 'rng-tariff'].forEach(id => {
+          const el = document.getElementById(id);
+          el.min = cfg.tariffMin;
+          el.max = cfg.tariffMax;
+          el.step = cfg.tariffStep;
+        });
+
+        controlMap.forEach(({ key, num, rng }) => {
+          document.getElementById(num).value = state.inputs[key];
+          document.getElementById(rng).value = state.inputs[key];
+        });
+        document.getElementById('location-preset').value = state.location;
+      }
+
+      function applyLanguage() {
+        document.documentElement.lang = state.lang;
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          el.textContent = t(el.getAttribute('data-i18n'));
+        });
+
+        const btnEn = document.getElementById('lang-en');
+        const btnId = document.getElementById('lang-id');
+        if (state.lang === 'en') {
+          btnEn.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition bg-stripe-tertiary text-stripe-onSurface';
+          btnId.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition text-stripe-muted hover:text-stripe-onSurface';
+        } else {
+          btnId.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition bg-stripe-tertiary text-stripe-onSurface';
+          btnEn.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition text-stripe-muted hover:text-stripe-onSurface';
+        }
+      }
+
+      function setCurrency(newCurrency) {
+        if (state.currency === newCurrency) return;
+        state.currency = newCurrency;
+        const cfg = CURRENCY_CONFIG[newCurrency];
+        state.inputs.capexPerKwp = cfg.capexDefault;
+        state.inputs.tariff = cfg.tariffDefault;
+
+        const btnIdr = document.getElementById('curr-idr');
+        const btnUsd = document.getElementById('curr-usd');
+        if (newCurrency === 'IDR') {
+          btnIdr.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition bg-stripe-primary text-white';
+          btnUsd.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition text-stripe-muted hover:text-stripe-onSurface';
+        } else {
+          btnUsd.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition bg-stripe-primary text-white';
+          btnIdr.className = 'px-2.5 py-1 text-xs font-medium rounded-[3px] transition text-stripe-muted hover:text-stripe-onSurface';
+        }
+
+        syncControlsFromState();
+        updateAll();
+      }
+
+      function resetDefaults() {
+        const cfg = CURRENCY_CONFIG[state.currency];
+        state.location = 'jakarta';
+        state.inputs = {
+          capacity: 500,
+          specificYield: 1450,
+          capexPerKwp: cfg.capexDefault,
+          omPct: 1.5,
+          tariff: cfg.tariffDefault,
+          escalation: 2.0,
+          degradation: 0.55,
+          wacc: 9.5,
+          lifetime: 25
+        };
+        syncControlsFromState();
+        updateAll();
+        showToast(t('toastReset'));
+      }
+
+      function downloadFile(filename, content, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function exportJSON() {
+        const payload = {
+          meta: {
+            app: 'RenewableX Solar PV Screening & Financial Modeler',
+            version: 'v0.2',
+            exportedAt: new Date().toISOString(),
+            currency: state.currency,
+            locationPreset: state.location,
+            gridEmissionFactorKgPerKwh: GRID_EMISSION_FACTOR
+          },
+          inputs: state.inputs,
+          summaryKPIs: {
+            totalCapex: state.lastModel.totalCapex,
+            npv: state.lastModel.npv,
+            irrPercent: state.lastModel.irr !== null ? Number((state.lastModel.irr * 100).toFixed(2)) : null,
+            simplePaybackYears: state.lastModel.simplePayback,
+            discountedPaybackYears: state.lastModel.discountedPayback,
+            lcoePerKwh: state.lastModel.lcoe,
+            lifetimeEnergyKwh: state.lastModel.totalEnergyKwh,
+            co2AvoidedTonnes: state.lastModel.co2AvoidedTonnes,
+            viability: state.lastModel.viability
+          },
+          schedule: state.lastModel.schedule
+        };
+        downloadFile(`renewablex-pv-model-${state.currency.toLowerCase()}.json`, JSON.stringify(payload, null, 2), 'application/json');
+        showToast(t('toastJson'));
+      }
+
+      function exportCSV() {
+        const headers = [
+          'Year',
+          'Energy_kWh',
+          `Tariff_${state.currency}_per_kWh`,
+          `Gross_Savings_${state.currency}`,
+          `OM_Cost_${state.currency}`,
+          `Net_Cash_Flow_${state.currency}`,
+          `Discounted_CF_${state.currency}`,
+          `Cumulative_CF_${state.currency}`
+        ];
+        const lines = [headers.join(',')];
+        state.lastModel.schedule.forEach(r => {
+          lines.push([
+            r.year,
+            r.energyKwh.toFixed(2),
+            r.tariff.toFixed(4),
+            r.savings.toFixed(2),
+            r.om.toFixed(2),
+            r.netCf.toFixed(2),
+            r.dcf.toFixed(2),
+            r.cumCf.toFixed(2)
+          ].join(','));
+        });
+        downloadFile(`renewablex-schedule-${state.currency.toLowerCase()}.csv`, lines.join('\n'), 'text/csv;charset=utf-8;');
+        showToast(t('toastCsv'));
+      }
+
+      // Bind sliders & numeric inputs
+      controlMap.forEach(({ key, num, rng }) => {
+        const numEl = document.getElementById(num);
+        const rngEl = document.getElementById(rng);
+
+        rngEl.addEventListener('input', () => {
+          const val = Number(rngEl.value);
+          state.inputs[key] = val;
+          numEl.value = val;
+          if (key === 'specificYield') {
+            state.location = 'custom';
+            document.getElementById('location-preset').value = 'custom';
+          }
+          updateAll();
+        });
+
+        numEl.addEventListener('input', () => {
+          const val = Number(numEl.value);
+          state.inputs[key] = val;
+          if (!isNaN(val)) rngEl.value = val;
+          if (key === 'specificYield') {
+            state.location = 'custom';
+            document.getElementById('location-preset').value = 'custom';
+          }
+          updateAll();
+        });
+      });
+
+      document.getElementById('location-preset').addEventListener('change', (e) => {
+        const loc = e.target.value;
+        state.location = loc;
+        if (LOCATION_PRESETS[loc] && LOCATION_PRESETS[loc].yield !== null) {
+          state.inputs.specificYield = LOCATION_PRESETS[loc].yield;
+          document.getElementById('num-yield').value = state.inputs.specificYield;
+          document.getElementById('rng-yield').value = state.inputs.specificYield;
+          updateAll();
+        }
+      });
+
+      document.getElementById('curr-idr').addEventListener('click', () => setCurrency('IDR'));
+      document.getElementById('curr-usd').addEventListener('click', () => setCurrency('USD'));
+      document.getElementById('lang-en').addEventListener('click', () => { state.lang = 'en'; applyLanguage(); updateAll(); });
+      document.getElementById('lang-id').addEventListener('click', () => { state.lang = 'id'; applyLanguage(); updateAll(); });
+      document.getElementById('btn-reset').addEventListener('click', resetDefaults);
+      document.getElementById('btn-export-json').addEventListener('click', exportJSON);
+      document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+
+      // Tab Switching
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.tab;
+          state.activeTab = tab;
+
+          document.querySelectorAll('.tab-btn').forEach(b => {
+            const isActive = b.dataset.tab === tab;
+            b.className = isActive
+              ? 'tab-btn pb-3 text-sm font-medium border-b-2 border-stripe-primary text-stripe-primary whitespace-nowrap transition'
+              : 'tab-btn pb-3 text-sm font-normal border-b-2 border-transparent text-stripe-muted hover:text-stripe-onSurface whitespace-nowrap transition';
+          });
+
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+          document.getElementById(`panel-${tab}`).classList.remove('hidden');
+
+          requestAnimationFrame(() => {
+            if (tab === 'charts') {
+              if (cashflowChart) cashflowChart.resize();
+              if (energyChart) energyChart.resize();
+            } else if (tab === 'sensitivity') {
+              if (tornadoChart) tornadoChart.resize();
+            }
+          });
+        });
+      });
+
+      // Init
+      window.addEventListener('load', () => {
+        applyLanguage();
+        syncControlsFromState();
+        updateAll();
+      });
+    })();
+  </script>
+</body>
+</html>
