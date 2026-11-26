@@ -1,0 +1,35 @@
+{
+  "contract_version": "0.1",
+  "project": {
+    "project_name": "Kasus Acuan Jakarta Hybrid Tahap 1",
+    "latitude": -6.2,
+    "longitude": 106.8,
+    "elevation_m": 16.0,
+    "timezone": "Asia/Jakarta"
+  },
+  "simulation": {
+    "step_minutes": 60,
+    "leap_day_policy": "ignore_feb_29",
+    "weather_file": "golden_jakarta_weather.json"
+  },
+  "load_profile": {
+    "mode": "synthetic",
+    "base_load_kw": 120.0,
+    "peak_load_kw": 350.0,
+    "seed": 42,
+    "noise_fraction": 0.05
+  },
+  "components": {
+    "pv": {
+      "capacity_kwp": 500.0,
+      "inverter_ac_kw": 420.0,
+      "tilt_degrees": 10.0,
+      "azimuth_degrees": 0.0,
+      "system_loss_fraction": 0.14,
+      "temp_coeff_per_c": -0.004,
+      "noct_c": 45.0,
+      "inverter_efficiency": 0.96,
+      "albedo": 0.2
+    }
+  }
+}
