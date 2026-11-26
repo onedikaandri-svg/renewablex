@@ -254,9 +254,9 @@ class TestHybridPVBESSIntegration:
 
 
 class TestProductionDependencyIsolation:
-    def test_app_package_never_imports_pvlib_scipy_or_pandas(self):
+    def test_app_package_never_imports_pvlib_scipy_pandas_or_numpy_financial(self):
         app_root = Path(__file__).resolve().parents[2] / "app"
-        forbidden = {"pvlib", "scipy", "pandas"}
+        forbidden = {"pvlib", "scipy", "pandas", "numpy_financial"}
         for py_file in app_root.rglob("*.py"):
             tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
             for node in ast.walk(tree):

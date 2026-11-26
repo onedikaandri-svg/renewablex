@@ -12,6 +12,13 @@ from app.hybrid.bess import BESSConfig
 from app.hybrid.biomass import BiomassConfig, resolve_biomass_config
 from app.hybrid.components import PVWattsConfig
 from app.hybrid.dispatch import DispatchConfig
+from app.hybrid.finance import (
+    FinanceResult,
+    resolve_finance_config,
+    resolve_lifetime_config,
+    run_financial_analysis,
+)
+from app.hybrid.lifetime import LifetimeSimulationResult, run_lifetime_simulation
 from app.hybrid.load import generate_synthetic_load, load_profile_from_csv
 from app.hybrid.pv_detailed import PVDetailedConfig
 from app.hybrid.simulator import SimulationConfig, SimulationResult, run_simulation
@@ -219,11 +226,79 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
     weather = _load_weather_from_config(cfg, base_dir, time_config)
     load_profile = _load_profile_from_config(cfg, base_dir, time_config)
 
-    result = run_simulation(sim_config, weather, load_profile)
+    finance_raw = cfg.get("finance")
+    has_lifetime = "project_lifetime_years" in sim_raw or "multi_year_mode" in sim_raw or finance_raw is not None
+
+    lifetime_result: LifetimeSimulationResult | None = None
+    finance_result: FinanceResult | None = None
+    if has_lifetime:
+        lifetime_cfg = resolve_lifetime_config(sim_raw, finance_raw if isinstance(finance_raw, dict) else None)
+        lifetime_result = run_lifetime_simulation(sim_config, weather, load_profile, lifetime_cfg)
+        result = lifetime_result.year_1_result
+        if finance_raw is not None:
+            currency = str(project_raw.get("currency_code", "IDR"))
+            finance_cfg = resolve_finance_config(finance_raw, currency_code=currency)
+            finance_result = run_financial_analysis(lifetime_result, finance_cfg)
+    else:
+        result = run_simulation(sim_config, weather, load_profile)
 
     output_dir.mkdir(parents=True, exist_ok=True)
+    summary_payload = result.to_summary_dict()
+    if lifetime_result is not None:
+        summary_payload["lifetime_summary"] = lifetime_result.to_summary_dict()
+    if finance_result is not None:
+        summary_payload.update(finance_result.to_summary_dict())
+
     summary_path = output_dir / "summary.json"
-    summary_path.write_text(json.dumps(result.to_summary_dict(), indent=2), encoding="utf-8")
+    summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
+
+    if finance_result is not None:
+        cf_path = output_dir / "cashflow_schedule.csv"
+        with cf_path.open("w", encoding="utf-8", newline="") as f_cf:
+            cf_writer = csv.writer(f_cf)
+            cf_writer.writerow([
+                "year",
+                "served_load_kwh",
+                "pv_generation_kwh",
+                "biomass_generation_kwh",
+                "grid_import_kwh",
+                "capex_outflow",
+                "gross_revenue_or_savings",
+                "export_revenue",
+                "om_cost",
+                "fuel_and_logistics_cost",
+                "grid_import_cost",
+                "unmet_load_penalty",
+                "replacement_and_overhaul_cost",
+                "salvage_inflow",
+                "tax_outflow",
+                "net_cash_flow",
+                "discounted_cash_flow",
+                "cumulative_cash_flow",
+                "cumulative_discounted_cash_flow",
+            ])
+            for cf_row in finance_result.schedule:
+                cf_writer.writerow([
+                    cf_row.year,
+                    round(cf_row.served_load_kwh, 6),
+                    round(cf_row.pv_generation_kwh, 6),
+                    round(cf_row.biomass_generation_kwh, 6),
+                    round(cf_row.grid_import_kwh, 6),
+                    round(cf_row.capex_outflow, 6),
+                    round(cf_row.gross_revenue_or_savings, 6),
+                    round(cf_row.export_revenue, 6),
+                    round(cf_row.om_cost, 6),
+                    round(cf_row.fuel_and_logistics_cost, 6),
+                    round(cf_row.grid_import_cost, 6),
+                    round(cf_row.unmet_load_penalty, 6),
+                    round(cf_row.replacement_and_overhaul_cost, 6),
+                    round(cf_row.salvage_inflow, 6),
+                    round(cf_row.tax_outflow, 6),
+                    round(cf_row.net_cash_flow, 6),
+                    round(cf_row.discounted_cash_flow, 6),
+                    round(cf_row.cumulative_cash_flow, 6),
+                    round(cf_row.cumulative_discounted_cash_flow, 6),
+                ])
 
     csv_path = output_dir / "hourly_balance.csv"
     labels = time_config.timestamp_labels()
