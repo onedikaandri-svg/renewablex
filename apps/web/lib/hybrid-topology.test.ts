@@ -209,6 +209,52 @@ describe("hybrid-topology: geometri SVG dan serialisasi tema terang untuk PDF Ta
       expect(pill.x + pill.width).toBeLessThanOrEqual(rightRect.x - 6);
     }
 
+    // Uji geometri 2D penuh: PV + BESS + Biomass + Diesel + Grid + Load aktif bersamaan
+    const fullConfig: HybridProjectConfig = {
+      ...withDiesel,
+      simulation: {
+        ...withDiesel.simulation,
+        dispatch_params: {
+          ...withDiesel.simulation.dispatch_params,
+          allow_grid_import: true,
+          allow_grid_export: true,
+        },
+      },
+    };
+    const fullTopo = deriveDefaultTopology(fullConfig);
+    expect(fullTopo.nodes).toHaveLength(7);
+    expect(fullTopo.edges).toHaveLength(6);
+
+    const fullNodeMap = new Map(fullTopo.nodes.map((n) => [n.id, n]));
+    const nodeRects = fullTopo.nodes.map((n) => getNodeRect(n));
+    const pills = fullTopo.edges.map((edge) => {
+      const src = fullNodeMap.get(edge.source)!;
+      const tgt = fullNodeMap.get(edge.target)!;
+      const eGeo = getEdgeGeometry(src, tgt);
+      return computeEdgePillLayout(eGeo, "1.234,5 / 987,6 MWh");
+    });
+
+    const rectsOverlap = (
+      a: { x: number; y: number; width: number; height: number },
+      b: { x: number; y: number; width: number; height: number },
+      gap = 0,
+    ) =>
+      a.x < b.x + b.width + gap &&
+      a.x + a.width + gap > b.x &&
+      a.y < b.y + b.height + gap &&
+      a.y + a.height + gap > b.y;
+
+    for (const pill of pills) {
+      for (const nRect of nodeRects) {
+        expect(rectsOverlap(pill, nRect, 6)).toBe(false);
+      }
+    }
+    for (let i = 0; i < pills.length; i++) {
+      for (let j = i + 1; j < pills.length; j++) {
+        expect(rectsOverlap(pills[i], pills[j], 4)).toBe(false);
+      }
+    }
+
     const fakeAttrMap = new Map<string, string>([
       ["viewBox", "0 0 680 340"],
       ["fill", "var(--surface)"],
