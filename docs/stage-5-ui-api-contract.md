@@ -1,6 +1,6 @@
 # Kontrak Tahap 5: UI Inti Next.js dan Integrasi Endpoint Hybrid
 
-**Status dokumen:** Usulan kontrak (menunggu persetujuan pemilik proyek sebelum penulisan kode implementasi Tahap 5 maupun pengajuan PR dependensi baru).
+**Status dokumen:** Disetujui pemilik proyek (keputusan Bagian 6 telah dikonfirmasi).
 **Cakupan:** Integrasi endpoint HTTP FastAPI untuk mesin simulasi hybrid (Tahap 1 sampai 4), penyesuaian middleware ukuran badan permintaan dan kompresi respons, rancangan arsitektur antarmuka web Next.js 16 untuk alur halaman 1 sampai 7 dan dasbor hasil dasar (Halaman 8) beserta tiga keadaan wajib (kosong, memuat, galat), serta evaluasi pilihan pustaka grafik.
 
 ---
@@ -417,13 +417,13 @@ Jika pemilik proyek menyetujui **Opsi A** (atau **Opsi B**), penambahan paket gr
 
 ---
 
-## 6. Keputusan Pemilik Proyek yang Dibutuhkan Sebelum Implementasi (`AGENTS.md` Bagian 12)
+## 6. Keputusan Pemilik Proyek yang Telah Dikonfirmasi (`AGENTS.md` Bagian 12)
 
-Sebelum PR dependensi atau penulisan kode implementasi Tahap 5 dimulai, mohon konfirmasi 6 keputusan berikut:
+Seluruh 6 keputusan desain dan arsitektur Tahap 5 telah dikonfirmasi oleh pemilik proyek pada 2026-11-26:
 
-1. **Palet warna utama (`AGENTS.md` bagian 12.7):** Apakah aksen violet dari `kiyo.html` dan `DESIGN.md` (`#533AFD` terang / `#A78BFA` gelap) beserta palet seri grafik hybrid (PV violet, BESS biru langit, Biomass amber, Beban navy) dipertahankan, atau Anda ingin mengganti ke palet warna lain?
-2. **Pilihan pustaka grafik (`AGENTS.md` bagian 11):** Mana yang Anda pilih untuk frontend: **Opsi A (`echarts`, direkomendasikan lewat PR dependensi terpisah)**, **Opsi B (`recharts` + canvas kustom)**, atau **Opsi C (SVG + Canvas murni tanpa dependensi baru)**?
-3. **Dial desain dan kontrol global (`AGENTS.md` bagian 12.6):** Apakah dial `ENERGY 1 / RHYTHM 2 / MOTION 1`, toggle Mode Terang/Gelap, dwibahasa ID/EN, dan pilihan mata uang IDR/USD sudah sesuai keinginan Anda?
-4. **Penyimpanan proyek sementara pada Tahap 5:** Apakah Anda setuju menggunakan penyimpanan lokal browser (`localStorage`) + ekspor/impor berkas JSON lebih dulu pada Tahap 5 agar alur Halaman 1 sampai 8 langsung bisa diuji end-to-end, sementara migrasi tabel Supabase dan autentikasi pengguna dikerjakan pada PR database terpisah?
-5. **Mode simulasi multi-tahun bawaan di Halaman 7:** Apakah tombol utama **"Jalankan Simulasi"** sebaiknya memakai mode cepat `"scaled_year_1"` sebagai bawaan (lebih ramah terhadap batas waktu server gratis Render) dengan opsi pilihan `"full_hourly"` (akurasi penuh 25 tahun via job asinkron), atau langsung `"full_hourly"` sebagai bawaan?
-6. **Penempatan URL Mode Cepat Screening PV:** Apakah setuju Mode Cepat Screening PV tetap berada di rute `/` (beranda saat ini) dan Desain Sistem Hybrid berada di `/hybrid`, dengan tautan navigasi atas yang jelas di antara keduanya?
+1. **Palet warna utama:** Dipertahankan. Aksen violet dari `kiyo.html` dan `DESIGN.md` (`#533AFD` mode terang / `#A78BFA` mode gelap) beserta palet seri grafik hybrid (PV violet, BESS biru langit, Biomass amber, Beban navy) tetap dipakai.
+2. **Pilihan pustaka grafik:** **Opsi A (`echarts`, lisensi Apache-2.0)** disetujui dan diajukan lebih dulu melalui PR dependensi terpisah (`deps/add-web-echarts`) sebelum penulisan kode implementasi Tahap 5.
+3. **Dial desain dan kontrol global:** Disetujui (`ENERGY 1 / RHYTHM 2 / MOTION 1`, toggle Mode Terang/Gelap, dwibahasa ID/EN, dan pilihan mata uang IDR/USD).
+4. **Penyimpanan proyek pada Tahap 5:** Disetujui menggunakan penyimpanan lokal browser (`localStorage`) + ekspor/impor berkas JSON lebih dulu pada Tahap 5, sementara migrasi tabel Supabase dan autentikasi pengguna dikerjakan pada PR database terpisah.
+5. **Mode simulasi multi-tahun bawaan di Halaman 7:** Disetujui memakai `"scaled_year_1"` sebagai bawaan tombol **"Jalankan Simulasi"**, dengan pilihan opsi `"full_hourly"` (simulasi per jam penuh lewat antrean job asinkron).
+6. **Penempatan URL Mode Cepat Screening PV:** Disetujui Mode Cepat Screening PV tetap di `/` (beranda) dan Desain Sistem Hybrid di `/hybrid`, dengan navigasi atas yang jelas di antara keduanya.
