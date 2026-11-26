@@ -65,6 +65,28 @@ const CODE_MESSAGES: Record<string, string> = {
   consumption_required: "Kebutuhan listrik tahunan wajib diisi untuk mode konsumsi sendiri.",
   self_consumption_tariff_required: "Tarif listrik yang dihemat wajib diisi.",
   feed_in_tariff_required: "Tarif jual kelebihan listrik ke grid wajib diisi.",
+  // Kode untuk sistem hybrid (Tahap 5)
+  invalid_load_length: "Jumlah baris data beban harus 8.760 langkah (1 tahun per jam).",
+  negative_load_value: "Nilai beban tidak boleh negatif.",
+  non_finite_load_value: "Data beban mengandung nilai kosong, NaN, atau tidak terhingga.",
+  invalid_csv_format: "Format berkas CSV beban tidak sesuai. Pastikan berisi 1 kolom nilai atau 2 kolom (waktu, load_kw).",
+  invalid_load_parameters: "Parameter pembangkit beban sintetis tidak valid. Pastikan beban puncak lebih besar atau sama dengan beban dasar.",
+  load_csv_required: "Unggah atau tempel isi berkas CSV beban terlebih dahulu.",
+  unsupported_load_mode: "Mode profil beban tidak dikenal.",
+  invalid_latitude: "Lintang (latitude) harus berada di rentang -90 sampai 90 derajat.",
+  invalid_longitude: "Bujur (longitude) harus berada di rentang -180 sampai 180 derajat.",
+  invalid_timezone: "Zona waktu proyek tidak valid.",
+  unsupported_weather_source: "Sumber data cuaca tidak didukung.",
+  invalid_weather_json: "Struktur data cuaca kustom tidak valid.",
+  invalid_pv_config: "Konfigurasi komponen PV tidak valid. Periksa kapasitas, inverter, dan batas rugi.",
+  invalid_bess_config: "Konfigurasi baterai BESS tidak valid. Periksa kapasitas, daya charge/discharge, dan batas SOC.",
+  invalid_biomass_config: "Konfigurasi pembangkit biomass tidak valid. Periksa kapasitas, kurva bahan bakar, dan parameter pasokan.",
+  invalid_dispatch_config: "Konfigurasi strategi dispatch EMS tidak valid. Periksa jam puncak atau batas beban puncak.",
+  invalid_finance_config: "Parameter keuangan tidak valid. Periksa tingkat diskonto, eskalasi, CAPEX, dan tarif.",
+  invalid_lifetime_config: "Umur proyek harus antara 1 sampai 40 tahun dan mode multi-tahun harus valid.",
+  job_not_found: "Job simulasi tidak ditemukan atau sudah kedaluwarsa di memori server.",
+  job_capacity_exceeded: "Antrean simulasi server sedang penuh. Tunggu sebentar lalu coba lagi.",
+  request_too_large: "Ukuran data permintaan melebihi batas yang diizinkan server.",
 };
 
 const WARNING_MESSAGES: Record<string, string> = {
@@ -72,6 +94,8 @@ const WARNING_MESSAGES: Record<string, string> = {
   high_degradation: "Degradasi di atas 2% per tahun tidak biasa untuk modul PV.",
   high_performance_loss: "Loss kinerja di atas 35% tidak biasa. Periksa agar tidak terhitung dua kali.",
   resource_data_fetched: "Data radiasi matahari berhasil diambil dari satelit. Hasil yield dihitung berdasarkan data ini.",
+  unmet_load_present: "Sebagian beban listrik belum terpenuhi pada konfigurasi sistem saat ini.",
+  scaled_multi_year_mode: "Simulasi multi-tahun memakai mode cepat scaled_year_1 (mengukur penuh Tahun 1 lalu menskalakan degradasi).",
 };
 
 const FRAGMENT_CODES: ReadonlyArray<{ fragment: string; code: string }> = [
