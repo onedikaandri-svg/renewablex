@@ -169,7 +169,7 @@ export default function SchematicCanvas({
       };
     }
     const rect = svg.getBoundingClientRect();
-    const vbWidth = 720;
+    const vbWidth = 840;
     const vbHeight = 400;
     return {
       svgX: ((clientX - rect.left) / Math.max(rect.width, 1)) * vbWidth,
@@ -471,7 +471,7 @@ export default function SchematicCanvas({
         <svg
           ref={svgRef}
           className="canvas-svg"
-          viewBox="0 0 720 400"
+          viewBox="0 0 840 400"
           role="region"
           aria-label={
             lang === "en"

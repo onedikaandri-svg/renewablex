@@ -15,7 +15,13 @@ from app.hybrid.finance import (
     run_financial_analysis_from_yearly,
     validate_finance_config,
 )
-from app.hybrid.lifetime import LifetimeConfig, LifetimeSimulationResult, run_lifetime_simulation, validate_lifetime_config
+from app.hybrid.lifetime import (
+    LifetimeConfig,
+    LifetimeSimulationResult,
+    run_lifetime_simulation,
+    run_scaled_lifetime_from_year_1,
+    validate_lifetime_config,
+)
 from app.hybrid.load import LoadProfile
 from app.hybrid.pv_detailed import PVDetailedConfig
 from app.hybrid.simulator import SimulationConfig
@@ -300,21 +306,32 @@ def _evaluate_pair_shifts(
     sim_cfg = base_sim_cfg
     lc_cfg = base_lifetime_cfg
     lp = base_load
-    has_tech = False
+    shifted_tech_vars: set[str] = set()
 
     for var, sh in shifts_map.items():
         if var not in FINANCE_ONLY_VARIABLES and abs(sh) > 1e-12:
             sim_cfg, lc_cfg, lp = _apply_technical_shift(var, sh, sim_cfg, lc_cfg, lp)
-            has_tech = True
+            shifted_tech_vars.add(var)
 
-    if has_tech:
-        lifetime_res = run_lifetime_simulation(
-            sim_cfg,
-            weather,
-            lp,
-            lc_cfg,
-            pv_output_cache=pv_cache,
-        )
+    if shifted_tech_vars:
+        if (
+            base_lifetime_cfg.multi_year_mode == "scaled_year_1"
+            and shifted_tech_vars == {"pv_degradation_rate"}
+        ):
+            # Pada mode scaled_year_1, degradasi tahunan PV baru memengaruhi Tahun 2 ke atas.
+            lifetime_res = run_scaled_lifetime_from_year_1(
+                sim_cfg,
+                base_lifetime_res.year_1_result,
+                lc_cfg,
+            )
+        else:
+            lifetime_res = run_lifetime_simulation(
+                sim_cfg,
+                weather,
+                lp,
+                lc_cfg,
+                pv_output_cache=pv_cache,
+            )
     else:
         lifetime_res = base_lifetime_res
 

@@ -92,7 +92,7 @@ export default function HybridProjectsPage() {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">Langkah 1 dari 8</p>
+          <p className="eyebrow">{lang === "en" ? "Step 1 of 10" : "Langkah 1 dari 10"}</p>
           <h1>{lang === "en" ? "Hybrid Energy System Projects" : "Proyek Sistem Energi Hybrid"}</h1>
           <p className="lead">
             Susun, simulasikan, dan analisis sistem energi hybrid (PV, BESS, Biomass, dan EMS) dari skala jam hingga 25 tahun.
@@ -109,6 +109,9 @@ export default function HybridProjectsPage() {
           <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
             Impor JSON
           </button>
+          <Link href="/hybrid/guide" className="btn ghost">
+            {lang === "en" ? "Open Guide" : "Buka Panduan"}
+          </Link>
           <input
             ref={fileInputRef}
             type="file"

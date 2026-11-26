@@ -368,6 +368,36 @@ class BiomassComponent(EnergyComponent):
         self._recorded_events: list[LifecycleEvent] = []
         self._cached_time_key: tuple[int, str] | None = None
         self._cached_outage_masks: tuple[np.ndarray, np.ndarray] | None = None
+        self._cached_fuel_params: ResolvedFuelParams | None = None
+        self._cached_min_load_kw: float | None = None
+        self._cached_curve_xs: tuple[float, ...] | None = None
+        self._cached_curve_ys_hr: tuple[float, ...] | None = None
+        self._fuel_tons_min_cache: dict[float, float] = {}
+        self._fuel_tons_rated_cache: dict[float, float] = {}
+
+    def _get_fuel_params(self) -> ResolvedFuelParams:
+        if self._cached_fuel_params is None:
+            self._cached_fuel_params = self.config.effective_fuel_params
+        return self._cached_fuel_params
+
+    def _get_min_load_kw(self) -> float:
+        if self._cached_min_load_kw is None:
+            self._cached_min_load_kw = self.config.effective_min_load_kw
+        return self._cached_min_load_kw
+
+    def _ensure_curve_cache(self) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        if self._cached_curve_xs is not None and self._cached_curve_ys_hr is not None:
+            return self._cached_curve_xs, self._cached_curve_ys_hr
+        c = self.config
+        assert c.fuel_curve_points is not None
+        xs = tuple(float(pt[0]) for pt in c.fuel_curve_points)
+        if c.fuel_curve_model == "piecewise_efficiency":
+            ys_hr = tuple(3600.0 / float(pt[1]) for pt in c.fuel_curve_points)
+        else:
+            ys_hr = tuple(float(pt[1]) for pt in c.fuel_curve_points)
+        self._cached_curve_xs = xs
+        self._cached_curve_ys_hr = ys_hr
+        return xs, ys_hr
 
     def validate(self) -> None:
         c = self.config
@@ -539,13 +569,18 @@ class BiomassComponent(EnergyComponent):
             thermal_kw = c.no_load_fuel_kw_th + c.slope_kw_th_per_kw_el * power_kw
             return (thermal_kw / power_kw) * 3600.0
 
-        assert c.fuel_curve_points is not None
-        xs = np.array([pt[0] for pt in c.fuel_curve_points], dtype=np.float64)
-        ys = np.array([pt[1] for pt in c.fuel_curve_points], dtype=np.float64)
-        if c.fuel_curve_model == "piecewise_efficiency":
-            ys = 3600.0 / ys
-        clamped_frac = min(max(load_fraction, float(xs[0])), float(xs[-1]))
-        return float(np.interp(clamped_frac, xs, ys))
+        xs, ys = self._ensure_curve_cache()
+        if load_fraction <= xs[0]:
+            return ys[0]
+        if load_fraction >= xs[-1]:
+            return ys[-1]
+        for i in range(len(xs) - 1):
+            x1 = xs[i + 1]
+            if load_fraction <= x1:
+                x0 = xs[i]
+                t = (load_fraction - x0) / (x1 - x0)
+                return ys[i] + t * (ys[i + 1] - ys[i])
+        return ys[-1]
 
     def fuel_energy_mj_for_power_kw(self, power_kw: float, step_hours: float) -> float:
         """Menghitung kebutuhan energi panas bahan bakar (MJ) untuk keluaran daya listrik tertentu."""
@@ -565,19 +600,33 @@ class BiomassComponent(EnergyComponent):
         energy_mj = self.fuel_energy_mj_for_power_kw(power_kw, step_hours)
         if energy_mj <= 0.0:
             return 0.0
-        lhv_eff = self.config.effective_fuel_params.lhv_effective_mj_per_kg
+        lhv_eff = self._get_fuel_params().lhv_effective_mj_per_kg
         fuel_kg = energy_mj / lhv_eff
         return fuel_kg / 1000.0
+
+    def _get_min_fuel_tons(self, step_hours: float) -> float:
+        val = self._fuel_tons_min_cache.get(step_hours)
+        if val is None:
+            val = self.fuel_tons_for_power_kw(self._get_min_load_kw(), step_hours)
+            self._fuel_tons_min_cache[step_hours] = val
+        return val
+
+    def _get_rated_fuel_tons(self, step_hours: float) -> float:
+        val = self._fuel_tons_rated_cache.get(step_hours)
+        if val is None:
+            val = self.fuel_tons_for_power_kw(self.config.rated_capacity_kw, step_hours)
+            self._fuel_tons_rated_cache[step_hours] = val
+        return val
 
     def max_power_for_fuel_tons(self, remaining_tons: float, step_hours: float) -> float:
         """Mencari daya listrik maksimum (kW) yang dapat ditopang oleh sisa bahan bakar."""
         c = self.config
         if remaining_tons <= 0.0 or step_hours <= 0.0:
             return 0.0
-        min_kw = c.effective_min_load_kw
-        if self.fuel_tons_for_power_kw(min_kw, step_hours) > remaining_tons + 1e-12:
+        min_kw = self._get_min_load_kw()
+        if self._get_min_fuel_tons(step_hours) > remaining_tons + 1e-12:
             return 0.0
-        if self.fuel_tons_for_power_kw(c.rated_capacity_kw, step_hours) <= remaining_tons + 1e-12:
+        if self._get_rated_fuel_tons(step_hours) <= remaining_tons + 1e-12:
             return float(c.rated_capacity_kw)
 
         lo = min_kw
@@ -709,7 +758,7 @@ class BiomassComponent(EnergyComponent):
         else:
             status_now = status
 
-        min_kw = c.effective_min_load_kw
+        min_kw = self._get_min_load_kw()
         curr_kw = float(state["current_power_kw"]) if status_now == "running" else 0.0
         hours_in_state = float(state["hours_in_state"])
         hours_run = float(state["hours_running_continuous"])
@@ -721,7 +770,7 @@ class BiomassComponent(EnergyComponent):
             fuel_ok_for_min = True
         else:
             max_by_fuel = self.max_power_for_fuel_tons(fuel_remaining, dt)
-            min_fuel = self.fuel_tons_for_power_kw(min_kw, dt)
+            min_fuel = self._get_min_fuel_tons(dt)
             fuel_ok_for_min = fuel_remaining + 1e-12 >= min_fuel
             if c.startup_time_hours == 0.0:
                 fuel_ok_for_start = fuel_remaining + 1e-12 >= (c.startup_fuel_tons + min_fuel)
@@ -747,12 +796,13 @@ class BiomassComponent(EnergyComponent):
                 first_hi = min(float(c.rated_capacity_kw), max(min_kw, c.ramp_up_kw_per_hour * dt))
                 available_kw = min(first_hi, max_by_fuel)
             elif status_now == "off" and c.startup_time_hours == 0.0 and can_start:
-                rem_after_startup = None if fuel_remaining is None else max(fuel_remaining - c.startup_fuel_tons, 0.0)
-                cap_fuel = (
-                    float(c.rated_capacity_kw)
-                    if rem_after_startup is None
-                    else self.max_power_for_fuel_tons(rem_after_startup, dt)
-                )
+                if fuel_remaining is None:
+                    cap_fuel = float(c.rated_capacity_kw)
+                elif c.startup_fuel_tons == 0.0:
+                    cap_fuel = max_by_fuel
+                else:
+                    rem_after_startup = max(fuel_remaining - c.startup_fuel_tons, 0.0)
+                    cap_fuel = self.max_power_for_fuel_tons(rem_after_startup, dt)
                 first_hi = min(float(c.rated_capacity_kw), max(min_kw, c.ramp_up_kw_per_hour * dt))
                 available_kw = min(first_hi, cap_fuel)
 
@@ -764,6 +814,7 @@ class BiomassComponent(EnergyComponent):
             "can_start": bool(can_start),
             "can_stop": bool(can_stop),
             "fuel_remaining_tons": fuel_remaining,
+            "max_by_fuel_kw": float(max_by_fuel),
             "is_outage": is_outage,
             "period_key": period_key,
             "fuel_period_used": fuel_period_used,
@@ -780,7 +831,7 @@ class BiomassComponent(EnergyComponent):
 
     def _compute_emissions_kg(self, output_kw: float, fuel_tons: float, step_hours: float) -> float:
         c = self.config
-        fuel_params = c.effective_fuel_params
+        fuel_params = self._get_fuel_params()
         supply_chain_kg = fuel_tons * fuel_params.supply_chain_emission_kg_co2e_per_ton
         combustion_kg = 0.0
         if fuel_params.biogenic_co2_accounting == "gross":
@@ -809,12 +860,13 @@ class BiomassComponent(EnergyComponent):
         state: dict[str, Any],
         start_request: bool = False,
         stop_request: bool = False,
+        precomputed_limits: dict[str, Any] | None = None,
     ) -> ComponentStepResult:
         """Menjalankan satu langkah simulasi pembangkit biomassa sesuai batas fisik."""
         c = self.config
         dt = weather.time_config.step_hours
-        fuel_params = c.effective_fuel_params
-        limits = self.inspect_step_limits(step_idx, weather, state)
+        fuel_params = self._get_fuel_params()
+        limits = precomputed_limits if precomputed_limits is not None else self.inspect_step_limits(step_idx, weather, state)
 
         prev_status = str(state["status"])
         status_now = str(limits["status"])
@@ -875,11 +927,12 @@ class BiomassComponent(EnergyComponent):
                 step_startup_cost += c.startup_cost
                 rem_after_start = None if fuel_remaining is None else max(fuel_remaining - c.startup_fuel_tons, 0.0)
                 if c.startup_time_hours == 0.0:
-                    max_fuel_kw = (
-                        float(c.rated_capacity_kw)
-                        if rem_after_start is None
-                        else self.max_power_for_fuel_tons(rem_after_start, dt)
-                    )
+                    if rem_after_start is None:
+                        max_fuel_kw = float(c.rated_capacity_kw)
+                    elif c.startup_fuel_tons == 0.0 and "max_by_fuel_kw" in limits:
+                        max_fuel_kw = float(limits["max_by_fuel_kw"])
+                    else:
+                        max_fuel_kw = self.max_power_for_fuel_tons(rem_after_start, dt)
                     first_hi = min(float(c.rated_capacity_kw), max(min_kw, c.ramp_up_kw_per_hour * dt), max_fuel_kw)
                     if first_hi + 1e-12 >= min_kw and cmd > 1e-12:
                         output_kw = min(max(cmd, min_kw), first_hi)
@@ -911,9 +964,13 @@ class BiomassComponent(EnergyComponent):
                 new_hours_run = 0.0
             elif hours_in_state + 1e-12 >= c.startup_time_hours:
                 max_fuel_kw = (
-                    float(c.rated_capacity_kw)
-                    if fuel_remaining is None
-                    else self.max_power_for_fuel_tons(fuel_remaining, dt)
+                    float(limits["max_by_fuel_kw"])
+                    if "max_by_fuel_kw" in limits
+                    else (
+                        float(c.rated_capacity_kw)
+                        if fuel_remaining is None
+                        else self.max_power_for_fuel_tons(fuel_remaining, dt)
+                    )
                 )
                 first_hi = min(float(c.rated_capacity_kw), max(min_kw, c.ramp_up_kw_per_hour * dt), max_fuel_kw)
                 if max_fuel_kw + 1e-12 < min_kw:
@@ -944,9 +1001,13 @@ class BiomassComponent(EnergyComponent):
             can_stop = bool(limits["can_stop"])
             want_stop = bool(stop_request or cmd <= 1e-12)
             max_fuel_kw = (
-                float(c.rated_capacity_kw)
-                if fuel_remaining is None
-                else self.max_power_for_fuel_tons(fuel_remaining, dt)
+                float(limits["max_by_fuel_kw"])
+                if "max_by_fuel_kw" in limits
+                else (
+                    float(c.rated_capacity_kw)
+                    if fuel_remaining is None
+                    else self.max_power_for_fuel_tons(fuel_remaining, dt)
+                )
             )
             ramp_lo = max(min_kw, curr_kw - c.ramp_down_kw_per_hour * dt)
             ramp_hi = min(float(c.rated_capacity_kw), curr_kw + c.ramp_up_kw_per_hour * dt)

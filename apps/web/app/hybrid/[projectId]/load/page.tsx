@@ -89,7 +89,7 @@ export default function HybridLoadPage({ params }: { params: Promise<{ projectId
         textStyle: { color: colors.muted },
         inRange: { color: ["#F1F5F9", "#B9B9F9", "#8E5CFF", "#533AFD"] },
       },
-      series: [{ type: "heatmap", data: points, progressive: 2000 }],
+      series: [{ type: "heatmap", data: points, animation: false, progressive: 2000 }],
     };
   }, [loadPreview, colors, lang]);
 

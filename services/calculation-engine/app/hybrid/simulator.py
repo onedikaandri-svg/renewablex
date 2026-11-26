@@ -24,7 +24,7 @@ from app.hybrid.dispatch import (
 )
 from app.hybrid.load import LoadProfile
 from app.hybrid.pv_detailed import PVDetailedComponent, PVDetailedConfig
-from app.hybrid.time_grid import TimeConfig
+from app.hybrid.time_grid import DAYS_PER_MONTH, TimeConfig
 from app.hybrid.weather import WeatherDataset
 from app.version import ENGINE_VERSION
 
@@ -252,44 +252,58 @@ def _compute_config_hash(config: SimulationConfig, weather: WeatherDataset, load
 
 
 def _aggregate_daily(balance: PowerBalanceSeries, time_config: TimeConfig) -> list[DailyRow]:
-    day_idx = time_config.day_indices()
+    steps_per_day = time_config.steps_per_day
     h = time_config.step_hours
     pv_gen = balance.effective_pv_generation_kw
-    rows: list[DailyRow] = []
-    for d in range(365):
-        mask = day_idx == d
-        rows.append(
-            DailyRow(
-                day=d + 1,
-                load_kwh=float(np.sum(balance.load_kw[mask]) * h),
-                pv_generation_kwh=float(np.sum(pv_gen[mask]) * h),
-                served_load_kwh=float(np.sum(balance.served_load_kw[mask]) * h),
-                unmet_load_kwh=float(np.sum(balance.unmet_load_kw[mask]) * h),
-                curtailment_kwh=float(np.sum(balance.curtailment_kw[mask]) * h),
-                peak_load_kw=float(np.max(balance.load_kw[mask])),
-                peak_pv_kw=float(np.max(pv_gen[mask])),
-            )
+
+    load_2d = balance.load_kw.reshape(365, steps_per_day)
+    pv_2d = pv_gen.reshape(365, steps_per_day)
+    served_2d = balance.served_load_kw.reshape(365, steps_per_day)
+    unmet_2d = balance.unmet_load_kw.reshape(365, steps_per_day)
+    curtail_2d = balance.curtailment_kw.reshape(365, steps_per_day)
+
+    load_kwh = (load_2d.sum(axis=1) * h).tolist()
+    pv_kwh = (pv_2d.sum(axis=1) * h).tolist()
+    served_kwh = (served_2d.sum(axis=1) * h).tolist()
+    unmet_kwh = (unmet_2d.sum(axis=1) * h).tolist()
+    curtail_kwh = (curtail_2d.sum(axis=1) * h).tolist()
+    peak_load = load_2d.max(axis=1).tolist()
+    peak_pv = pv_2d.max(axis=1).tolist()
+
+    return [
+        DailyRow(
+            day=d + 1,
+            load_kwh=float(load_kwh[d]),
+            pv_generation_kwh=float(pv_kwh[d]),
+            served_load_kwh=float(served_kwh[d]),
+            unmet_load_kwh=float(unmet_kwh[d]),
+            curtailment_kwh=float(curtail_kwh[d]),
+            peak_load_kw=float(peak_load[d]),
+            peak_pv_kw=float(peak_pv[d]),
         )
-    return rows
+        for d in range(365)
+    ]
 
 
 def _aggregate_monthly(balance: PowerBalanceSeries, time_config: TimeConfig) -> list[MonthlyRow]:
-    month_idx = time_config.month_indices()
+    steps_per_day = time_config.steps_per_day
     h = time_config.step_hours
     pv_gen = balance.effective_pv_generation_kw
     rows: list[MonthlyRow] = []
-    for m in range(1, 13):
-        mask = month_idx == m
+    start = 0
+    for m, days in enumerate(DAYS_PER_MONTH, start=1):
+        end = start + days * steps_per_day
         rows.append(
             MonthlyRow(
                 month=m,
-                load_kwh=float(np.sum(balance.load_kw[mask]) * h),
-                pv_generation_kwh=float(np.sum(pv_gen[mask]) * h),
-                served_load_kwh=float(np.sum(balance.served_load_kw[mask]) * h),
-                unmet_load_kwh=float(np.sum(balance.unmet_load_kw[mask]) * h),
-                curtailment_kwh=float(np.sum(balance.curtailment_kw[mask]) * h),
+                load_kwh=float(np.sum(balance.load_kw[start:end]) * h),
+                pv_generation_kwh=float(np.sum(pv_gen[start:end]) * h),
+                served_load_kwh=float(np.sum(balance.served_load_kw[start:end]) * h),
+                unmet_load_kwh=float(np.sum(balance.unmet_load_kw[start:end]) * h),
+                curtailment_kwh=float(np.sum(balance.curtailment_kw[start:end]) * h),
             )
         )
+        start = end
     return rows
 
 
@@ -456,6 +470,7 @@ def run_simulation(
                 bio_can_stop = bool(bio_limits["can_stop"])
                 bio_fuel_rem = bio_limits["fuel_remaining_tons"]
             else:
+                bio_limits = None
                 bio_status_now = "off"
                 bio_avail = 0.0
                 bio_curr = 0.0
@@ -494,6 +509,7 @@ def run_simulation(
             bio_losses = 0.0
             step_reason = decision.trace_reason
             if biomass_component is not None:
+                assert bio_limits is not None
                 bio_step = biomass_component.step(
                     t,
                     decision.biomass_command_kw,
@@ -501,6 +517,7 @@ def run_simulation(
                     biomass_state,
                     start_request=decision.biomass_start_request,
                     stop_request=decision.biomass_stop_request,
+                    precomputed_limits=bio_limits,
                 )
                 biomass_state = bio_step.state_out
                 bio_gen = bio_step.generation_kw

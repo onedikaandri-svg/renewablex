@@ -6,14 +6,18 @@ import path from "path";
 const cssPath = path.resolve(__dirname, "../app/globals.css");
 const css = fs.readFileSync(cssPath, "utf-8");
 
-function extractVars(cssContent: string, isDark: boolean): Record<string, string> {
+function extractVars(cssContent: string, mode: "light" | "dark" | "theme-dark"): Record<string, string> {
   const vars: Record<string, string> = {};
   let targetBlock = cssContent;
 
-  if (isDark) {
+  if (mode === "dark") {
     // Mengambil blok :root di dalam prefers-color-scheme: dark
     const darkMatch = cssContent.match(/@media\s*\(prefers-color-scheme:\s*dark\)\s*{\s*:root\s*{([^}]+)}/);
     if (darkMatch) targetBlock = darkMatch[1];
+    else return {};
+  } else if (mode === "theme-dark") {
+    const themeDarkMatch = cssContent.match(/:root\[data-theme="dark"\]\s*{([^}]+)}/);
+    if (themeDarkMatch) targetBlock = themeDarkMatch[1];
     else return {};
   } else {
     // Mengambil blok :root pertama (mode terang)
@@ -22,7 +26,7 @@ function extractVars(cssContent: string, isDark: boolean): Record<string, string
     else return {};
   }
 
-  // Regex yang tahan terhadap spasi dan baris baru (format Stripe Modern)
+  // Regex yang tahan terhadap spasi dan baris baru pada blok token CSS
   const regex = /--([\w-]+):\s*([^;]+);/g;
   let match;
   while ((match = regex.exec(targetBlock)) !== null) {
@@ -31,8 +35,9 @@ function extractVars(cssContent: string, isDark: boolean): Record<string, string
   return vars;
 }
 
-const light = extractVars(css, false);
-const dark = extractVars(css, true);
+const light = extractVars(css, "light");
+const dark = extractVars(css, "dark");
+const themeDark = extractVars(css, "theme-dark");
 
 function luminance(hex: string) {
   const h = hex.length === 4 ? [...hex.slice(1)].map((c) => c + c).join("") : hex.slice(1);
@@ -65,11 +70,28 @@ const TEXT = [
   ["btntext", "btnhover"],
   ["errtext", "errbg"],
   ["errtext", "surface"],
+  ["success", "bg"],
+  ["success", "surface"],
+  ["success", "successbg"],
+  ["warntext", "bg"],
+  ["warntext", "warnbg"],
+  ["series-pv", "surface"],
+  ["series-pv", "surface-subtle"],
+  ["series-bess", "surface"],
+  ["series-bess", "surface-subtle"],
+  ["series-biomass", "surface"],
+  ["series-biomass", "surface-subtle"],
+  ["series-load", "surface"],
+  ["series-grid", "surface"],
+  ["series-grid", "surface-subtle"],
+  ["series-unmet", "surface"],
 ];
 
 const NON_TEXT = [
   ["field", "bg"],
   ["field", "surface"],
+  ["field-border", "bg"],
+  ["field-border", "surface"],
   ["accent", "bg"],
   ["accent", "surface"],
   ["errtext", "bg"],
@@ -79,9 +101,34 @@ const NON_TEXT = [
   ["btnhover", "surface"],
 ];
 
-describe.each([["terang", light], ["gelap", dark]] as const)("kontras mode %s", (_, vars) => {
+describe.each([["terang", light], ["gelap", dark], ["toggle gelap", themeDark]] as const)("kontras mode %s", (_, vars) => {
   it("token dasar terbaca dari globals.css", () => {
-    const required = ["bg", "surface", "text", "muted", "navy", "navytext", "accent", "field", "errtext", "warnbg", "btn", "btnhover", "btntext"];
+    const required = [
+      "bg",
+      "surface",
+      "surface-subtle",
+      "text",
+      "muted",
+      "navy",
+      "navytext",
+      "accent",
+      "field",
+      "field-border",
+      "success",
+      "successbg",
+      "errtext",
+      "warntext",
+      "warnbg",
+      "btn",
+      "btnhover",
+      "btntext",
+      "series-pv",
+      "series-bess",
+      "series-biomass",
+      "series-load",
+      "series-grid",
+      "series-unmet",
+    ];
     for (const k of required) {
       expect(vars[k], `Token --${k} tidak ditemukan di mode ${_}`).toBeDefined();
     }

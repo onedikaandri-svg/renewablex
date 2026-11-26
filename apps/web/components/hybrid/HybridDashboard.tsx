@@ -1,16 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import EChart, { getChartThemeColors, type EChartsOption } from "@/components/hybrid/EChart";
 import SystemSchematicSvg from "@/components/hybrid/SystemSchematicSvg";
 import { translateDetailText, translateWarning } from "@/lib/errors-id";
 import { downloadFile, formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
+import {
+  buildDegradationSeries,
+  buildDurationCurveSeries,
+  buildSankeyEnergyData,
+} from "@/lib/hybrid-charts";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
 import { usePreferences } from "@/lib/preferences";
 
 type DashboardTab = "overview" | "dispatch" | "heatmap" | "finance";
 type HeatmapMetric = "load" | "pv" | "soc" | "unmet";
 
+const DASHBOARD_TABS: DashboardTab[] = ["overview", "dispatch", "heatmap", "finance"];
 const MONTH_NAMES_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const MONTH_NAMES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -28,6 +34,23 @@ export default function HybridDashboard({
   const [windowDays, setWindowDays] = useState<1 | 3 | 7>(3);
   const [heatmapMetric, setHeatmapMetric] = useState<HeatmapMetric>("load");
   const [inspectHourOffset, setInspectHourOffset] = useState(12);
+  const tabRefs = useRef<Partial<Record<DashboardTab, HTMLButtonElement | null>>>({});
+
+  function handleTabKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, current: DashboardTab) {
+    const idx = DASHBOARD_TABS.indexOf(current);
+    if (idx < 0) return;
+    let nextIdx: number | null = null;
+    if (e.key === "ArrowRight") nextIdx = (idx + 1) % DASHBOARD_TABS.length;
+    else if (e.key === "ArrowLeft") nextIdx = (idx - 1 + DASHBOARD_TABS.length) % DASHBOARD_TABS.length;
+    else if (e.key === "Home") nextIdx = 0;
+    else if (e.key === "End") nextIdx = DASHBOARD_TABS.length - 1;
+    if (nextIdx !== null) {
+      e.preventDefault();
+      const target = DASHBOARD_TABS[nextIdx];
+      setActiveTab(target);
+      tabRefs.current[target]?.focus();
+    }
+  }
 
   const fin = result.finance_summary;
   const em = result.emissions_summary;
@@ -349,11 +372,204 @@ export default function HybridDashboard({
         {
           type: "heatmap",
           data: heatmapData.points,
+          animation: false,
           progressive: 2000,
         },
       ],
     };
   }, [heatmapData, heatmapMetric, colors, lang]);
+
+  // 4b. Diagram Aliran Energi (Sankey Tahun 1)
+  const sankeyData = useMemo(() => buildSankeyEnergyData(result, lang), [result, lang]);
+  const sankeyOption = useMemo<EChartsOption>(() => {
+    if (sankeyData.links.length === 0) return {};
+    const nodeColorMap: Record<string, string> = {
+      "Solar PV": colors.pv,
+      Biomass: colors.biomass,
+      "Impor Grid": colors.grid,
+      "Grid Import": colors.grid,
+      "Penyimpanan BESS": colors.bess,
+      "BESS Storage": colors.bess,
+      "Beban Terpenuhi": colors.load,
+      "Served Load": colors.load,
+      Curtailment: colors.unmet,
+      "Rugi Konversi BESS": colors.muted,
+      "BESS Losses": colors.muted,
+      "Beban Parasitik": colors.muted,
+      "Aux & Parasitic": colors.muted,
+      "Ekspor Grid": colors.grid,
+      "Grid Export": colors.grid,
+      "Bus Pasokan AC": colors.accent,
+      "Supply Bus": colors.accent,
+      "Distribusi AC": colors.accent,
+      "AC Distribution": colors.accent,
+    };
+    return {
+      tooltip: {
+        trigger: "item",
+        triggerOn: "mousemove",
+        formatter: (params: unknown) => {
+          const p = params as { dataType?: string; name?: string; value?: number; data?: { source?: string; target?: string; value?: number } };
+          if (p.dataType === "edge" && p.data) {
+            return `${p.data.source} -> ${p.data.target}<br/><b>${formatNumber(p.data.value ?? 0, lang, 2)} MWh/thn</b>`;
+          }
+          return `${p.name ?? ""}: <b>${formatNumber(p.value ?? 0, lang, 2)} MWh/thn</b>`;
+        },
+      },
+      series: [
+        {
+          type: "sankey",
+          left: 16,
+          right: 120,
+          top: 16,
+          bottom: 16,
+          nodeAlign: "justify",
+          emphasis: { focus: "adjacency" },
+          lineStyle: { color: "gradient", curveness: 0.45, opacity: 0.45 },
+          label: { color: colors.text, fontSize: 11 },
+          data: sankeyData.nodes.map((n) => ({
+            name: n.name,
+            itemStyle: { color: nodeColorMap[n.name] ?? colors.accent },
+          })),
+          links: sankeyData.links,
+        },
+      ],
+    };
+  }, [sankeyData, colors, lang]);
+
+  // 4c. Kurva Durasi Beban & Pembangkitan (Tahun 1, decimated untuk tampilan mulus)
+  const durationData = useMemo(() => (hourly ? buildDurationCurveSeries(hourly, 240) : null), [hourly]);
+  const durationOption = useMemo<EChartsOption>(() => {
+    if (!durationData) return {};
+    return {
+      tooltip: { trigger: "axis" },
+      legend: { top: 0, textStyle: { color: colors.text } },
+      grid: { left: 52, right: 20, top: 44, bottom: 38 },
+      xAxis: {
+        type: "category",
+        data: durationData.percentLabels,
+        name: lang === "en" ? "Time Exceeded (%)" : "Durasi Terlampaui (% jam/thn)",
+        nameLocation: "middle",
+        nameGap: 24,
+        axisLabel: { color: colors.muted, interval: Math.max(1, Math.floor(durationData.percentLabels.length / 6)) },
+        axisLine: { lineStyle: { color: colors.border } },
+      },
+      yAxis: {
+        type: "value",
+        name: "kW",
+        nameTextStyle: { color: colors.muted },
+        axisLabel: { color: colors.muted },
+        splitLine: { lineStyle: { color: colors.border } },
+      },
+      series: [
+        {
+          name: lang === "en" ? "Load (kW)" : "Beban (kW)",
+          type: "line",
+          symbol: "none",
+          color: colors.load,
+          lineStyle: { width: 2, type: "dashed" },
+          data: durationData.loadKw,
+        },
+        {
+          name: lang === "en" ? "Served Load (kW)" : "Beban Terpenuhi (kW)",
+          type: "line",
+          symbol: "none",
+          color: colors.grid,
+          lineStyle: { width: 2 },
+          data: durationData.servedKw,
+        },
+        {
+          name: "PV (kW)",
+          type: "line",
+          symbol: "none",
+          color: colors.pv,
+          lineStyle: { width: 2 },
+          data: durationData.pvKw,
+        },
+        ...(durationData.biomassKw.some((v) => v > 0)
+          ? [
+              {
+                name: "Biomass (kW)",
+                type: "line" as const,
+                symbol: "none",
+                color: colors.biomass,
+                lineStyle: { width: 2 },
+                data: durationData.biomassKw,
+              },
+            ]
+          : []),
+      ],
+    };
+  }, [durationData, colors, lang]);
+
+  // 4d. Grafik Degradasi Kapasitas PV & BESS Sepanjang Umur Proyek
+  const degradationData = useMemo(() => buildDegradationSeries(result, config), [result, config]);
+  const degradationOption = useMemo<EChartsOption>(() => {
+    if (degradationData.years.length === 0) return {};
+    const eventLines = degradationData.events.map((ev) => ({
+      xAxis: `${ev.year}`,
+      name: ev.eventType,
+    }));
+    const minPv = Math.min(...degradationData.pvCapacityPct, 75);
+    const minBess = degradationData.bessCapacityPct ? Math.min(...degradationData.bessCapacityPct, 75) : 75;
+    const yMin = Math.max(0, Math.floor(Math.min(minPv, minBess) / 5) * 5 - 5);
+
+    return {
+      tooltip: { trigger: "axis" },
+      legend: { top: 0, textStyle: { color: colors.text } },
+      grid: { left: 52, right: 20, top: 44, bottom: 32 },
+      xAxis: {
+        type: "category",
+        data: degradationData.years,
+        name: lang === "en" ? "Year" : "Tahun",
+        axisLabel: { color: colors.muted },
+        axisLine: { lineStyle: { color: colors.border } },
+      },
+      yAxis: {
+        type: "value",
+        min: yMin,
+        max: 102,
+        name: "%",
+        nameTextStyle: { color: colors.muted },
+        axisLabel: { color: colors.muted },
+        splitLine: { lineStyle: { color: colors.border } },
+      },
+      series: [
+        {
+          name: lang === "en" ? "PV Capacity Factor (%)" : "Kapasitas Efektif PV (%)",
+          type: "line",
+          color: colors.pv,
+          lineStyle: { width: 2.5 },
+          symbol: "circle",
+          symbolSize: 5,
+          data: degradationData.pvCapacityPct,
+          markLine:
+            eventLines.length > 0
+              ? {
+                  symbol: ["none", "none"],
+                  silent: true,
+                  label: { formatter: "{b}", color: colors.muted, fontSize: 10 },
+                  lineStyle: { color: colors.biomass, type: "dashed" },
+                  data: eventLines,
+                }
+              : undefined,
+        },
+        ...(degradationData.bessCapacityPct
+          ? [
+              {
+                name: lang === "en" ? "BESS Effective Capacity (%)" : "Kapasitas Efektif BESS (%)",
+                type: "line" as const,
+                color: colors.bess,
+                lineStyle: { width: 2.5 },
+                symbol: "triangle",
+                symbolSize: 6,
+                data: degradationData.bessCapacityPct,
+              },
+            ]
+          : []),
+      ],
+    };
+  }, [degradationData, colors, lang]);
 
   // 5. Arus Kas Tahunan + Kumulatif & Rincian LCOE
   const cashflowOption = useMemo<EChartsOption>(() => {
@@ -605,46 +821,58 @@ export default function HybridDashboard({
       <div className="sec">
         <div className="tabs" role="tablist" aria-label={lang === "en" ? "Dashboard sections" : "Bagian dasbor hasil"}>
           <button
+            ref={(el) => { tabRefs.current.overview = el; }}
             type="button"
             role="tab"
             id="tab-overview"
+            tabIndex={activeTab === "overview" ? 0 : -1}
             aria-selected={activeTab === "overview"}
             aria-controls="panel-overview"
             className="tab-btn"
             onClick={() => setActiveTab("overview")}
+            onKeyDown={(e) => handleTabKeyDown(e, "overview")}
           >
             {lang === "en" ? "Overview & Monthly" : "Ringkasan & Bulanan"}
           </button>
           <button
+            ref={(el) => { tabRefs.current.dispatch = el; }}
             type="button"
             role="tab"
             id="tab-dispatch"
+            tabIndex={activeTab === "dispatch" ? 0 : -1}
             aria-selected={activeTab === "dispatch"}
             aria-controls="panel-dispatch"
             className="tab-btn"
             onClick={() => setActiveTab("dispatch")}
+            onKeyDown={(e) => handleTabKeyDown(e, "dispatch")}
           >
             {lang === "en" ? "Dispatch & SOC" : "Dispatch & SOC"}
           </button>
           <button
+            ref={(el) => { tabRefs.current.heatmap = el; }}
             type="button"
             role="tab"
             id="tab-heatmap"
+            tabIndex={activeTab === "heatmap" ? 0 : -1}
             aria-selected={activeTab === "heatmap"}
             aria-controls="panel-heatmap"
             className="tab-btn"
             onClick={() => setActiveTab("heatmap")}
+            onKeyDown={(e) => handleTabKeyDown(e, "heatmap")}
           >
             {lang === "en" ? "8760h Heatmaps" : "Peta Panas 8.760 Jam"}
           </button>
           <button
+            ref={(el) => { tabRefs.current.finance = el; }}
             type="button"
             role="tab"
             id="tab-finance"
+            tabIndex={activeTab === "finance" ? 0 : -1}
             aria-selected={activeTab === "finance"}
             aria-controls="panel-finance"
             className="tab-btn"
             onClick={() => setActiveTab("finance")}
+            onKeyDown={(e) => handleTabKeyDown(e, "finance")}
           >
             {lang === "en" ? "Finance & Cash Flow" : "Keuangan & Arus Kas"}
           </button>
@@ -657,13 +885,45 @@ export default function HybridDashboard({
               <div className="chart-card">
                 <div className="chart-head">
                   <h3>{lang === "en" ? "Monthly Energy Supply vs Load" : "Energi Bulanan per Sumber vs Beban"}</h3>
-                  <span className="chip">MWh / bulan</span>
+                  <span className="chip">MWh / {lang === "en" ? "mo" : "bulan"}</span>
                 </div>
                 <EChart
                   option={monthlyOption}
                   height={320}
                   ariaLabel="Grafik batang bertumpuk energi bulanan PV, Biomass, BESS, dan Grid terhadap beban."
                 />
+                <details className="more">
+                  <summary>{lang === "en" ? "Monthly energy table (accessible alternative)" : "Tabel energi bulanan (alternatif teks)"}</summary>
+                  <div className="tw" tabIndex={0} role="region" aria-label="Tabel ringkasan energi bulanan">
+                    <table className="sens-main">
+                      <caption>Energi bulanan Tahun 1 (MWh)</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Bulan</th>
+                          <th scope="col">Beban</th>
+                          <th scope="col">PV</th>
+                          <th scope="col">Biomass</th>
+                          <th scope="col">BESS Dis.</th>
+                          <th scope="col">Grid Imp.</th>
+                          <th scope="col">Unmet</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.monthly.map((m) => (
+                          <tr key={m.month}>
+                            <th scope="row">{monthLabels[m.month - 1] ?? m.month}</th>
+                            <td>{formatNumber(m.load_kwh / 1000, lang, 1)}</td>
+                            <td>{formatNumber(m.pv_generation_kwh / 1000, lang, 1)}</td>
+                            <td>{formatNumber(m.biomass_generation_kwh / 1000, lang, 1)}</td>
+                            <td>{formatNumber(m.bess_discharge_kwh / 1000, lang, 1)}</td>
+                            <td>{formatNumber(m.grid_import_kwh / 1000, lang, 1)}</td>
+                            <td>{formatNumber(m.unmet_load_kwh / 1000, lang, 1)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
               </div>
 
               <div className="chart-card">
@@ -676,7 +936,73 @@ export default function HybridDashboard({
                   height={320}
                   ariaLabel="Diagram waterfall rugi PV dari irradiansi POA nominal hingga keluaran AC bersih."
                 />
+                <details className="more">
+                  <summary>{lang === "en" ? "PV loss breakdown table" : "Tabel rincian rugi PV (alternatif teks)"}</summary>
+                  <div className="tw tw-auto" tabIndex={0} role="region" aria-label="Tabel rincian rugi PV">
+                    <table className="sens-main">
+                      <caption>Rincian konversi energi PV Tahun 1 (MWh)</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Tahap</th>
+                          <th scope="col">Energi (MWh)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(result.pv_loss_breakdown_kwh || {}).map(([k, v]) => (
+                          <tr key={k}>
+                            <th scope="row">{k}</th>
+                            <td>{formatNumber(v / 1000, lang, 2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
               </div>
+            </div>
+
+            <div className="sec chart-card">
+              <div className="chart-head">
+                <h3>{lang === "en" ? "Annual Energy Flow Diagram (Sankey, Year 1)" : "Diagram Aliran Energi Tahunan (Sankey Tahun 1)"}</h3>
+                <span className="chip">{lang === "en" ? "MWh/yr" : "MWh/thn"}</span>
+              </div>
+              {sankeyData.links.length === 0 ? (
+                <div className="state">
+                  <p>{lang === "en" ? "No energy flow data available." : "Belum ada data aliran energi untuk ditampilkan."}</p>
+                </div>
+              ) : (
+                <>
+                  <EChart
+                    option={sankeyOption}
+                    height={300}
+                    ariaLabel="Diagram Sankey aliran energi Tahun 1 dari pembangkit menuju BESS, beban terpenuhi, ekspor, dan rugi konversi."
+                  />
+                  <details className="more">
+                    <summary>{lang === "en" ? "Energy flow table (accessible alternative)" : "Tabel aliran energi Sankey (alternatif teks)"}</summary>
+                    <div className="tw tw-auto" tabIndex={0} role="region" aria-label="Tabel aliran energi Sankey">
+                      <table className="sens-main">
+                        <caption>Aliran energi tahunan antar simpul sistem (MWh/thn)</caption>
+                        <thead>
+                          <tr>
+                            <th scope="col">Dari</th>
+                            <th scope="col">Menuju</th>
+                            <th scope="col">Energi (MWh/thn)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sankeyData.rows.map((r, i) => (
+                            <tr key={`${r.source}-${r.target}-${i}`}>
+                              <th scope="row">{r.source}</th>
+                              <td>{r.target}</td>
+                              <td>{formatNumber(r.mwh, lang, 2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                </>
+              )}
             </div>
 
             <div className="sec grid-2">
@@ -820,6 +1146,46 @@ export default function HybridDashboard({
                     </p>
                   </div>
                 )}
+
+                {durationData && (
+                  <div className="sec chart-card">
+                    <div className="chart-head">
+                      <h3>{lang === "en" ? "Load & Generation Duration Curve (Year 1)" : "Kurva Durasi Beban & Pembangkitan (Tahun 1)"}</h3>
+                      <span className="chip">{durationData.percentLabels.length} titik sampel dari 8.760 jam</span>
+                    </div>
+                    <EChart
+                      option={durationOption}
+                      height={300}
+                      ariaLabel="Kurva durasi beban, beban terpenuhi, PV, dan Biomass sepanjang 8.760 jam Tahun 1."
+                    />
+                    <details className="more">
+                      <summary>{lang === "en" ? "Duration curve statistics table" : "Ringkasan statistik kurva durasi (alternatif teks)"}</summary>
+                      <div className="tw tw-auto" tabIndex={0} role="region" aria-label="Ringkasan statistik kurva durasi">
+                        <table className="sens-main">
+                          <caption>Nilai puncak, median, dan minimum deret 8.760 jam (kW)</caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">Seri</th>
+                              <th scope="col">Puncak (kW)</th>
+                              <th scope="col">Median (kW)</th>
+                              <th scope="col">Minimum (kW)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {durationData.stats.map((st) => (
+                              <tr key={st.key}>
+                                <th scope="row">{st.key}</th>
+                                <td>{formatNumber(st.peakKw, lang, 2)}</td>
+                                <td>{formatNumber(st.medianKw, lang, 2)}</td>
+                                <td>{formatNumber(st.minKw, lang, 2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -896,8 +1262,79 @@ export default function HybridDashboard({
                   height={320}
                   ariaLabel="Grafik batang rincian komponen biaya LCOE."
                 />
+                {result.lcoe_breakdown && (
+                  <details className="more">
+                    <summary>{lang === "en" ? "LCOE breakdown table" : "Tabel rincian komponen LCOE (alternatif teks)"}</summary>
+                    <div className="tw tw-auto" tabIndex={0} role="region" aria-label="Tabel rincian LCOE">
+                      <table className="sens-main">
+                        <caption>Kontribusi biaya LCOE ({curr}/kWh)</caption>
+                        <thead>
+                          <tr>
+                            <th scope="col">Komponen Biaya</th>
+                            <th scope="col">Nilai ({curr}/kWh)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(result.lcoe_breakdown).map(([k, v]) => (
+                            <tr key={k}>
+                              <th scope="row">{k}</th>
+                              <td>{formatNumber(v, lang, 2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )}
               </div>
             </div>
+
+            {degradationData.years.length > 0 && (
+              <div className="sec chart-card">
+                <div className="chart-head">
+                  <div>
+                    <h3>{lang === "en" ? "PV & BESS Capacity Degradation Over Project Lifetime" : "Degradasi Kapasitas PV & BESS Sepanjang Umur Proyek"}</h3>
+                    <p className="note">
+                      {result.lifetime_summary.multi_year_mode === "scaled_year_1"
+                        ? "Catatan jujur: pada mode cepat scaled_year_1, kapasitas BESS Tahun 2 ke atas mengikuti hasil Tahun 1. Jalankan full_hourly di Halaman 7 untuk degradasi BESS tiap jam selama umur proyek."
+                        : "Menampilkan penurunan kapasitas efektif tahunan PV dan BESS beserta penanda tahun penggantian."}
+                    </p>
+                  </div>
+                  <span className="chip">% kapasitas awal</span>
+                </div>
+                <EChart
+                  option={degradationOption}
+                  height={280}
+                  ariaLabel="Grafik degradasi kapasitas efektif PV dan BESS dari Tahun 1 sampai akhir umur proyek."
+                />
+                <details className="more">
+                  <summary>{lang === "en" ? "Capacity degradation table" : "Tabel degradasi kapasitas tahunan (alternatif teks)"}</summary>
+                  <div className="tw" tabIndex={0} role="region" aria-label="Tabel degradasi kapasitas PV dan BESS">
+                    <table className="sens-main">
+                      <caption>Kapasitas efektif PV dan BESS per tahun (%)</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Tahun</th>
+                          <th scope="col">PV (%)</th>
+                          <th scope="col">BESS (%)</th>
+                          <th scope="col">Kejadian Umur</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {degradationData.rows.map((row) => (
+                          <tr key={row.year}>
+                            <th scope="row">{row.year}</th>
+                            <td>{formatNumber(row.pvPct, lang, 1)}</td>
+                            <td>{row.bessPct !== null ? formatNumber(row.bessPct, lang, 1) : "-"}</td>
+                            <td>{row.eventsLabel}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              </div>
+            )}
 
             <div className="sec actions-inline">
               <button type="button" className="btn ghost" onClick={handleExportJson}>

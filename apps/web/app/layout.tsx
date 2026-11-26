@@ -20,8 +20,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <PreferencesProvider>
           <ToastProvider>
+            <a href="#main-content" className="skip-link">
+              Lewati ke konten utama
+            </a>
             <AppHeader />
-            <main className="wrap">{children}</main>
+            <main id="main-content" className="wrap" tabIndex={-1}>
+              {children}
+            </main>
             <footer>
               <div className="wrap">RenewableX · Desain Sistem Energi Hybrid dan Screening PV (Estimasi Pendahuluan)</div>
             </footer>

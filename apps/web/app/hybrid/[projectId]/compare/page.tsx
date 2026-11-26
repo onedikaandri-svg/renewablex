@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 import HybridShell from "@/components/hybrid/HybridShell";
 import ScenarioCompareTab from "@/components/hybrid/ScenarioCompareTab";
 import SensitivityTab from "@/components/hybrid/SensitivityTab";
@@ -9,6 +9,7 @@ import { usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 type CompareTabKey = "sweep" | "scenarios" | "sensitivity";
+const COMPARE_TABS: CompareTabKey[] = ["sweep", "scenarios", "sensitivity"];
 
 export default function HybridComparePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params);
@@ -16,6 +17,23 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
   const { lang } = usePreferences();
   const [activeTab, setActiveTab] = useState<CompareTabKey>("sweep");
   const [scenarioRefresh, setScenarioRefresh] = useState(0);
+  const tabRefs = useRef<Partial<Record<CompareTabKey, HTMLButtonElement | null>>>({});
+
+  function handleTabKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, current: CompareTabKey) {
+    const idx = COMPARE_TABS.indexOf(current);
+    if (idx < 0) return;
+    let nextIdx: number | null = null;
+    if (e.key === "ArrowRight") nextIdx = (idx + 1) % COMPARE_TABS.length;
+    else if (e.key === "ArrowLeft") nextIdx = (idx - 1 + COMPARE_TABS.length) % COMPARE_TABS.length;
+    else if (e.key === "Home") nextIdx = 0;
+    else if (e.key === "End") nextIdx = COMPARE_TABS.length - 1;
+    if (nextIdx !== null) {
+      e.preventDefault();
+      const target = COMPARE_TABS[nextIdx];
+      setActiveTab(target);
+      tabRefs.current[target]?.focus();
+    }
+  }
 
   if (!ready) {
     return (
@@ -39,35 +57,44 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
     >
       <div className="tabs" role="tablist" aria-label={lang === "en" ? "Comparison views" : "Tab perbandingan sistem hybrid"}>
         <button
+          ref={(el) => { tabRefs.current.sweep = el; }}
           type="button"
           role="tab"
           id="tab-sweep"
+          tabIndex={activeTab === "sweep" ? 0 : -1}
           aria-selected={activeTab === "sweep"}
           aria-controls="panel-sweep"
           className="tab-btn"
           onClick={() => setActiveTab("sweep")}
+          onKeyDown={(e) => handleTabKeyDown(e, "sweep")}
         >
           {lang === "en" ? "Component Sweep" : "Sapuan Kombinasi HOMER"}
         </button>
         <button
+          ref={(el) => { tabRefs.current.scenarios = el; }}
           type="button"
           role="tab"
           id="tab-scenarios"
+          tabIndex={activeTab === "scenarios" ? 0 : -1}
           aria-selected={activeTab === "scenarios"}
           aria-controls="panel-scenarios"
           className="tab-btn"
           onClick={() => setActiveTab("scenarios")}
+          onKeyDown={(e) => handleTabKeyDown(e, "scenarios")}
         >
           {lang === "en" ? "Compare Scenarios" : "Bandingkan Skenario Proyek"}
         </button>
         <button
+          ref={(el) => { tabRefs.current.sensitivity = el; }}
           type="button"
           role="tab"
           id="tab-sensitivity"
+          tabIndex={activeTab === "sensitivity" ? 0 : -1}
           aria-selected={activeTab === "sensitivity"}
           aria-controls="panel-sensitivity"
           className="tab-btn"
           onClick={() => setActiveTab("sensitivity")}
+          onKeyDown={(e) => handleTabKeyDown(e, "sensitivity")}
         >
           {lang === "en" ? "Hybrid Sensitivity" : "Sensitivitas Hybrid (Tornado & 5x5)"}
         </button>
