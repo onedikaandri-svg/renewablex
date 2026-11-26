@@ -1,6 +1,6 @@
 # Kontrak Tahap 7: Sapuan Kombinasi Gaya HOMER, Perbandingan Skenario, Sensitivitas Hybrid, dan Ekspor Laporan PDF/Excel
 
-**Status dokumen:** Usulan kontrak (menunggu persetujuan pemilik proyek sebelum PR dependensi dan PR implementasi kode).  
+**Status dokumen:** Disetujui pemilik proyek (keputusan Bagian 7 telah dikonfirmasi pada 2026-11-26).  
 **Cabang usulan kontrak:** `docs/stage-7-contract` (berbasis `main` setelah penggabungan Tahap 6A, commit `64e6d5f`).  
 **Cakupan:** Endpoint backend sapuan kombinasi gaya HOMER asinkron, endpoint analisis sensitivitas hybrid (Tornado dan Matriks `5x5`), pembaruan navigasi `HybridShell.tsx` menjadi alur lengkap 10 halaman, rancangan antarmuka Halaman 9 (`/hybrid/[projectId]/compare`) dan Halaman 10 (`/hybrid/[projectId]/export`), strategi performa untuk instance gratis Render, serta evaluasi jujur pustaka ekspor PDF dan Excel (`.xlsx`) sesuai aturan Diet Paket.
 
@@ -548,18 +548,11 @@ PR implementasi kode Tahap 7 (setelah kontrak ini disetujui dan PR dependensi bi
 
 ---
 
-## 7. Keputusan Pemilik Proyek yang Dibutuhkan Sebelum PR Dependensi dan PR Kode
+## 7. Keputusan Pemilik Proyek yang Telah Dikonfirmasi
 
-Mohon pemilik proyek menentukan **4 keputusan berikut** sebelum agen membuat PR dependensi maupun menulis kode implementasi Tahap 7:
+Seluruh 4 keputusan desain, pustaka ekspor, batas sapuan, dan sensitivitas Tahap 7 telah dikonfirmasi oleh pemilik proyek pada 2026-11-26:
 
-1. **Pilihan Ekspor PDF (Bagian 4.2):**
-   - **Opsi P1 (Direkomendasikan):** Tampilan Laporan Cetak A4 khusus Next.js + CSS `@media print` (`window.print()`). Nol dependensi baru, nol beban RAM Render, dan SVG skema sistem tetap berupa vektor 100% tajam. Pengguna memilih "Simpan sebagai PDF" di dialog cetak browser.
-   - **Opsi P3:** Paket `jspdf` + `jspdf-autotable` (MIT) di browser. Unduhan `.pdf` 1-klik langsung tanpa dialog cetak, tetapi menambah 2 dependensi frontend (lewat PR dependensi terpisah) dan SVG skema dirasterisasi ke gambar PNG resolusi tinggi.
-   - **Opsi P2:** Pembuatan PDF di backend (`reportlab`), tidak disarankan karena tata letak lebih rumit dan masalah konversi `<marker>` panah SVG.
-2. **Pilihan Ekspor Excel `.xlsx` (Bagian 4.1):**
-   - **Opsi E1 (Direkomendasikan):** Backend Python `openpyxl` (MIT), diajukan lewat PR dependensi backend terpisah (`deps/add-engine-openpyxl`). Nol tambahan bundel JS browser, sangat ringan untuk RAM, dan mudah diuji otomatis di `pytest`.
-   - **Opsi E2:** Browser `exceljs` atau `write-excel-file` (MIT), diajukan lewat PR dependensi frontend terpisah. Berjalan offline di browser tanpa memanggil Render, tetapi menambah ukuran bundel JS frontend.
-3. **Batas Aman Kombinasi Sapuan dan Penskalaan Otomatis (Bagian 2.2 dan 3):**
-   - Apakah batas maksimal **64 kombinasi** untuk `scaled_year_1` dan **12 kombinasi** untuk `full_hourly` (maks 10 nilai per sumbu) sudah sesuai, serta apakah penskalaan otomatis rasio DC/AC inverter (`keep_dc_ac_ratio`) dan C-rate BESS (`0.5 C` bila BESS dasar nonaktif) disetujui?
-4. **Variabel Default Sensitivitas Tornado Hybrid dan Matriks `5 x 5` (Bagian 2.3):**
-   - Apakah 6 variabel bawaan (`capex_total`, `electricity_tariff`, `discount_rate`, `biomass_fuel_price`, `om_total`, `pv_degradation_rate`) dengan pergeseran bawaan `-20%, -10%, +10%, +20%` dan Matriks Sensitivitas `5 x 5` disetujui?
+1. **Pilihan Ekspor PDF (Bagian 4.2):** **Opsi P1** disetujui (Tampilan Laporan Cetak A4 khusus Next.js + CSS `@media print` / `window.print()`, nol dependensi baru untuk PDF, nol beban RAM Render, dan memakai SVG vektor murni dari `serializeSchematicSvgWithLightTheme`). Endpoint `POST /v1/hybrid/export/pdf` tidak dibuat.
+2. **Pilihan Ekspor Excel `.xlsx` (Bagian 4.1):** **Opsi E1** disetujui (Backend Python `openpyxl` berlisensi MIT melalui PR dependensi terpisah `deps/add-engine-openpyxl`, dengan endpoint `POST /v1/hybrid/export/excel`).
+3. **Batas Aman Kombinasi Sapuan dan Penskalaan Otomatis (Bagian 2.2 dan 3):** Disetujui (maksimal **64 kombinasi** untuk `scaled_year_1`, maksimal **12 kombinasi** untuk `full_hourly`, maksimal 10 nilai unik per sumbu, rasio DC/AC inverter `keep_dc_ac_ratio`, serta C-rate BESS mengikuti konfigurasi dasar atau `0,5 C` bila BESS dasar nonaktif).
+4. **Variabel Bawaan Sensitivitas Tornado Hybrid dan Matriks `5 x 5` (Bagian 2.3):** Disetujui (6 variabel bawaan `capex_total`, `electricity_tariff`, `discount_rate`, `biomass_fuel_price`, `om_total`, `pv_degradation_rate`, pergeseran `-20%, -10%, +10%, +20%`, serta Matriks Sensitivitas `5 x 5`).
