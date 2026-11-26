@@ -2,13 +2,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, NetworkError } from "./api";
 import {
   buildHybridSimulatePayload,
+  cancelHybridSweepJob,
+  downloadHybridExcelReport,
   getHybridJob,
+  getHybridSweepJob,
   previewHybridLoad,
   previewHybridWeather,
+  runHybridSensitivity,
   runHybridSimulate,
   submitHybridJob,
+  submitHybridSweepJob,
 } from "./hybrid-api";
 import { buildSampleProject } from "./hybrid-storage";
+import type { HybridSimulateResponse } from "./hybrid-types";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -70,5 +76,59 @@ describe("hybrid-api", () => {
 
     vi.stubGlobal("fetch", vi.fn().mockRejectedValueOnce(new Error("offline")));
     await expect(runHybridSimulate(cfg)).rejects.toBeInstanceOf(NetworkError);
+  });
+
+  it("mendukung sapuan kombinasi, pembatalan, sensitivitas hybrid, dan ekspor Excel", async () => {
+    const cfg = buildSampleProject("test-id");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "sw1", total_combinations: 4, status: "queued" }), { status: 202 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "sw1", status: "completed" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "sw1", status: "cancelled" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ contract_version: "0.6", variables: [] }), { status: 200 }))
+        .mockResolvedValueOnce(
+          new Response(new Uint8Array([80, 75, 3, 4]), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "Content-Disposition": 'attachment; filename="cikarang-laporan-hybrid.xlsx"',
+            },
+          }),
+        ),
+    );
+
+    const sw = await submitHybridSweepJob(cfg, {
+      pv_capacity_kwp_values: [300, 500],
+      bess_capacity_kwh_values: [0, 400],
+      biomass_capacity_kw_values: [0],
+      pv_inverter_sizing_mode: "keep_dc_ac_ratio",
+      scale_replacement_costs: true,
+      max_unmet_load_fraction: 0.05,
+      min_renewable_fraction: null,
+      sort_by: "lcoe_asc",
+      feasible_first: true,
+    });
+    expect(sw.job_id).toBe("sw1");
+
+    const swStatus = await getHybridSweepJob("sw1");
+    expect(swStatus.status).toBe("completed");
+
+    const swCancel = await cancelHybridSweepJob("sw1");
+    expect(swCancel.status).toBe("cancelled");
+
+    const sens = await runHybridSensitivity(cfg, { variables: ["capex_total"], shifts: [-0.1, 0.1] });
+    expect(sens.contract_version).toBe("0.6");
+
+    const fakeResult = {
+      project_name: "Cikarang",
+      summary: {},
+      monthly: [],
+      cashflow_schedule: [],
+      hourly_year_1: { steps_count: 8760 },
+    } as unknown as HybridSimulateResponse;
+    const excel = await downloadHybridExcelReport({ cfg, result: fakeResult, language: "id" });
+    expect(excel.filename).toBe("cikarang-laporan-hybrid.xlsx");
+    expect(excel.blob.size).toBe(4);
   });
 });

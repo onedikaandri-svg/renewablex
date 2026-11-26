@@ -1,8 +1,25 @@
-import { deriveDefaultTopology, syncProjectFromTopology } from "@/lib/hybrid-topology";
-import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
+import {
+  addTopologyNode,
+  connectTopologyNodes,
+  deriveDefaultTopology,
+  getNodeIdForKind,
+  isKindConnectedToBus,
+  removeTopologyNode,
+  resolveProjectTopology,
+  syncProjectFromTopology,
+} from "@/lib/hybrid-topology";
+import type {
+  HybridProjectConfig,
+  HybridSensitivityResponse,
+  HybridSimulateResponse,
+  HybridSweepCombination,
+  HybridSweepResult,
+} from "@/lib/hybrid-types";
 
 const PROJECTS_KEY = "renewablex.hybrid.projects.v1";
 const RESULT_KEY_PREFIX = "renewablex.hybrid.result.v1.";
+const SWEEP_KEY_PREFIX = "renewablex.hybrid.sweep.v1.";
+const SENSITIVITY_KEY_PREFIX = "renewablex.hybrid.sensitivity.v1.";
 
 function makeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -227,6 +244,8 @@ export function deleteProject(projectId: string): void {
   if (typeof window !== "undefined") {
     try {
       window.localStorage.removeItem(`${RESULT_KEY_PREFIX}${projectId}`);
+      window.localStorage.removeItem(`${SWEEP_KEY_PREFIX}${projectId}`);
+      window.localStorage.removeItem(`${SENSITIVITY_KEY_PREFIX}${projectId}`);
     } catch {
       // Abaikan.
     }
@@ -310,4 +329,165 @@ export function getSimulationResult(projectId: string): HybridSimulateResponse |
   } catch {
     return null;
   }
+}
+
+export function clearSimulationResult(projectId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(`${RESULT_KEY_PREFIX}${projectId}`);
+  } catch {
+    // Abaikan.
+  }
+}
+
+export function saveSweepResult(projectId: string, result: HybridSweepResult): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`${SWEEP_KEY_PREFIX}${projectId}`, JSON.stringify(result));
+  } catch {
+    // Abaikan bila kuota penyimpanan penuh.
+  }
+}
+
+export function getSweepResult(projectId: string): HybridSweepResult | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`${SWEEP_KEY_PREFIX}${projectId}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as HybridSweepResult;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSensitivityResult(projectId: string, result: HybridSensitivityResponse): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`${SENSITIVITY_KEY_PREFIX}${projectId}`, JSON.stringify(result));
+  } catch {
+    // Abaikan bila kuota penyimpanan penuh.
+  }
+}
+
+export function getSensitivityResult(projectId: string): HybridSensitivityResponse | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`${SENSITIVITY_KEY_PREFIX}${projectId}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as HybridSensitivityResponse;
+  } catch {
+    return null;
+  }
+}
+
+function ensureOptionalNodeConnected(
+  project: HybridProjectConfig,
+  kind: "bess" | "biomass",
+  enabled: boolean,
+): HybridProjectConfig {
+  const topo = resolveProjectTopology(project);
+  const nodeId = getNodeIdForKind(kind);
+  const exists = topo.nodes.some((n) => n.kind === kind);
+  const connected = isKindConnectedToBus(topo, kind);
+
+  if (enabled) {
+    let next = project;
+    if (!exists) {
+      next = addTopologyNode(next, kind, { autoConnect: true });
+    } else if (!connected) {
+      next = connectTopologyNodes(next, nodeId, getNodeIdForKind("ac_bus")).project;
+    }
+    return next;
+  }
+
+  if (exists) {
+    return removeTopologyNode(project, nodeId).project;
+  }
+  return project;
+}
+
+export function applySweepCombinationToProject(
+  project: HybridProjectConfig,
+  combo: HybridSweepCombination,
+): HybridProjectConfig {
+  const prevInvKw = project.components.pv.inverter_ac_kw;
+  const invScale = prevInvKw > 0 ? combo.sizing.pv_inverter_ac_kw / prevInvKw : 1;
+
+  const prevBessKwh = project.components.bess.nominal_capacity_kwh;
+  const nextBessRepl = combo.sizing.bess_enabled
+    ? (prevBessKwh > 0
+      ? project.components.bess.replacement_cost * (combo.sizing.bess_nominal_capacity_kwh / prevBessKwh)
+      : combo.sizing.bess_nominal_capacity_kwh * project.finance.bess_capex_per_kwh)
+    : project.components.bess.replacement_cost;
+
+  const prevBioKw = project.components.biomass.rated_capacity_kw;
+  const nextBioOverhaul = combo.sizing.biomass_enabled
+    ? (prevBioKw > 0
+      ? project.components.biomass.overhaul_cost * (combo.sizing.biomass_rated_capacity_kw / prevBioKw)
+      : project.components.biomass.overhaul_cost)
+    : project.components.biomass.overhaul_cost;
+
+  let next: HybridProjectConfig = {
+    ...structuredClone(project),
+    components: {
+      ...project.components,
+      pv: {
+        ...project.components.pv,
+        enabled: true,
+        capacity_kwp: combo.sizing.pv_capacity_kwp,
+        inverter_ac_kw: combo.sizing.pv_inverter_ac_kw,
+      },
+      bess: {
+        ...project.components.bess,
+        enabled: combo.sizing.bess_enabled,
+        nominal_capacity_kwh: combo.sizing.bess_enabled
+          ? combo.sizing.bess_nominal_capacity_kwh
+          : project.components.bess.nominal_capacity_kwh,
+        max_charge_kw: combo.sizing.bess_enabled
+          ? combo.sizing.bess_max_charge_kw
+          : project.components.bess.max_charge_kw,
+        max_discharge_kw: combo.sizing.bess_enabled
+          ? combo.sizing.bess_max_discharge_kw
+          : project.components.bess.max_discharge_kw,
+        replacement_cost: nextBessRepl,
+      },
+      biomass: {
+        ...project.components.biomass,
+        enabled: combo.sizing.biomass_enabled,
+        rated_capacity_kw: combo.sizing.biomass_enabled
+          ? combo.sizing.biomass_rated_capacity_kw
+          : project.components.biomass.rated_capacity_kw,
+        overhaul_cost: nextBioOverhaul,
+      },
+    },
+    finance: {
+      ...project.finance,
+      inverter_replacement_cost:
+        project.finance.inverter_replacement_cost > 0
+          ? project.finance.inverter_replacement_cost * invScale
+          : project.finance.inverter_replacement_cost,
+    },
+  };
+
+  next = ensureOptionalNodeConnected(next, "bess", combo.sizing.bess_enabled);
+  next = ensureOptionalNodeConnected(next, "biomass", combo.sizing.biomass_enabled);
+  return next;
+}
+
+export function saveSweepCombinationAsScenario(
+  project: HybridProjectConfig,
+  combo: HybridSweepCombination,
+): HybridProjectConfig {
+  const updated = applySweepCombinationToProject(project, combo);
+  const scenario: HybridProjectConfig = {
+    ...updated,
+    id: makeId(),
+    project: {
+      ...updated.project,
+      project_name: `${project.project.project_name} (${combo.combination_id})`,
+    },
+    weatherPreview: null,
+    loadPreview: null,
+  };
+  return saveProject(scenario);
 }

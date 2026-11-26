@@ -165,4 +165,18 @@ describe("kode galat sistem hybrid Tahap 5", () => {
     expect(byCode("invalid_bess_config")).toContain("BESS");
     expect(byCode("job_not_found")).toContain("Job simulasi");
   });
+
+  it("menerjemahkan seluruh kode galat Tahap 7", () => {
+    expect(byCode("sweep_combinations_exceeded")).toContain("64");
+    expect(byCode("sweep_full_hourly_limit_exceeded")).toContain("12");
+    expect(byCode("invalid_sweep_axis")).toContain("10 nilai");
+    expect(byCode("sweep_job_not_found")).toContain("sapuan");
+    expect(byCode("sweep_job_cancelled")).toContain("dibatalkan");
+    expect(byCode("duplicate_sensitivity_variables")).toContain("berulang");
+    expect(byCode("duplicate_sensitivity_shifts")).toContain("berulang");
+    expect(byCode("invalid_sensitivity_shift")).toContain("-90%");
+    expect(byCode("sensitivity_shift_out_of_range")).toContain("batas sah");
+    expect(byCode("invalid_matrix_axes")).toContain("Sumbu X dan Y");
+    expect(byCode("export_payload_invalid")).toContain("Excel");
+  });
 });

@@ -484,3 +484,162 @@ export interface HybridJobStatusResponse {
   result?: HybridSimulateResponse | null;
   error?: { code: string; msg: string } | null;
 }
+
+export type SweepSortBy =
+  | "lcoe_asc"
+  | "total_npc_asc"
+  | "npv_desc"
+  | "irr_desc"
+  | "renewable_fraction_desc";
+
+export interface HybridSweepCombination {
+  rank: number;
+  combination_id: string;
+  feasible: boolean;
+  infeasible_reasons: string[];
+  sizing: {
+    pv_capacity_kwp: number;
+    pv_inverter_ac_kw: number;
+    bess_enabled: boolean;
+    bess_nominal_capacity_kwh: number;
+    bess_max_charge_kw: number;
+    bess_max_discharge_kw: number;
+    biomass_enabled: boolean;
+    biomass_rated_capacity_kw: number;
+  };
+  technical: {
+    pv_generation_kwh: number;
+    biomass_generation_kwh: number;
+    served_load_kwh: number;
+    unmet_load_kwh: number;
+    unmet_load_fraction: number;
+    curtailment_kwh: number;
+    renewable_fraction: number;
+    bess_equivalent_full_cycles: number;
+    biomass_fuel_tons: number;
+    avoided_emissions_tons_co2e: number;
+  };
+  finance: {
+    currency_code: string;
+    gross_capex: number;
+    net_capex: number;
+    total_npc: number;
+    lcoe: number;
+    npv: number;
+    irr: number | null;
+    irr_status: "ok" | "no_sign_change" | "ambiguous" | "not_found";
+    simple_payback_years: number | null;
+    discounted_payback_years: number | null;
+    viability_status: "viable" | "marginal" | "unviable";
+  };
+}
+
+export interface HybridSweepResult {
+  sort_by: SweepSortBy;
+  feasible_count: number;
+  total_combinations: number;
+  best_combination_id: string | null;
+  weather_source: HybridWeatherPreviewResponse["weather_source"];
+  combinations: HybridSweepCombination[];
+}
+
+export interface HybridSweepJobResponse {
+  job_id: string;
+  engine_version?: string;
+  contract_version?: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  progress_percent: number;
+  completed_combinations: number;
+  total_combinations: number;
+  current_step_label: string;
+  created_at?: string;
+  result?: HybridSweepResult | null;
+  error?: { code: string; msg: string } | null;
+}
+
+export interface HybridSweepRequestInput {
+  pv_capacity_kwp_values: number[];
+  bess_capacity_kwh_values: number[];
+  biomass_capacity_kw_values: number[];
+  pv_inverter_sizing_mode: "keep_dc_ac_ratio" | "fixed";
+  scale_replacement_costs: boolean;
+  max_unmet_load_fraction: number | null;
+  min_renewable_fraction: number | null;
+  sort_by: SweepSortBy;
+  feasible_first: boolean;
+}
+
+export type HybridSensitivityVariableId =
+  | "capex_total"
+  | "electricity_tariff"
+  | "discount_rate"
+  | "biomass_fuel_price"
+  | "om_total"
+  | "pv_degradation_rate"
+  | "load_scale"
+  | "pv_capacity";
+
+export interface HybridSensitivityCase {
+  shift_fraction: number;
+  input_value: number;
+  npv: number;
+  npv_delta: number;
+  lcoe: number;
+  lcoe_delta: number;
+  irr: number | null;
+  irr_status: "ok" | "no_sign_change" | "ambiguous" | "not_found";
+  simple_payback_years: number | null;
+  discounted_payback_years: number | null;
+  viability_status: "viable" | "marginal" | "unviable";
+}
+
+export interface HybridSensitivityVariableResult {
+  variable: HybridSensitivityVariableId;
+  category: "finance_only" | "technical";
+  base_value: number;
+  unit: string;
+  skipped: boolean;
+  skip_reason: string | null;
+  zero_base: boolean;
+  max_abs_npv_delta: number;
+  max_abs_lcoe_delta: number;
+  cases: HybridSensitivityCase[];
+}
+
+export interface HybridSensitivityMatrixCell {
+  x_index: number;
+  y_index: number;
+  x_shift: number;
+  y_shift: number;
+  npv: number;
+  npv_delta: number;
+  lcoe: number;
+  lcoe_delta: number;
+  irr: number | null;
+  viability_status: "viable" | "marginal" | "unviable";
+}
+
+export interface HybridSensitivityResponse {
+  engine_version: string;
+  contract_version: string;
+  calculated_at: string;
+  currency_code: string;
+  base: {
+    npv: number;
+    lcoe: number;
+    total_npc: number;
+    irr: number | null;
+    irr_status: string;
+    simple_payback_years: number | null;
+    discounted_payback_years: number | null;
+    viability_status: "viable" | "marginal" | "unviable";
+  };
+  variables: HybridSensitivityVariableResult[];
+  matrix_result: {
+    x_variable: HybridSensitivityVariableId;
+    x_shifts: number[];
+    y_variable: HybridSensitivityVariableId;
+    y_shifts: number[];
+    cells: HybridSensitivityMatrixCell[];
+  } | null;
+}

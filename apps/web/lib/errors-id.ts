@@ -87,6 +87,18 @@ const CODE_MESSAGES: Record<string, string> = {
   job_not_found: "Job simulasi tidak ditemukan atau sudah kedaluwarsa di memori server.",
   job_capacity_exceeded: "Antrean simulasi server sedang penuh. Tunggu sebentar lalu coba lagi.",
   request_too_large: "Ukuran data permintaan melebihi batas yang diizinkan server.",
+  // Kode untuk Tahap 7 (sapuan kombinasi, sensitivitas hybrid, dan ekspor Excel)
+  sweep_combinations_exceeded: "Jumlah total kombinasi melebihi batas aman (maksimal 64 kombinasi untuk mode cepat).",
+  sweep_full_hourly_limit_exceeded: "Mode simulasi penuh (full_hourly) dibatasi maksimal 12 kombinasi dalam satu sapuan.",
+  invalid_sweep_axis: "Daftar ukuran komponen tidak valid. Isi 1 sampai 10 nilai unik (PV > 0, BESS/Biomass >= 0).",
+  sweep_job_not_found: "Sesi job sapuan tidak ditemukan atau server baru saja terbangun ulang. Anda dapat menjalankan ulang sapuan.",
+  sweep_job_cancelled: "Job sapuan kombinasi telah dibatalkan.",
+  duplicate_sensitivity_variables: "Daftar variabel sensitivitas tidak boleh berulang.",
+  duplicate_sensitivity_shifts: "Daftar pergeseran sensitivitas tidak boleh berulang.",
+  invalid_sensitivity_shift: "Pergeseran sensitivitas harus berada di rentang -90% sampai +100% dan bukan 0% untuk Tornado.",
+  sensitivity_shift_out_of_range: "Salah satu pergeseran membuat parameter keluar dari batas sah mesin (misalnya diskonto <= -100%).",
+  invalid_matrix_axes: "Sumbu X dan Y matriks sensitivitas harus berbeda, sah, dan masing-masing maksimal 5 nilai.",
+  export_payload_invalid: "Data proyek atau hasil simulasi tidak lengkap untuk diekspor ke Excel.",
 };
 
 const WARNING_MESSAGES: Record<string, string> = {

@@ -300,6 +300,7 @@ def run_simulation(
     initial_bess_state: dict[str, Any] | None = None,
     initial_biomass_state: dict[str, Any] | None = None,
     simulation_year: int | None = None,
+    pv_output_cache: dict[tuple[Any, int], PVHourlyOutput] | None = None,
 ) -> SimulationResult:
     """Menjalankan simulasi hybrid per langkah waktu dan memverifikasi neraca energi."""
     if weather.time_config != config.time_config:
@@ -313,6 +314,13 @@ def run_simulation(
             "TimeConfig pada profil beban tidak sama dengan konfigurasi simulasi.",
         )
 
+    if simulation_year is not None:
+        sim_year = int(simulation_year)
+    elif isinstance(config.pv, PVDetailedConfig):
+        sim_year = config.pv.simulation_year
+    else:
+        sim_year = 1
+
     pv_component: PVWattsComponent | PVDetailedComponent
     if isinstance(config.pv, PVDetailedConfig):
         pv_component = PVDetailedComponent(config.pv)
@@ -320,14 +328,14 @@ def run_simulation(
     else:
         pv_component = PVWattsComponent(config.pv)
         pv_cap_kwp = config.pv.capacity_kwp
-    pv_output = pv_component.prepare(weather)
 
-    if simulation_year is not None:
-        sim_year = int(simulation_year)
-    elif isinstance(config.pv, PVDetailedConfig):
-        sim_year = config.pv.simulation_year
+    cache_key = (config.pv, sim_year)
+    if pv_output_cache is not None and cache_key in pv_output_cache:
+        pv_output = pv_component.set_precomputed_output(weather, pv_output_cache[cache_key])
     else:
-        sim_year = 1
+        pv_output = pv_component.prepare(weather)
+        if pv_output_cache is not None:
+            pv_output_cache[cache_key] = pv_output
 
     bess_component: BESSComponent | None = None
     bess_state: dict[str, Any] = {}

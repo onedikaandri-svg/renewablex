@@ -240,10 +240,67 @@ class HybridOutputOptions(HybridStrictModel):
 
 
 class HybridSimulateRequest(HybridStrictModel):
-    contract_version: Literal["0.5"] = "0.5"
+    contract_version: Literal["0.5", "0.6"] = "0.5"
     project: HybridProjectInput
     simulation: HybridSimulationInput = Field(default_factory=HybridSimulationInput)
     load_profile: HybridLoadProfileInput
     components: HybridComponentsInput
     finance: HybridFinanceInput | None = None
     output_options: HybridOutputOptions = Field(default_factory=HybridOutputOptions)
+
+
+class HybridSweepAxisConfig(HybridStrictModel):
+    pv_capacity_kwp_values: list[float]
+    bess_capacity_kwh_values: list[float]
+    biomass_capacity_kw_values: list[float]
+    pv_inverter_sizing_mode: Literal["keep_dc_ac_ratio", "fixed"] = "keep_dc_ac_ratio"
+    scale_replacement_costs: bool = True
+    bess_replacement_cost_per_kwh: float | None = Field(default=None, ge=0.0)
+
+
+class HybridSweepConstraints(HybridStrictModel):
+    max_unmet_load_fraction: float | None = Field(default=None, ge=0.0, le=1.0)
+    min_renewable_fraction: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class HybridSweepRanking(HybridStrictModel):
+    sort_by: Literal[
+        "lcoe_asc",
+        "total_npc_asc",
+        "npv_desc",
+        "irr_desc",
+        "renewable_fraction_desc",
+    ] = "lcoe_asc"
+    feasible_first: bool = True
+
+
+class HybridSweepJobRequest(HybridStrictModel):
+    contract_version: Literal["0.6"] = "0.6"
+    base_request: HybridSimulateRequest
+    sweep: HybridSweepAxisConfig
+    constraints: HybridSweepConstraints = Field(default_factory=HybridSweepConstraints)
+    ranking: HybridSweepRanking = Field(default_factory=HybridSweepRanking)
+
+
+class HybridSensitivityMatrixInput(HybridStrictModel):
+    x_variable: str
+    x_shifts: list[float]
+    y_variable: str
+    y_shifts: list[float]
+
+
+class HybridSensitivityRequest(HybridStrictModel):
+    contract_version: Literal["0.6"] = "0.6"
+    base_request: HybridSimulateRequest
+    variables: list[str] | None = None
+    shifts: list[float] | None = None
+    matrix: HybridSensitivityMatrixInput | None = None
+
+
+class HybridExcelExportRequest(HybridStrictModel):
+    contract_version: Literal["0.6"] = "0.6"
+    language: Literal["id", "en"] = "id"
+    project_config: dict[str, Any]
+    simulation_result: dict[str, Any]
+    sweep_result: dict[str, Any] | None = None
+    sensitivity_result: dict[str, Any] | None = None

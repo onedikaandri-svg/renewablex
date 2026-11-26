@@ -1,21 +1,25 @@
-"""Endpoint HTTP FastAPI untuk sistem energi hybrid RenewableX (Tahap 5)."""
+"""Endpoint HTTP FastAPI untuk sistem energi hybrid RenewableX (Tahap 5 dan Tahap 7)."""
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from datetime import datetime, timezone
+import re
 import threading
 import time
 from typing import Any
 import uuid
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 import numpy as np
 
 from app.api.hybrid_schemas import (
+    HybridExcelExportRequest,
     HybridLoadPreviewRequest,
     HybridLoadProfileInput,
+    HybridSensitivityRequest,
     HybridSimulateRequest,
+    HybridSweepJobRequest,
     HybridWeatherPreviewRequest,
 )
 from app.errors import EngineError
@@ -27,6 +31,7 @@ from app.hybrid.cli import (
     _parse_dispatch_config,
     _parse_pv_config,
 )
+from app.hybrid.excel_export import build_hybrid_excel_bytes
 from app.hybrid.finance import (
     FinanceResult,
     resolve_finance_config,
@@ -35,7 +40,9 @@ from app.hybrid.finance import (
 )
 from app.hybrid.lifetime import LifetimeSimulationResult, run_lifetime_simulation
 from app.hybrid.load import LoadProfile, generate_synthetic_load, load_profile_from_csv
+from app.hybrid.sensitivity import run_hybrid_sensitivity
 from app.hybrid.simulator import SimulationConfig, SimulationResult
+from app.hybrid.sweep import run_hybrid_sweep, validate_sweep_axis, validate_sweep_limits
 from app.hybrid.time_grid import TimeConfig
 from app.hybrid.weather import PVGISTMYWeatherProvider, WeatherDataset, load_weather_from_json
 from app.providers.base import ResourceError, ResourceErrorKind
@@ -44,13 +51,20 @@ from app.version import ENGINE_VERSION
 router = APIRouter(prefix="/v1/hybrid", tags=["hybrid"])
 
 CONTRACT_VERSION = "0.5"
+STAGE7_CONTRACT_VERSION = "0.6"
 MAX_JOBS = 50
 JOB_TTL_SECONDS = 1800.0
+MAX_SWEEP_JOBS = 15
+SWEEP_JOB_TTL_SECONDS = 1800.0
 
 _weather_provider = PVGISTMYWeatherProvider(cache_ttl_seconds=3600.0)
 _job_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="hybrid-sim")
 _jobs_lock = threading.Lock()
 _jobs_store: dict[str, dict[str, Any]] = {}
+
+_sweep_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="hybrid-sweep")
+_sweep_jobs_lock = threading.Lock()
+_sweep_jobs_store: dict[str, dict[str, Any]] = {}
 
 LOCATION_PRESETS: list[dict[str, Any]] = [
     {"id": "jakarta", "name": "Jakarta (Jawa Barat) [REAL DATA]", "latitude": -6.20, "longitude": 106.80, "elevation_m": 12.0, "timezone": "Asia/Jakarta"},
@@ -303,10 +317,7 @@ def _build_simulation_response(
     return out
 
 
-def _prepare_and_run(
-    req: HybridSimulateRequest,
-    progress_cb: Any = None,
-) -> dict[str, Any]:
+def _build_core_inputs(req: HybridSimulateRequest) -> tuple[SimulationConfig, Any, Any, WeatherDataset, LoadProfile]:
     if not req.components.pv.enabled:
         raise EngineError("invalid_pv_config", "Komponen PV harus diaktifkan pada simulasi hybrid.")
 
@@ -354,6 +365,14 @@ def _prepare_and_run(
         weather_data=req.simulation.weather_data,
     )
     load_profile = _resolve_load(req.load_profile, time_config)
+    return sim_config, lifetime_cfg, finance_cfg, weather, load_profile
+
+
+def _prepare_and_run(
+    req: HybridSimulateRequest,
+    progress_cb: Any = None,
+) -> dict[str, Any]:
+    sim_config, lifetime_cfg, finance_cfg, weather, load_profile = _build_core_inputs(req)
 
     if progress_cb is not None:
         progress_cb(8, "Menjalankan simulasi energi per jam")
@@ -731,3 +750,291 @@ def get_hybrid_job(job_id: str) -> dict[str, Any]:
             "result": job["result"],
             "error": job["error"],
         }
+
+
+# ---------------------------------------------------------------------------
+# Endpoint Tahap 7: Sapuan Kombinasi, Sensitivitas Hybrid, dan Ekspor Excel
+# ---------------------------------------------------------------------------
+
+
+def _prune_sweep_jobs_locked(now: float) -> None:
+    terminal = ("completed", "failed", "cancelled")
+    expired = [
+        jid for jid, job in _sweep_jobs_store.items()
+        if job["status"] in terminal and (now - job["updated_at"]) > SWEEP_JOB_TTL_SECONDS
+    ]
+    for jid in expired:
+        del _sweep_jobs_store[jid]
+
+    if len(_sweep_jobs_store) >= MAX_SWEEP_JOBS:
+        done_jobs = sorted(
+            ((jid, job["updated_at"]) for jid, job in _sweep_jobs_store.items() if job["status"] in terminal),
+            key=lambda item: item[1],
+        )
+        for jid, _ in done_jobs:
+            if len(_sweep_jobs_store) < MAX_SWEEP_JOBS:
+                break
+            del _sweep_jobs_store[jid]
+
+
+def _run_sweep_job(job_id: str, req: HybridSweepJobRequest, cancel_event: threading.Event) -> None:
+    def set_state(status: str, pct: int, done_cnt: int, label: str) -> None:
+        with _sweep_jobs_lock:
+            job = _sweep_jobs_store.get(job_id)
+            if job is not None:
+                job["status"] = status
+                job["progress_percent"] = max(0, min(99, int(pct)))
+                job["completed_combinations"] = done_cnt
+                job["current_step_label"] = label
+                job["updated_at"] = time.monotonic()
+
+    try:
+        if cancel_event.is_set():
+            raise EngineError("sweep_job_cancelled", "Job sapuan kombinasi dibatalkan oleh pengguna.")
+
+        set_state("running", 3, 0, "Menyiapkan data cuaca dan profil beban")
+        sim_config, lifetime_cfg, finance_cfg, weather, load_profile = _build_core_inputs(req.base_request)
+        if finance_cfg is None:
+            finance_cfg = resolve_finance_config({}, currency_code=req.base_request.project.currency_code)
+
+        def on_combo(done_idx: int, total_cnt: int, combo_id: str) -> None:
+            pct = 5 + int(92 * done_idx / max(total_cnt, 1))
+            set_state("running", pct, done_idx, f"Mengevaluasi {done_idx} dari {total_cnt} ({combo_id})")
+
+        sweep_out = run_hybrid_sweep(
+            base_sim_config=sim_config,
+            weather=weather,
+            load_profile=load_profile,
+            base_lifetime_config=lifetime_cfg,
+            base_finance_config=finance_cfg,
+            pv_values=req.sweep.pv_capacity_kwp_values,
+            bess_values=req.sweep.bess_capacity_kwh_values,
+            biomass_values=req.sweep.biomass_capacity_kw_values,
+            inverter_sizing_mode=req.sweep.pv_inverter_sizing_mode,
+            scale_replacement_costs=req.sweep.scale_replacement_costs,
+            bess_replacement_cost_per_kwh=req.sweep.bess_replacement_cost_per_kwh,
+            max_unmet_load_fraction=req.constraints.max_unmet_load_fraction,
+            min_renewable_fraction=req.constraints.min_renewable_fraction,
+            sort_by=req.ranking.sort_by,
+            feasible_first=req.ranking.feasible_first,
+            progress_callback=on_combo,
+            cancel_event=cancel_event,
+        )
+        sweep_out["weather_source"] = _weather_metadata_dict(weather)
+
+        with _sweep_jobs_lock:
+            job = _sweep_jobs_store.get(job_id)
+            if job is not None:
+                job["status"] = "completed"
+                job["progress_percent"] = 100
+                job["completed_combinations"] = sweep_out["total_combinations"]
+                job["current_step_label"] = f"Sapuan selesai: {sweep_out['total_combinations']} kombinasi dievaluasi"
+                job["result"] = sweep_out
+                job["updated_at"] = time.monotonic()
+    except EngineError as exc:
+        with _sweep_jobs_lock:
+            job = _sweep_jobs_store.get(job_id)
+            if job is not None:
+                if exc.code == "sweep_job_cancelled":
+                    job["status"] = "cancelled"
+                    job["current_step_label"] = "Sapuan dibatalkan"
+                else:
+                    job["status"] = "failed"
+                    job["current_step_label"] = "Sapuan gagal"
+                job["error"] = {"code": exc.code, "msg": str(exc)}
+                job["updated_at"] = time.monotonic()
+    except ResourceError as exc:
+        code, msg = _map_resource_error(exc)
+        with _sweep_jobs_lock:
+            job = _sweep_jobs_store.get(job_id)
+            if job is not None:
+                job["status"] = "failed"
+                job["current_step_label"] = "Gagal mengambil data cuaca"
+                job["error"] = {"code": code, "msg": msg}
+                job["updated_at"] = time.monotonic()
+    except Exception as exc:
+        with _sweep_jobs_lock:
+            job = _sweep_jobs_store.get(job_id)
+            if job is not None:
+                job["status"] = "failed"
+                job["current_step_label"] = "Kesalahan internal sapuan"
+                job["error"] = {"code": "internal_simulation_error", "msg": str(exc)}
+                job["updated_at"] = time.monotonic()
+
+
+@router.post("/sweep/jobs", status_code=202)
+def create_hybrid_sweep_job(req: HybridSweepJobRequest) -> JSONResponse:
+    """Mendaftarkan job sapuan kombinasi gaya HOMER secara asinkron."""
+    try:
+        if not req.base_request.components.pv.enabled:
+            raise EngineError("invalid_pv_config", "Komponen PV harus diaktifkan pada sapuan hybrid.")
+        pv_vals = validate_sweep_axis(req.sweep.pv_capacity_kwp_values, "pv_capacity_kwp_values", allow_zero=False)
+        bess_vals = validate_sweep_axis(req.sweep.bess_capacity_kwh_values, "bess_capacity_kwh_values", allow_zero=True)
+        bio_vals = validate_sweep_axis(req.sweep.biomass_capacity_kw_values, "biomass_capacity_kw_values", allow_zero=True)
+        total_combos = validate_sweep_limits(
+            pv_vals,
+            bess_vals,
+            bio_vals,
+            req.base_request.simulation.multi_year_mode,
+        )
+    except EngineError as exc:
+        _raise_engine_error(exc)
+
+    job_id = str(uuid.uuid4())
+    now = time.monotonic()
+    cancel_event = threading.Event()
+    with _sweep_jobs_lock:
+        _prune_sweep_jobs_locked(now)
+        if len(_sweep_jobs_store) >= MAX_SWEEP_JOBS:
+            raise HTTPException(
+                status_code=422,
+                detail=[{
+                    "type": "value_error",
+                    "code": "job_capacity_exceeded",
+                    "loc": ["body"],
+                    "msg": "Antrean sapuan kombinasi sedang penuh. Coba beberapa saat lagi.",
+                }],
+            )
+        _sweep_jobs_store[job_id] = {
+            "job_id": job_id,
+            "engine_version": ENGINE_VERSION,
+            "contract_version": STAGE7_CONTRACT_VERSION,
+            "status": "queued",
+            "progress_percent": 0,
+            "completed_combinations": 0,
+            "total_combinations": total_combos,
+            "current_step_label": "Menunggu giliran antrean sapuan",
+            "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "updated_at": now,
+            "result": None,
+            "error": None,
+            "cancel_event": cancel_event,
+        }
+
+    _sweep_executor.submit(_run_sweep_job, job_id, req, cancel_event)
+    return JSONResponse(
+        status_code=202,
+        content={
+            "job_id": job_id,
+            "engine_version": ENGINE_VERSION,
+            "contract_version": STAGE7_CONTRACT_VERSION,
+            "status": "queued",
+            "progress_percent": 0,
+            "completed_combinations": 0,
+            "total_combinations": total_combos,
+            "current_step_label": "Menunggu giliran antrean sapuan",
+        },
+    )
+
+
+@router.get("/sweep/jobs/{job_id}")
+def get_hybrid_sweep_job(job_id: str) -> dict[str, Any]:
+    """Mengambil status progres dan hasil terurut sapuan kombinasi."""
+    with _sweep_jobs_lock:
+        job = _sweep_jobs_store.get(job_id)
+        if job is None:
+            raise HTTPException(
+                status_code=404,
+                detail=[{
+                    "type": "value_error",
+                    "code": "sweep_job_not_found",
+                    "loc": ["path", "job_id"],
+                    "msg": "Job sapuan kombinasi tidak ditemukan atau sudah kedaluwarsa di server.",
+                }],
+            )
+        return {
+            "job_id": job["job_id"],
+            "engine_version": job["engine_version"],
+            "contract_version": job["contract_version"],
+            "status": job["status"],
+            "progress_percent": job["progress_percent"],
+            "completed_combinations": job["completed_combinations"],
+            "total_combinations": job["total_combinations"],
+            "current_step_label": job["current_step_label"],
+            "created_at": job["created_at"],
+            "result": job["result"],
+            "error": job["error"],
+        }
+
+
+@router.post("/sweep/jobs/{job_id}/cancel")
+def cancel_hybrid_sweep_job(job_id: str) -> dict[str, Any]:
+    """Mengirim sinyal pembatalan kooperatif ke job sapuan kombinasi."""
+    with _sweep_jobs_lock:
+        job = _sweep_jobs_store.get(job_id)
+        if job is None:
+            raise HTTPException(
+                status_code=404,
+                detail=[{
+                    "type": "value_error",
+                    "code": "sweep_job_not_found",
+                    "loc": ["path", "job_id"],
+                    "msg": "Job sapuan kombinasi tidak ditemukan atau sudah kedaluwarsa.",
+                }],
+            )
+        job["cancel_event"].set()
+        if job["status"] == "queued":
+            job["status"] = "cancelled"
+            job["current_step_label"] = "Sapuan dibatalkan sebelum dijalankan"
+            job["error"] = {"code": "sweep_job_cancelled", "msg": "Job sapuan dibatalkan oleh pengguna."}
+            job["updated_at"] = time.monotonic()
+        return {
+            "job_id": job["job_id"],
+            "status": job["status"],
+            "current_step_label": job["current_step_label"],
+        }
+
+
+@router.post("/sensitivity")
+def sensitivity_hybrid(req: HybridSensitivityRequest) -> dict[str, Any]:
+    """Menjalankan analisis sensitivitas Tornado dan Matriks 5x5 untuk sistem hybrid."""
+    try:
+        sim_config, lifetime_cfg, finance_cfg, weather, load_profile = _build_core_inputs(req.base_request)
+        if finance_cfg is None:
+            finance_cfg = resolve_finance_config({}, currency_code=req.base_request.project.currency_code)
+
+        res = run_hybrid_sensitivity(
+            base_sim_config=sim_config,
+            weather=weather,
+            load_profile=load_profile,
+            base_lifetime_config=lifetime_cfg,
+            base_finance_config=finance_cfg,
+            variables=req.variables,
+            shifts=req.shifts,
+            matrix=req.matrix.model_dump() if req.matrix is not None else None,
+        )
+    except EngineError as exc:
+        _raise_engine_error(exc)
+    except ResourceError as exc:
+        _raise_resource_error(exc)
+
+    return {
+        "engine_version": ENGINE_VERSION,
+        "contract_version": STAGE7_CONTRACT_VERSION,
+        "calculated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        **res,
+    }
+
+
+@router.post("/export/excel")
+def export_hybrid_excel(req: HybridExcelExportRequest) -> Response:
+    """Menghasilkan buku kerja Excel (.xlsx) multi-sheet dari hasil simulasi hybrid."""
+    try:
+        xlsx_bytes = build_hybrid_excel_bytes(
+            project_config=req.project_config,
+            simulation_result=req.simulation_result,
+            language=req.language,
+            sweep_result=req.sweep_result,
+            sensitivity_result=req.sensitivity_result,
+        )
+    except EngineError as exc:
+        _raise_engine_error(exc)
+
+    raw_name = str(req.simulation_result.get("project_name") or "proyek-hybrid").lower()
+    slug = re.sub(r"[^a-z0-9]+", "-", raw_name).strip("-") or "proyek-hybrid"
+    filename = f"{slug}-laporan-hybrid.xlsx"
+    return Response(
+        content=xlsx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

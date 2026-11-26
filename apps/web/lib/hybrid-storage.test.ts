@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  applySweepCombinationToProject,
   buildSampleProject,
   createBlankProject,
   createSampleProject,
@@ -7,12 +8,23 @@ import {
   duplicateProject,
   exportProjectJson,
   getProject,
+  getSensitivityResult,
   getSimulationResult,
+  getSweepResult,
   importProjectJson,
   listProjects,
+  saveSensitivityResult,
   saveSimulationResult,
+  saveSweepCombinationAsScenario,
+  saveSweepResult,
 } from "./hybrid-storage";
-import type { HybridSimulateResponse } from "./hybrid-types";
+import { validateSystemTopology } from "./hybrid-topology";
+import type {
+  HybridSensitivityResponse,
+  HybridSimulateResponse,
+  HybridSweepCombination,
+  HybridSweepResult,
+} from "./hybrid-types";
 
 class MemoryStorage implements Storage {
   private map = new Map<string, string>();
@@ -79,5 +91,69 @@ describe("hybrid-storage", () => {
     } as unknown as HybridSimulateResponse;
     saveSimulationResult(p.id, fakeResult);
     expect(getSimulationResult(p.id)?.config_hash).toBe("sha256:abc");
+  });
+
+  it("menyimpan cache sapuan/sensitivitas, membersihkan saat hapus, dan menerapkan pemenang sapuan", () => {
+    const p = createSampleProject();
+    saveSweepResult(p.id, { total_combinations: 6 } as unknown as HybridSweepResult);
+    saveSensitivityResult(p.id, { currency_code: "IDR" } as unknown as HybridSensitivityResponse);
+    expect(getSweepResult(p.id)?.total_combinations).toBe(6);
+    expect(getSensitivityResult(p.id)?.currency_code).toBe("IDR");
+
+    const combo: HybridSweepCombination = {
+      rank: 1,
+      combination_id: "pv700-bess0-bio300",
+      feasible: true,
+      infeasible_reasons: [],
+      sizing: {
+        pv_capacity_kwp: 700,
+        pv_inverter_ac_kw: 588,
+        bess_enabled: false,
+        bess_nominal_capacity_kwh: 0,
+        bess_max_charge_kw: 0,
+        bess_max_discharge_kw: 0,
+        biomass_enabled: true,
+        biomass_rated_capacity_kw: 300,
+      },
+      technical: {
+        pv_generation_kwh: 1,
+        biomass_generation_kwh: 1,
+        served_load_kwh: 1,
+        unmet_load_kwh: 0,
+        unmet_load_fraction: 0,
+        curtailment_kwh: 0,
+        renewable_fraction: 1,
+        bess_equivalent_full_cycles: 0,
+        biomass_fuel_tons: 1,
+        avoided_emissions_tons_co2e: 1,
+      },
+      finance: {
+        currency_code: "IDR",
+        gross_capex: 1,
+        net_capex: 1,
+        total_npc: 1,
+        lcoe: 1000,
+        npv: 1,
+        irr: 0.15,
+        irr_status: "ok",
+        simple_payback_years: 5,
+        discounted_payback_years: 7,
+        viability_status: "viable",
+      },
+    };
+
+    const applied = applySweepCombinationToProject(p, combo);
+    expect(applied.components.pv.capacity_kwp).toBe(700);
+    expect(applied.components.bess.enabled).toBe(false);
+    expect(applied.components.biomass.rated_capacity_kw).toBe(300);
+    expect(validateSystemTopology(applied).valid).toBe(true);
+
+    const scenario = saveSweepCombinationAsScenario(p, combo);
+    expect(scenario.id).not.toBe(p.id);
+    expect(scenario.project.project_name).toContain("pv700-bess0-bio300");
+
+    deleteProject(p.id);
+    expect(getSweepResult(p.id)).toBeNull();
+    expect(getSensitivityResult(p.id)).toBeNull();
   });
 });

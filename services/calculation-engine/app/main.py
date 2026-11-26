@@ -25,7 +25,13 @@ origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:300
 # CORS wraps the body limit so a 413 still carries CORS headers, and the request log wraps everything.
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 app.add_middleware(BodyLimit)
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+    expose_headers=["Content-Disposition"],
+)
 app.add_middleware(RequestLog)
 app.include_router(pv_router)
 app.include_router(sensitivity_router)

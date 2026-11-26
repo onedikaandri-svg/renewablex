@@ -14,6 +14,8 @@ const STEPS = [
   { key: "economics", num: 6, href: (id: string) => `/hybrid/${id}/economics`, id: "Ekonomi", en: "Economics" },
   { key: "run", num: 7, href: (id: string) => `/hybrid/${id}/run`, id: "Jalankan", en: "Run" },
   { key: "results", num: 8, href: (id: string) => `/hybrid/${id}/results`, id: "Hasil", en: "Results" },
+  { key: "compare", num: 9, href: (id: string) => `/hybrid/${id}/compare`, id: "Bandingkan", en: "Compare" },
+  { key: "export", num: 10, href: (id: string) => `/hybrid/${id}/export`, id: "Ekspor", en: "Export" },
 ] as const;
 
 export type HybridStepKey = (typeof STEPS)[number]["key"];
@@ -53,7 +55,7 @@ export default function HybridShell({
 
   return (
     <>
-      <nav className="stepper" aria-label={lang === "en" ? "Hybrid design steps" : "Tahapan desain hybrid"}>
+      <nav className="stepper no-print" aria-label={lang === "en" ? "Hybrid design steps" : "Tahapan desain hybrid"}>
         {STEPS.map((s) => {
           const isCurrent = s.key === activeStep;
           return (
@@ -70,7 +72,7 @@ export default function HybridShell({
         })}
       </nav>
 
-      <div className="page-head">
+      <div className="page-head no-print">
         <div>
           <p className="eyebrow">
             {project.project.project_name} ({project.project.currency_code})
@@ -85,7 +87,7 @@ export default function HybridShell({
 
       {children}
 
-      <div className="row" style={{ justifyContent: "space-between", marginTop: "2rem" }}>
+      <div className="row no-print" style={{ justifyContent: "space-between", marginTop: "2rem" }}>
         <div>
           {prevStep && (
             <Link href={prevStep.href(project.id)} className="btn ghost">
