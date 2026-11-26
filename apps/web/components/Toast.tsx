@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { IconClose } from "@/components/Icons";
 
 export interface ToastItem {
   id: string;
@@ -49,12 +50,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <span>{item.message}</span>
             <button
               type="button"
-              className="seg-btn"
+              className="seg-btn seg-icon"
               style={{ color: "inherit", minWidth: "2.75rem", minHeight: "2.75rem" }}
               onClick={() => setItems((prev) => prev.filter((x) => x.id !== item.id))}
               aria-label="Tutup notifikasi"
+              title="Tutup notifikasi"
             >
-              ×
+              <IconClose size={16} />
             </button>
           </div>
         ))}

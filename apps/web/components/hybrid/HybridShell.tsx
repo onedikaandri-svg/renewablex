@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { IconChevronLeft, IconChevronRight } from "@/components/Icons";
 import { usePreferences } from "@/lib/preferences";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
 
@@ -91,6 +92,7 @@ export default function HybridShell({
         <div>
           {prevStep && (
             <Link href={prevStep.href(project.id)} className="btn ghost">
+              <IconChevronLeft size={15} />
               {lang === "en" ? `Previous: ${prevStep.en}` : `Sebelumnya: ${prevStep.id}`}
             </Link>
           )}
@@ -99,6 +101,7 @@ export default function HybridShell({
           {nextStep && (
             <Link href={nextStep.href(project.id)} className="btn primary">
               {lang === "en" ? `Next: ${nextStep.en}` : `Lanjut: ${nextStep.id}`}
+              <IconChevronRight size={15} />
             </Link>
           )}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { ComponentSvgIcon, IconDownload } from "@/components/Icons";
 import { downloadFile, formatNumber } from "@/lib/format";
 import {
   computeEdgePillLayout,
@@ -222,6 +223,7 @@ export default function SystemSchematicSvg({
           <span className="chip">{config.simulation.dispatch_strategy}</span>
           {result && (
             <button type="button" className="btn btn-sm ghost" onClick={handleDownloadSvg}>
+              <IconDownload size={14} />
               Unduh SVG
             </button>
           )}
@@ -332,17 +334,24 @@ export default function SystemSchematicSvg({
                 strokeWidth={isBus ? 2.5 : 2}
                 strokeDasharray={connected ? undefined : "4 4"}
               />
+              <ComponentSvgIcon
+                kind={node.kind}
+                x={isBus ? rect.cx - 8 : rect.x + 10}
+                y={isBus ? rect.y + 10 : rect.y + 11}
+                size={isBus ? 16 : 14}
+                color={connected ? color : "var(--muted)"}
+              />
               <text
-                x={isBus ? rect.cx : rect.x + 12}
-                y={rect.y + 23}
+                x={isBus ? rect.cx : rect.x + 28}
+                y={isBus ? rect.y + 42 : rect.y + 22}
                 textAnchor={isBus ? "middle" : "start"}
-                style={{ fill: "var(--navytext)", fontWeight: 700, fontSize: "12.5px" }}
+                style={{ fill: "var(--navytext)", fontWeight: 700, fontSize: isBus ? "12.5px" : "11.5px" }}
               >
                 {nodeHeading(node.kind, lang, config)}
               </text>
               <text
                 x={isBus ? rect.cx : rect.x + 12}
-                y={rect.y + 43}
+                y={isBus ? rect.y + 60 : rect.y + 43}
                 textAnchor={isBus ? "middle" : "start"}
                 style={{
                   fill: connected ? color : "var(--muted)",
@@ -355,7 +364,7 @@ export default function SystemSchematicSvg({
               </text>
               <text
                 x={isBus ? rect.cx : rect.x + 12}
-                y={rect.y + 61}
+                y={isBus ? rect.y + 78 : rect.y + 61}
                 textAnchor={isBus ? "middle" : "start"}
                 style={{
                   fill: info.isAlert ? "var(--errtext)" : "var(--muted)",
