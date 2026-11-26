@@ -49,13 +49,21 @@ Seluruh nilai di bawah ini bersifat **asumsi sementara untuk keperluan pengemban
 - **Rugi sistem default (`system_loss_fraction`):** `0,14` (14%, sesuai konvensi default PVGIS `PVcalc`) `[REAL DATA]`.
 - **Koefisien suhu daya (`temp_coeff_per_c`):** `-0,004` per derajat Celsius (-0,4%/C, nilai umum modul kristal silikon komersial) `[REAL DATA]`.
 - **Nominal Operating Cell Temperature (NOCT):** `45` derajat Celsius `[REAL DATA]`.
+- **Koefisien suhu sel Faiman (Faiman 2008 untuk modul c-Si terpasang terbuka):** `u0 = 25,0` W/(m2.K) dan `u1 = 6,84` W.s/(m3.K) (rujukan standar literatur Faiman, Prog. Photovolt. 2008).
+- **Koefisien IAM model ASHRAE (`iam_b0`):** `0,05` (nilai umum kaca surya standar tanpa lapisan anti-pantul khusus) `[REAL DATA]`.
+- **Soiling bulanan (`soiling_monthly`) dan salju (`snow_loss_monthly`):** bawaan `0,02` (2%) merata per bulan untuk soiling dan `0,0` (0%) untuk salju di Indonesia `[REAL DATA]`.
+- **Rincian rugi sistem Tahap 2 (bila mode PV detail dipilih):** `mismatch_fraction = 0,02`, `dc_wiring_fraction = 0,02`, `shading_fraction = 0,0`, `availability_fraction = 0,01`, `lid_fraction = 0,015` `[REAL DATA]`.
+- **Konsumsi malam inverter (`night_tare_kw`):** `0,0` kW bawaan (dapat diisi sesuai datasheet inverter) `[REAL DATA]`.
+- **Parameter modul satu-dioda ilustratif (untuk uji model sampai datasheet modul nyata dipilih pemilik):** `i_sc = 13,8` A, `v_oc = 49,5` V, `i_mp = 13,0` A, `v_mp = 41,5` V, `alpha_sc = 0,0005 * i_sc` A/K, `beta_voc = -0,0028 * v_oc` V/K, `cells_in_series = 72` `[REAL DATA]`.
 - **Degradasi tahunan modul (`degradation_fraction_per_year`):** `0,005` per tahun (0,5%/tahun) `[REAL DATA]`.
 - **Rasio DC/AC inverter tipikal:** `1,15` sampai `1,20` `[REAL DATA]`.
 
-### 2.2 Komponen BESS (`[REAL DATA]`, Persiapan Tahap 2)
-- **Efisiensi round-trip atau efisiensi satu arah (charge/discharge):** `0,92` per arah `[REAL DATA]`.
-- **Batas SOC minimum dan maksimum:** `0,20` (20%) dan `0,95` (95%) `[REAL DATA]`.
-- **Batas akhir umur baterai (End of Life):** `0,80` (80% dari kapasitas awal) `[REAL DATA]`.
+### 2.2 Komponen BESS (`[REAL DATA]`, Tahap 2)
+- **Efisiensi satu arah (`charge_efficiency`, `discharge_efficiency`):** `0,94` per arah (atau sekitar 0,88 round-trip sebelum rugi PCS) `[REAL DATA]`.
+- **Rugi PCS (`pcs_loss_fraction`) dan beban tambahan (`aux_load_kw`):** `0,02` (2%) dan `0,0` kW bawaan `[REAL DATA]`.
+- **Batas SOC minimum dan maksimum:** `0,20` (20%) dan `0,95` (95%), dengan `initial_soc_fraction = 0,50` `[REAL DATA]`.
+- **Degradasi kalender dan siklus (aditif):** `calendar_fade_per_year = 0,015` (1,5%/tahun) dan `cycle_fade_per_efc = 0,00005` (0,005% per siklus penuh, setara ~4.000 siklus menuju batas EOL bersama fade kalender) `[REAL DATA]`.
+- **Batas akhir umur baterai (End of Life):** `0,80` (80% dari kapasitas nominal awal) `[REAL DATA]`.
 
 ### 2.3 Komponen Biomass (`[REAL DATA]`, Persiapan Tahap 3)
 - Seluruh kurva konsumsi bahan bakar beban parsial, LHV (nilai kalor bawah), kadar air, ramp rate, serta faktor emisi akan diminta langsung ke pemilik proyek sebelum Tahap 3 dimulai (tidak ditebak).
