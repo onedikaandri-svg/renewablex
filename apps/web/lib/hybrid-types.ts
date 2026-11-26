@@ -9,10 +9,76 @@ export type MultiYearMode = "scaled_year_1" | "full_hourly";
 export type BiomassPresetId = "efb" | "wood_pellet" | "pks" | "woodchip" | "rice_husk";
 export type BiomassPlantSampleId = "sample_gasifier_250kw" | "sample_steam_turbine_1000kw";
 
+export type TopologyNodeKind = "ac_bus" | "pv" | "bess" | "biomass" | "load" | "grid";
+
+export type TopologyEdgeFlowType =
+  | "dc_ac_generation"
+  | "bidirectional_storage"
+  | "ac_generation"
+  | "ac_load"
+  | "bidirectional_grid";
+
+export interface TopologyNode {
+  id: string;
+  kind: TopologyNodeKind;
+  label?: string;
+  x: number;
+  y: number;
+}
+
+export interface TopologyEdge {
+  id: string;
+  source: string;
+  target: string;
+  flowType: TopologyEdgeFlowType;
+}
+
+export interface TopologyViewport {
+  panX: number;
+  panY: number;
+  zoom: number;
+}
+
+export interface HybridSystemTopology {
+  version: "1.0";
+  viewport: TopologyViewport;
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+}
+
+export type TopologyIssueSeverity = "error" | "warning";
+
+export type TopologyIssueCode =
+  | "missing_ac_bus"
+  | "missing_pv_node"
+  | "pv_not_connected"
+  | "missing_load_node"
+  | "load_not_connected"
+  | "invalid_edge_connection"
+  | "invalid_component_params"
+  | "disconnected_optional_node"
+  | "pv_dc_ac_ratio_warning";
+
+export interface TopologyIssue {
+  code: TopologyIssueCode;
+  severity: TopologyIssueSeverity;
+  nodeId?: string;
+  field?: string;
+  messageId: string;
+  messageEn: string;
+}
+
+export interface TopologyValidationResult {
+  valid: boolean;
+  errors: TopologyIssue[];
+  warnings: TopologyIssue[];
+}
+
 export interface HybridProjectConfig {
   id: string;
-  schemaVersion: "0.5";
+  schemaVersion: "0.5" | "0.6";
   updatedAt: string;
+  topology?: HybridSystemTopology;
   project: {
     project_name: string;
     latitude: number;
@@ -332,6 +398,24 @@ export interface HybridSimulateResponse {
       event_type: string;
       description: string;
       cost_amount: number;
+    }>;
+    yearly?: Array<{
+      year: number;
+      pv_degradation_factor: number;
+      total_load_kwh: number;
+      pv_generation_kwh: number;
+      biomass_generation_kwh: number;
+      served_load_kwh: number;
+      unmet_load_kwh: number;
+      curtailment_kwh: number;
+      grid_import_kwh: number;
+      grid_export_kwh: number;
+      renewable_fraction: number;
+      bess_yearly_efc: number;
+      bess_final_effective_capacity_kwh: number;
+      bess_replacement_count: number;
+      biomass_fuel_tons: number;
+      biomass_overhaul_count: number;
     }>;
   };
   finance_summary: {

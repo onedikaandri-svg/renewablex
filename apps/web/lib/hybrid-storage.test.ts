@@ -48,7 +48,18 @@ describe("hybrid-storage", () => {
     const jsonText = exportProjectJson(sample);
     const imported = importProjectJson(jsonText);
     expect(imported.id).not.toBe(sample.id);
+    expect(imported.schemaVersion).toBe("0.6");
+    expect(imported.topology?.nodes.length).toBeGreaterThanOrEqual(3);
     expect(listProjects()).toHaveLength(4);
+
+    // Kompatibilitas mundur: impor JSON proyek Tahap 5 (v0.5 tanpa topology)
+    const legacyObj = JSON.parse(jsonText) as Record<string, unknown>;
+    delete legacyObj.topology;
+    legacyObj.schemaVersion = "0.5";
+    const importedLegacy = importProjectJson(JSON.stringify(legacyObj));
+    expect(importedLegacy.schemaVersion).toBe("0.6");
+    expect(importedLegacy.topology?.nodes.some((n) => n.kind === "pv")).toBe(true);
+    expect(importedLegacy.topology?.nodes.some((n) => n.kind === "bess")).toBe(true);
 
     deleteProject(blank.id);
     expect(getProject(blank.id)).toBeNull();

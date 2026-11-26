@@ -1,3 +1,4 @@
+import { deriveDefaultTopology, syncProjectFromTopology } from "@/lib/hybrid-topology";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
 
 const PROJECTS_KEY = "renewablex.hybrid.projects.v1";
@@ -12,9 +13,9 @@ function makeId(): string {
 
 // Seluruh angka sampel bawaan berasal dari docs/assumptions.md dan ditandai [REAL DATA].
 export function buildSampleProject(id = makeId()): HybridProjectConfig {
-  return {
+  const base: HybridProjectConfig = {
     id,
-    schemaVersion: "0.5",
+    schemaVersion: "0.6",
     updatedAt: new Date().toISOString(),
     project: {
       project_name: "Pabrik Hybrid Cikarang [REAL DATA]",
@@ -130,11 +131,15 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
     weatherPreview: null,
     loadPreview: null,
   };
+  return {
+    ...base,
+    topology: deriveDefaultTopology(base),
+  };
 }
 
 export function buildBlankProject(name = "Proyek Hybrid Baru", id = makeId()): HybridProjectConfig {
   const sample = buildSampleProject(id);
-  return {
+  const blank: HybridProjectConfig = {
     ...sample,
     project: {
       ...sample.project,
@@ -146,6 +151,10 @@ export function buildBlankProject(name = "Proyek Hybrid Baru", id = makeId()): H
       bess: { ...sample.components.bess, enabled: false },
       biomass: { ...sample.components.biomass, enabled: false },
     },
+  };
+  return {
+    ...blank,
+    topology: deriveDefaultTopology(blank),
   };
 }
 
@@ -248,7 +257,7 @@ export function importProjectJson(jsonText: string): HybridProjectConfig {
     ...base,
     ...obj,
     id: makeId(),
-    schemaVersion: "0.5",
+    schemaVersion: "0.6",
     updatedAt: new Date().toISOString(),
     project: { ...base.project, ...obj.project },
     simulation: {
@@ -266,7 +275,15 @@ export function importProjectJson(jsonText: string): HybridProjectConfig {
     weatherPreview: null,
     loadPreview: null,
   };
-  return saveProject(merged);
+
+  if (obj.topology && Array.isArray(obj.topology.nodes) && Array.isArray(obj.topology.edges)) {
+    return saveProject(syncProjectFromTopology(merged, obj.topology));
+  }
+
+  return saveProject({
+    ...merged,
+    topology: deriveDefaultTopology(merged),
+  });
 }
 
 export function saveSimulationResult(projectId: string, result: HybridSimulateResponse): void {

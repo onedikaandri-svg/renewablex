@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import HybridShell from "@/components/hybrid/HybridShell";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
@@ -10,6 +10,7 @@ import { translateDetailText } from "@/lib/errors-id";
 import { SLOW_ENGINE_NOTE, formatNumber, formatPercent } from "@/lib/format";
 import { getHybridJob, runHybridSimulate, submitHybridJob } from "@/lib/hybrid-api";
 import { saveSimulationResult } from "@/lib/hybrid-storage";
+import { validateSystemTopology } from "@/lib/hybrid-topology";
 import type { MultiYearMode } from "@/lib/hybrid-types";
 import { usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
@@ -39,11 +40,16 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
     return () => { cancelledRef.current = true; };
   }, []);
 
+  const validation = useMemo(() => {
+    if (!project) return { valid: true, errors: [], warnings: [] };
+    return validateSystemTopology(project);
+  }, [project]);
+
   if (!ready) return <div className="state"><p>Memuat proyek&hellip;</p></div>;
   if (!project) return <MissingProjectState />;
 
   async function handleRun() {
-    if (!project) return;
+    if (!project || !validation.valid) return;
     setRunning(true);
     setErrors([]);
     setProgress(5);
@@ -114,6 +120,33 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
             <h2 id="h-run-cfg">Ringkasan Konfigurasi</h2>
           </div>
 
+          {!validation.valid && (
+            <div className="state bad" role="alert" style={{ marginBottom: "1rem" }}>
+              <h3>Topologi sistem belum siap disimulasikan</h3>
+              <ul>
+                {validation.errors.map((err, i) => (
+                  <li key={i}>{lang === "en" ? err.messageEn : err.messageId}</li>
+                ))}
+              </ul>
+              <div className="row" style={{ borderTop: 0, paddingTop: "0.5rem", marginTop: "0.25rem" }}>
+                <Link href={`/hybrid/${project.id}/system`} className="btn btn-sm primary">
+                  Perbaiki di Desain Sistem (Halaman 4)
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {validation.warnings.length > 0 && (
+            <div className="warn" role="note">
+              <h3>Catatan Topologi</h3>
+              <ul>
+                {validation.warnings.map((w, i) => (
+                  <li key={i}>{lang === "en" ? w.messageEn : w.messageId}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <p className="note"><strong>Lokasi:</strong> {project.project.latitude}, {project.project.longitude} ({project.project.timezone})</p>
           <p className="note">
             <strong>Beban:</strong>{" "}
@@ -174,7 +207,7 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
           </fieldset>
 
           <div className="row">
-            <button type="button" className="btn primary" disabled={running} onClick={() => void handleRun()}>
+            <button type="button" className="btn primary" disabled={running || !validation.valid} onClick={() => void handleRun()}>
               {running ? "Sedang Menghitung..." : "Jalankan Simulasi"}
             </button>
             {result && (
