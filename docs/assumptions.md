@@ -67,7 +67,9 @@ Seluruh nilai di bawah ini bersifat **asumsi sementara untuk keperluan pengemban
 - **Batas akhir umur baterai (End of Life):** `0,80` (80% dari kapasitas nominal awal) `[REAL DATA]`.
 
 ### 2.3 Komponen Biomass (`[REAL DATA]`, Persiapan Tahap 3)
-- Seluruh kurva konsumsi bahan bakar beban parsial, LHV (nilai kalor bawah), kadar air, ramp rate, serta faktor emisi akan diminta langsung ke pemilik proyek sebelum Tahap 3 dimulai (tidak ditebak).
+- **Kebijakan kurva bahan bakar:** Mesin **tidak menanam kurva konsumsi bahan bakar tebakan**. Seluruh titik kurva beban parsial (`piecewise_heat_rate`, `piecewise_efficiency`, atau parameter `willans_linear`), nilai kalor bawah (LHV beserta basis `as_received` atau `dry`), kadar air, ramp rate, waktu start/stop, min up/down time, jadwal overhaul, dan faktor emisi wajib dipasok eksplisit melalui konfigurasi dari datasheet nyata pemilik proyek (`[REAL DATA]`).
+- **Konstanta konversi LHV basis kering ke kondisi terima (`as_received`):** Jika pengguna memasukkan LHV dalam basis kering (`lhv_basis = "dry"`), koreksi kadar air menggunakan konstanta termodinamika standar kalor laten penguapan air pada suhu acuan 25 C sebesar `2,443 MJ/kg` (rujukan standar analisis bahan bakar padat ISO 18125 / ASTM): `lhv_effective = lhv_dry * (1 - moisture_fraction) - 2.443 * moisture_fraction`.
+- **Angka contoh di dokumen kontrak Tahap 3:** Nilai seperti kapasitas `250 kW`, beban minimum `40%`, heat rate `13.500 sampai 16.500 kJ/kWh`, LHV cangkang sawit `16,5 MJ/kg`, kadar air `12%`, harga `Rp 950.000/ton`, biaya logistik `Rp 150.000/ton`, dan emisi rantai pasok `45 kg CO2e/ton` hanya bersifat ilustratif struktur JSON dan ditandai `[REAL DATA]` sampai datasheet resmi diterima.
 
 ---
 
