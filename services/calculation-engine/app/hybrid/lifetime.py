@@ -297,6 +297,7 @@ def run_lifetime_simulation(
     load_profile: LoadProfile,
     lifetime_config: LifetimeConfig | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
+    pv_output_cache: dict[tuple[Any, int], Any] | None = None,
 ) -> LifetimeSimulationResult:
     """Menjalankan simulasi multi-tahun (full_hourly atau scaled_year_1) beserta kejadian umur."""
     lc = lifetime_config if lifetime_config is not None else LifetimeConfig()
@@ -321,6 +322,7 @@ def run_lifetime_simulation(
                 initial_bess_state=bess_state,
                 initial_biomass_state=biomass_state,
                 simulation_year=year,
+                pv_output_cache=pv_output_cache,
             )
             if year == 1:
                 year_1_res = res
@@ -336,7 +338,7 @@ def run_lifetime_simulation(
                 progress_callback(year, lc.project_lifetime_years)
     else:
         yr1_cfg = _make_year_sim_config(config, 1, pv_deg)
-        res1 = run_simulation(yr1_cfg, weather, load_profile, simulation_year=1)
+        res1 = run_simulation(yr1_cfg, weather, load_profile, simulation_year=1, pv_output_cache=pv_output_cache)
         year_1_res = res1
         row1, prev_efc = _extract_yearly_row(res1, 1, 1.0, 0.0, _inverter_event_for_year(lc, 1))
         yearly_rows.append(row1)

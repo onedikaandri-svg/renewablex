@@ -1229,3 +1229,184 @@ table.sens-main {
     padding: 1rem;
   }
 }
+
+/* Matriks sensitivitas 5 x 5 dan pratinjau cetak laporan A4 Tahap 7 */
+.matrix-cell {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.matrix-cell[aria-pressed="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.matrix-viable {
+  background: var(--successbg);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.matrix-marginal {
+  background: var(--warnbg);
+  color: var(--warntext);
+  border-color: var(--warntext);
+}
+
+.matrix-unviable {
+  background: var(--errbg);
+  color: var(--errtext);
+  border-color: var(--errtext);
+}
+
+.matrix-cell .sub {
+  font-size: 0.6875rem;
+  color: inherit;
+}
+
+.print-report-sheet {
+  background: #FFFFFF;
+  color: #0B1F3A;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+}
+
+.print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #533AFD;
+}
+
+.print-eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #533AFD;
+}
+
+.print-block {
+  margin-top: 1.25rem;
+  break-inside: avoid;
+}
+
+.print-block h3 {
+  margin: 0 0 0.625rem;
+  color: #061B31;
+  font-size: 1rem;
+}
+
+.print-kpi-grid {
+  display: grid;
+  gap: 0.625rem;
+  grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+  margin-bottom: 0.75rem;
+}
+
+.print-kpi {
+  border: 1px solid #E5EDF5;
+  border-radius: 4px;
+  padding: 0.625rem 0.75rem;
+  background: #F8FAFC;
+}
+
+.print-kpi span {
+  display: block;
+  font-size: 0.75rem;
+  color: #5A687D;
+}
+
+.print-kpi strong {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  color: #061B31;
+  font-variant-numeric: tabular-nums;
+}
+
+.print-note {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  color: #0B1F3A;
+}
+
+.print-svg-frame {
+  border: 1px solid #E5EDF5;
+  border-radius: 4px;
+  padding: 0.5rem;
+  background: #FFFFFF;
+}
+
+.print-table {
+  min-width: 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  color: #0B1F3A;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #E5EDF5;
+  padding: 0.375rem 0.5rem;
+  color: #0B1F3A;
+  background: #FFFFFF;
+  position: static;
+}
+
+.print-table th {
+  background: #F8FAFC;
+  color: #061B31;
+  font-weight: 600;
+}
+
+.print-table th:first-child,
+.print-table td:first-child {
+  text-align: left;
+}
+
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #0B1F3A !important;
+  }
+  .top,
+  header,
+  footer,
+  .toast-stack,
+  .no-print {
+    display: none !important;
+  }
+  .wrap {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .print-report-sheet {
+    border: 0 !important;
+    padding: 0 !important;
+  }
+}

@@ -943,6 +943,13 @@ class PVDetailedComponent(EnergyComponent):
             return self._cached_output
         return self.compute_hourly(weather)
 
+    def set_precomputed_output(self, weather: WeatherDataset, output: PVHourlyOutput) -> PVHourlyOutput:
+        """Menyematkan hasil PVHourlyOutput yang sudah dihitung sebelumnya untuk cuaca yang sama."""
+        self.validate()
+        self._cached_weather_id = id(weather)
+        self._cached_output = output
+        return output
+
     def available_power_kw(
         self,
         step_idx: int,

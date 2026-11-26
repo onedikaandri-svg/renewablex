@@ -4,7 +4,12 @@ import type {
   HybridLoadPreviewResponse,
   HybridPresetsResponse,
   HybridProjectConfig,
+  HybridSensitivityResponse,
+  HybridSensitivityVariableId,
   HybridSimulateResponse,
+  HybridSweepJobResponse,
+  HybridSweepRequestInput,
+  HybridSweepResult,
   HybridWeatherPreviewResponse,
 } from "@/lib/hybrid-types";
 
@@ -252,4 +257,145 @@ export async function getHybridJob(jobId: string, signal?: AbortSignal): Promise
     throw new NetworkError(`Gagal memeriksa status simulasi (HTTP ${res.status}).`);
   }
   return res.json();
+}
+
+function buildCompactBaseRequest(cfg: HybridProjectConfig): Record<string, unknown> {
+  const payload = buildHybridSimulatePayload(cfg);
+  return {
+    ...payload,
+    output_options: {
+      include_hourly: false,
+      include_daily: false,
+      include_trace_reasons: false,
+    },
+  };
+}
+
+export async function submitHybridSweepJob(
+  cfg: HybridProjectConfig,
+  sweepInput: HybridSweepRequestInput,
+  signal?: AbortSignal,
+): Promise<HybridSweepJobResponse> {
+  return postJson<HybridSweepJobResponse>(
+    "/v1/hybrid/sweep/jobs",
+    {
+      contract_version: "0.6",
+      base_request: buildCompactBaseRequest(cfg),
+      sweep: {
+        pv_capacity_kwp_values: sweepInput.pv_capacity_kwp_values,
+        bess_capacity_kwh_values: sweepInput.bess_capacity_kwh_values,
+        biomass_capacity_kw_values: sweepInput.biomass_capacity_kw_values,
+        pv_inverter_sizing_mode: sweepInput.pv_inverter_sizing_mode,
+        scale_replacement_costs: sweepInput.scale_replacement_costs,
+      },
+      constraints: {
+        max_unmet_load_fraction: sweepInput.max_unmet_load_fraction,
+        min_renewable_fraction: sweepInput.min_renewable_fraction,
+      },
+      ranking: {
+        sort_by: sweepInput.sort_by,
+        feasible_first: sweepInput.feasible_first,
+      },
+    },
+    signal,
+  );
+}
+
+export async function getHybridSweepJob(jobId: string, signal?: AbortSignal): Promise<HybridSweepJobResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/v1/hybrid/sweep/jobs/${encodeURIComponent(jobId)}`, { signal });
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    throw new NetworkError(`Tidak bisa terhubung ke mesin hitung di ${API_URL}.`);
+  }
+  if (res.status === 404 || res.status === 422) {
+    const data = await res.json();
+    throw new ApiError(parseProblems(data.detail));
+  }
+  if (!res.ok) {
+    throw new NetworkError(`Gagal memeriksa status sapuan (HTTP ${res.status}).`);
+  }
+  return res.json();
+}
+
+export async function cancelHybridSweepJob(jobId: string): Promise<HybridSweepJobResponse> {
+  return postJson<HybridSweepJobResponse>(`/v1/hybrid/sweep/jobs/${encodeURIComponent(jobId)}/cancel`, {});
+}
+
+export async function runHybridSensitivity(
+  cfg: HybridProjectConfig,
+  options: {
+    variables?: HybridSensitivityVariableId[];
+    shifts?: number[];
+    matrix?: {
+      x_variable: HybridSensitivityVariableId;
+      x_shifts: number[];
+      y_variable: HybridSensitivityVariableId;
+      y_shifts: number[];
+    } | null;
+  } = {},
+  signal?: AbortSignal,
+): Promise<HybridSensitivityResponse> {
+  return postJson<HybridSensitivityResponse>(
+    "/v1/hybrid/sensitivity",
+    {
+      contract_version: "0.6",
+      base_request: buildCompactBaseRequest(cfg),
+      ...(options.variables ? { variables: options.variables } : {}),
+      ...(options.shifts ? { shifts: options.shifts } : {}),
+      ...(options.matrix ? { matrix: options.matrix } : {}),
+    },
+    signal,
+  );
+}
+
+export async function downloadHybridExcelReport(
+  params: {
+    cfg: HybridProjectConfig;
+    result: HybridSimulateResponse;
+    language: "id" | "en";
+    sweepResult?: HybridSweepResult | null;
+    sensitivityResult?: HybridSensitivityResponse | null;
+  },
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; filename: string }> {
+  const { hourly_year_1: _hourly, daily: _daily, ...compactResult } = params.result as HybridSimulateResponse & {
+    daily?: unknown;
+  };
+  const body = {
+    contract_version: "0.6",
+    language: params.language,
+    project_config: buildCompactBaseRequest(params.cfg),
+    simulation_result: compactResult,
+    sweep_result: params.sweepResult ?? null,
+    sensitivity_result: params.sensitivityResult ?? null,
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/v1/hybrid/export/excel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    throw new NetworkError(`Tidak bisa terhubung ke mesin hitung di ${API_URL}.`);
+  }
+
+  if (res.status === 422 || res.status === 413 || res.status === 404) {
+    const data = await res.json();
+    throw new ApiError(parseProblems(data.detail));
+  }
+  if (!res.ok) {
+    throw new NetworkError(`Gagal membuat berkas Excel di mesin hitung (HTTP ${res.status}).`);
+  }
+
+  const disposition = res.headers.get("content-disposition") ?? "";
+  const match = /filename="?([^";]+)"?/i.exec(disposition);
+  const filename = match?.[1] ?? "laporan-hybrid.xlsx";
+  const blob = await res.blob();
+  return { blob, filename };
 }
