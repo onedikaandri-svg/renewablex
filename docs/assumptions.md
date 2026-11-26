@@ -80,14 +80,23 @@ Seluruh nilai di bawah ini bersifat **asumsi sementara untuk keperluan pengemban
 
 ---
 
-## 3. Asumsi Ekonomi Default dan Kasus Pembanding `kiyo.html`
+## 3. Asumsi Ekonomi Default, Sampel Keuangan Tahap 4, dan Kasus Pembanding `kiyo.html`
 
 ### 3.1 Asumsi Ekonomi Default Sementara (`[REAL DATA]`)
 - **Mata uang default:** `IDR`.
 - **Umur proyek default:** `25` tahun.
 - **Tingkat diskonto (WACC) pre-tax:** `0,10` (10%/tahun) `[REAL DATA]`.
-- **Eskalasi tarif dan inflasi O&M:** `0,0` (0%/tahun) pada mode cepat dasar; bila memakai pembanding `kiyo.html` (inflasi O&M 2%/tahun, eskalasi tarif 2%/tahun), hal tersebut merupakan asumsi ilustratif `[REAL DATA]`.
-- **Faktor emisi grid Indonesia:** Di `kiyo.html` tercantum `0,78 kg CO2/kWh` tanpa dokumen rujukan; statusnya ditandai `[REAL DATA]` sampai disepakati nilai resmi (misalnya faktor emisi jaringan listrik Indonesia dari Kementerian ESDM) pada Tahap 4.
+- **Eskalasi tarif, inflasi O&M, dan eskalasi bahan bakar:** `0,0` (0%/tahun) pada mode cepat dasar; pada sampel skenario hybrid Tahap 4 dan pembanding `kiyo.html` digunakan `0,02` (2%/tahun) sebagai nilai ilustratif `[REAL DATA]`.
+- **Faktor emisi grid Indonesia:** Di `kiyo.html` tercantum `0,78 kg CO2/kWh` tanpa dokumen rujukan; statusnya ditandai `[REAL DATA]` sampai disepakati nilai resmi (misalnya faktor emisi jaringan listrik Indonesia dari Kementerian ESDM).
 
-### 3.2 Catatan Kasus Uji Pembanding `docs/reference/kiyo.html`
+### 3.2 Parameter Sampel Keuangan Tahap 4 (`[REAL DATA]`)
+Seluruh angka di bawah ini bersifat **sampel ilustratif sementara** untuk contoh skema dan pengujian Tahap 4 sampai data penawaran komersial nyata ditetapkan oleh pemilik proyek:
+- **CAPEX dan O&M PV sampel:** `Rp 11.500.000/kWp`, O&M tahunan `1,5%` dari CAPEX PV, penggantian inverter tahun ke-13 sebesar `Rp 420.000.000` (untuk acuan ~420 kW AC, umur desain inverter `12` tahun) `[REAL DATA]`.
+- **CAPEX, penggantian, dan O&M BESS sampel:** `Rp 3.500.000/kWh`, biaya penggantian EOL `Rp 3.000.000/kWh` (mis. `Rp 1.800.000.000` untuk 600 kWh), O&M tetap `Rp 50.000/kWh/tahun`, umur desain acuan nilai sisa `10` tahun `[REAL DATA]`.
+- **CAPEX dan overhaul Biomass sampel:** `Rp 18.000.000/kW`, biaya overhaul `Rp 150.000.000` (untuk sampel 250 kW), umur overhaul acuan nilai sisa `5` tahun `[REAL DATA]`.
+- **Tarif listrik acuan sampel:** `Rp 1.445/kWh` `[REAL DATA]`.
+- **Pajak opsional (`after_tax`):** Tarif pajak penghasilan badan Indonesia acuan umum `0,22` (22%) dengan depresiasi garis lurus `10` tahun (hanya aktif bila pengguna memilih `tax_model = "after_tax"`, default tetap `"pre_tax"`) `[REAL DATA]`.
+- **Metode nilai sisa (Salvage Value):** Depresiasi linear sisa umur pakai ala HOMER pada akhir umur proyek untuk aset yang mengalami penggantian atau overhaul di tengah umur proyek.
+
+### 3.3 Catatan Kasus Uji Pembanding `docs/reference/kiyo.html`
 Berdasarkan `AGENTS.md` bagian 9.4, nilai bawaan di prototipe `kiyo.html` **tidak boleh disalin sebagai angka default tanpa sumber**, tetapi konfigurasi bawaannya (500 kWp, Jakarta 1.450 kWh/kWp/tahun, degradasi 0,55%/tahun, CAPEX Rp 11.500.000/kWp, O&M 1,5% CAPEX dengan inflasi 2%/tahun, tarif Rp 1.445/kWh dengan eskalasi 2%/tahun, WACC 9,5%, umur 25 tahun) akan digunakan sebagai **kasus uji pembanding** terhadap mesin backend Python dan dicatat selisihnya (misalnya perbedaan perlakuan inflasi O&M serta metode payback terdiskonto yang belum ada di mode cepat).
