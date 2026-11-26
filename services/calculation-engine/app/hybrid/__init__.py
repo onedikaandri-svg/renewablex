@@ -1,6 +1,16 @@
 """Fondasi mesin simulasi per jam untuk sistem energi hybrid RenewableX."""
 
 from app.hybrid.bess import BESSComponent, BESSConfig
+from app.hybrid.biomass import (
+    BIOMASS_FUEL_PRESETS,
+    BIOMASS_PLANT_SAMPLES,
+    BiomassComponent,
+    BiomassConfig,
+    ResolvedFuelParams,
+    ScheduledOutageWindow,
+    build_sample_biomass_config,
+    resolve_biomass_config,
+)
 from app.hybrid.components import (
     ComponentStepResult,
     EnergyComponent,
@@ -41,6 +51,7 @@ from app.hybrid.pv_detailed import (
 from app.hybrid.simulator import (
     AnnualSummary,
     BESSSummary,
+    BiomassSummary,
     DailyRow,
     MonthlyRow,
     PowerBalanceSeries,
@@ -63,6 +74,11 @@ __all__ = [
     "BESSComponent",
     "BESSConfig",
     "BESSSummary",
+    "BIOMASS_FUEL_PRESETS",
+    "BIOMASS_PLANT_SAMPLES",
+    "BiomassComponent",
+    "BiomassConfig",
+    "BiomassSummary",
     "ComponentStepResult",
     "CycleChargingStrategy",
     "DAYS_PER_MONTH",
@@ -84,7 +100,9 @@ __all__ = [
     "PVWattsConfig",
     "PeakShavingStrategy",
     "PowerBalanceSeries",
+    "ResolvedFuelParams",
     "SUPPORTED_STEP_MINUTES",
+    "ScheduledOutageWindow",
     "SelfConsumptionStrategy",
     "SimulationConfig",
     "SimulationResult",
@@ -94,6 +112,7 @@ __all__ = [
     "WeatherMetadata",
     "WeatherProvider",
     "ashrae_iam",
+    "build_sample_biomass_config",
     "cell_temperature_faiman",
     "compute_tracking_angles",
     "create_dispatch_strategy",
@@ -102,6 +121,7 @@ __all__ = [
     "generate_synthetic_load",
     "load_profile_from_csv",
     "load_weather_from_json",
+    "resolve_biomass_config",
     "run_simulation",
     "shift_utc_to_local",
     "single_diode_mpp_power_w",

@@ -9,6 +9,7 @@ from typing import Any
 
 from app.errors import EngineError
 from app.hybrid.bess import BESSConfig
+from app.hybrid.biomass import BiomassConfig, resolve_biomass_config
 from app.hybrid.components import PVWattsConfig
 from app.hybrid.dispatch import DispatchConfig
 from app.hybrid.load import generate_synthetic_load, load_profile_from_csv
@@ -159,6 +160,12 @@ def _parse_bess_config(bess_raw: dict[str, Any] | None) -> BESSConfig | None:
     )
 
 
+def _parse_biomass_config(biomass_raw: dict[str, Any] | None) -> BiomassConfig | None:
+    if not biomass_raw or biomass_raw.get("enabled") is False:
+        return None
+    return resolve_biomass_config(biomass_raw)
+
+
 def _parse_dispatch_config(sim_raw: dict[str, Any]) -> DispatchConfig | None:
     if "dispatch_strategy" not in sim_raw and "dispatch_params" not in sim_raw:
         return None
@@ -196,6 +203,7 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
 
     pv_config = _parse_pv_config(pv_raw)
     bess_config = _parse_bess_config(components_raw.get("bess"))
+    biomass_config = _parse_biomass_config(components_raw.get("biomass"))
     dispatch_config = _parse_dispatch_config(sim_raw)
 
     sim_config = SimulationConfig(
@@ -205,6 +213,7 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
         contract_version=str(cfg.get("contract_version", "0.1")),
         bess=bess_config,
         dispatch=dispatch_config,
+        biomass=biomass_config,
     )
 
     weather = _load_weather_from_config(cfg, base_dir, time_config)
@@ -219,7 +228,9 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
     csv_path = output_dir / "hourly_balance.csv"
     labels = time_config.timestamp_labels()
     b = result.balance
+    pv_gen_series = b.effective_pv_generation_kw
     include_stage2_cols = result.bess_soc is not None or result.dispatch_strategy is not None
+    include_biomass_cols = result.biomass_summary is not None
 
     with csv_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
@@ -236,6 +247,8 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
         ]
         if include_stage2_cols:
             header.extend(["charge_kw", "discharge_kw", "grid_import_kw", "grid_export_kw", "bess_soc", "trace_reason"])
+        if include_biomass_cols:
+            header.extend(["biomass_generation_kw", "biomass_status", "biomass_fuel_tons"])
         writer.writerow(header)
 
         for i in range(time_config.steps_per_year):
@@ -244,7 +257,7 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
                 labels[i],
                 round(float(b.load_kw[i]), 6),
                 round(float(b.pv_available_kw[i]), 6),
-                round(float(b.generation_kw[i]), 6),
+                round(float(pv_gen_series[i]), 6),
                 round(float(b.served_load_kw[i]), 6),
                 round(float(b.unmet_load_kw[i]), 6),
                 round(float(b.curtailment_kw[i]), 6),
@@ -261,6 +274,11 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
                     soc_val,
                     reason,
                 ])
+            if include_biomass_cols:
+                bio_gen_val = round(float(result.biomass_generation_kw[i]), 6) if result.biomass_generation_kw is not None else 0.0
+                bio_stat_val = result.biomass_status[i] if i < len(result.biomass_status) else "off"
+                bio_fuel_val = round(float(result.biomass_fuel_tons[i]), 6) if result.biomass_fuel_tons is not None else 0.0
+                row.extend([bio_gen_val, bio_stat_val, bio_fuel_val])
             writer.writerow(row)
 
     return result
