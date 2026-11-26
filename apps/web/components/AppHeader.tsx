@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { IconBookOpen, IconLayers, IconMoon, IconSun, IconZap } from "@/components/Icons";
 import { usePreferences } from "@/lib/preferences";
 
 const HYBRID_STUDIO_VERSION = "v0.7.0";
@@ -29,12 +30,15 @@ export default function AppHeader() {
         <div className="header-controls">
           <nav className="mode-nav" aria-label={lang === "en" ? "Workspace mode" : "Mode kerja"}>
             <Link href="/" className="mode-link" aria-current={!isHybrid ? "page" : undefined}>
+              <IconZap size={15} />
               {lang === "en" ? "Quick PV" : "Mode Cepat PV"}
             </Link>
             <Link href="/hybrid" className="mode-link" aria-current={isHybrid && !isGuide ? "page" : undefined}>
+              <IconLayers size={15} />
               {lang === "en" ? "Hybrid Design" : "Desain Hybrid"}
             </Link>
             <Link href="/hybrid/guide" className="mode-link" aria-current={isGuide ? "page" : undefined}>
+              <IconBookOpen size={15} />
               {lang === "en" ? "Guide" : "Panduan"}
             </Link>
           </nav>
@@ -80,19 +84,23 @@ export default function AppHeader() {
           <div className="seg-group" role="group" aria-label={lang === "en" ? "Color theme" : "Tema warna"}>
             <button
               type="button"
-              className="seg-btn"
+              className="seg-btn seg-icon"
               aria-pressed={theme === "light"}
+              aria-label={lang === "en" ? "Light theme" : "Tema Terang"}
+              title={lang === "en" ? "Light theme" : "Tema Terang"}
               onClick={() => setTheme("light")}
             >
-              {lang === "en" ? "Light" : "Terang"}
+              <IconSun size={15} />
             </button>
             <button
               type="button"
-              className="seg-btn"
+              className="seg-btn seg-icon"
               aria-pressed={theme === "dark"}
+              aria-label={lang === "en" ? "Dark theme" : "Tema Gelap"}
+              title={lang === "en" ? "Dark theme" : "Tema Gelap"}
               onClick={() => setTheme("dark")}
             >
-              {lang === "en" ? "Dark" : "Gelap"}
+              <IconMoon size={15} />
             </button>
           </div>
         </div>

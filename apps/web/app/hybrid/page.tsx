@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import {
+  IconBarChart,
+  IconBookOpen,
+  IconCopy,
+  IconDownload,
+  IconPlus,
+  IconSliders,
+  IconTrash,
+  IconUpload,
+} from "@/components/Icons";
 import { ViabilityChip } from "@/components/hybrid/HybridShell";
 import { useToast } from "@/components/Toast";
 import { downloadFile, formatNumber } from "@/lib/format";
@@ -104,12 +114,15 @@ export default function HybridProjectsPage() {
             Muat Contoh Proyek [REAL DATA]
           </button>
           <button type="button" className="btn ghost" onClick={handleCreateBlank}>
+            <IconPlus size={15} />
             Buat Proyek Baru
           </button>
           <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
+            <IconUpload size={15} />
             Impor JSON
           </button>
           <Link href="/hybrid/guide" className="btn ghost">
+            <IconBookOpen size={15} />
             {lang === "en" ? "Open Guide" : "Buka Panduan"}
           </Link>
           <input
@@ -172,25 +185,41 @@ export default function HybridProjectsPage() {
 
                 <div className="actions-inline">
                   <Link href={`/hybrid/${p.id}/location`} className="btn btn-sm primary">
+                    <IconSliders size={14} />
                     Buka Konfigurasi
                   </Link>
                   {res && (
                     <Link href={`/hybrid/${p.id}/results`} className="btn btn-sm ghost">
+                      <IconBarChart size={14} />
                       Lihat Hasil
                     </Link>
                   )}
-                  <button type="button" className="btn btn-sm ghost" onClick={() => handleDuplicate(p.id)}>
-                    Duplikat
-                  </button>
-                  <button type="button" className="btn btn-sm ghost" onClick={() => handleExport(p)}>
-                    Ekspor
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-icon ghost"
+                    aria-label={`Duplikat proyek ${p.project.project_name}`}
+                    title="Duplikat proyek"
+                    onClick={() => handleDuplicate(p.id)}
+                  >
+                    <IconCopy size={15} />
                   </button>
                   <button
                     type="button"
-                    className="btn btn-sm danger-ghost"
+                    className="btn btn-sm btn-icon ghost"
+                    aria-label={`Ekspor JSON proyek ${p.project.project_name}`}
+                    title="Ekspor JSON"
+                    onClick={() => handleExport(p)}
+                  >
+                    <IconDownload size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-icon danger-ghost"
+                    aria-label={`Hapus proyek ${p.project.project_name}`}
+                    title="Hapus proyek"
                     onClick={() => handleDelete(p.id, p.project.project_name)}
                   >
-                    Hapus
+                    <IconTrash size={15} />
                   </button>
                 </div>
               </article>

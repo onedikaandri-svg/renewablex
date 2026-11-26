@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { IconActivity, IconBarChart, IconGrid, IconWallet } from "@/components/Icons";
 import EChart, { getChartThemeColors, type EChartsOption } from "@/components/hybrid/EChart";
 import SystemSchematicSvg from "@/components/hybrid/SystemSchematicSvg";
 import { translateDetailText, translateWarning } from "@/lib/errors-id";
@@ -861,6 +862,7 @@ export default function HybridDashboard({
             onClick={() => setActiveTab("overview")}
             onKeyDown={(e) => handleTabKeyDown(e, "overview")}
           >
+            <IconBarChart size={15} />
             {lang === "en" ? "Overview & Monthly" : "Ringkasan & Bulanan"}
           </button>
           <button
@@ -875,6 +877,7 @@ export default function HybridDashboard({
             onClick={() => setActiveTab("dispatch")}
             onKeyDown={(e) => handleTabKeyDown(e, "dispatch")}
           >
+            <IconActivity size={15} />
             {lang === "en" ? "Dispatch & SOC" : "Dispatch & SOC"}
           </button>
           <button
@@ -889,6 +892,7 @@ export default function HybridDashboard({
             onClick={() => setActiveTab("heatmap")}
             onKeyDown={(e) => handleTabKeyDown(e, "heatmap")}
           >
+            <IconGrid size={15} />
             {lang === "en" ? "8760h Heatmaps" : "Peta Panas 8.760 Jam"}
           </button>
           <button
@@ -903,6 +907,7 @@ export default function HybridDashboard({
             onClick={() => setActiveTab("finance")}
             onKeyDown={(e) => handleTabKeyDown(e, "finance")}
           >
+            <IconWallet size={15} />
             {lang === "en" ? "Finance & Cash Flow" : "Keuangan & Arus Kas"}
           </button>
         </div>

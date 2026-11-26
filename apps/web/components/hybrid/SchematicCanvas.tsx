@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { ComponentIcon, ComponentSvgIcon, IconRotateCcw, IconZoomIn, IconZoomOut } from "@/components/Icons";
 import { formatNumber } from "@/lib/format";
 import {
   MAX_ZOOM,
@@ -431,6 +432,7 @@ export default function SchematicCanvas({
                 className={`btn btn-sm ${exists ? "ghost" : "primary"}`}
                 onClick={() => handleAddOptional(item.kind)}
               >
+                <ComponentIcon kind={item.kind} size={15} />
                 {exists
                   ? (lang === "en" ? `Select ${item.labelEn}` : `Pilih ${item.labelId}`)
                   : (lang === "en" ? item.addEn : item.addId)}
@@ -442,34 +444,38 @@ export default function SchematicCanvas({
         <div className="actions-inline">
           <button
             type="button"
-            className="btn btn-sm ghost"
+            className="btn btn-sm btn-icon ghost"
             aria-label={lang === "en" ? "Zoom out canvas" : "Perkecil tampilan kanvas"}
+            title={lang === "en" ? "Zoom out" : "Perkecil tampilan"}
             disabled={zoom <= MIN_ZOOM}
             onClick={() => onChangeProject(setTopologyViewport(project, { zoom: zoom - ZOOM_STEP }))}
           >
-            Perkecil (-)
+            <IconZoomOut size={16} />
           </button>
           <span className="chip tabular-nums" aria-label="Tingkat perbesaran kanvas">
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
-            className="btn btn-sm ghost"
+            className="btn btn-sm btn-icon ghost"
             aria-label={lang === "en" ? "Zoom in canvas" : "Perbesar tampilan kanvas"}
+            title={lang === "en" ? "Zoom in" : "Perbesar tampilan"}
             disabled={zoom >= MAX_ZOOM}
             onClick={() => onChangeProject(setTopologyViewport(project, { zoom: zoom + ZOOM_STEP }))}
           >
-            Perbesar (+)
+            <IconZoomIn size={16} />
           </button>
           <button
             type="button"
-            className="btn btn-sm ghost"
+            className="btn btn-sm btn-icon ghost"
+            aria-label={lang === "en" ? "Reset canvas layout" : "Reset tata letak kanvas"}
+            title={lang === "en" ? "Reset layout" : "Reset Tata Letak"}
             onClick={() => {
               onChangeProject(resetTopologyLayout(project));
               onNotify?.("Tata letak kanvas dikembalikan ke posisi rapi awal.", "info");
             }}
           >
-            Reset Tata Letak
+            <IconRotateCcw size={16} />
           </button>
         </div>
       </div>
@@ -479,7 +485,7 @@ export default function SchematicCanvas({
         <svg
           ref={svgRef}
           className="canvas-svg"
-          viewBox="0 0 840 500"
+          viewBox="0 0 900 520"
           role="region"
           aria-label={
             lang === "en"
@@ -551,14 +557,12 @@ export default function SchematicCanvas({
                     }}
                   >
                     <circle cx={geo.mx} cy={geo.my} r={11} fill="var(--surface)" stroke={strokeColor} strokeWidth={1.5} />
-                    <text
-                      x={geo.mx}
-                      y={geo.my + 4}
-                      textAnchor="middle"
-                      style={{ fill: "var(--navytext)", fontSize: "11px", fontWeight: 700 }}
-                    >
-                      x
-                    </text>
+                    <path
+                      d={`M ${geo.mx - 3.5} ${geo.my - 3.5} L ${geo.mx + 3.5} ${geo.my + 3.5} M ${geo.mx + 3.5} ${geo.my - 3.5} L ${geo.mx - 3.5} ${geo.my + 3.5}`}
+                      stroke="var(--navytext)"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                    />
                   </g>
                 </g>
               );
@@ -642,18 +646,26 @@ export default function SchematicCanvas({
                     strokeDasharray={isConnected ? undefined : "5 4"}
                   />
 
+                  <ComponentSvgIcon
+                    kind={node.kind}
+                    x={isBus ? rect.cx - 8 : rect.x + 10}
+                    y={isBus ? rect.y + 10 : rect.y + 11}
+                    size={isBus ? 16 : 14}
+                    color={isConnected ? color : "var(--warntext)"}
+                  />
+
                   <text
-                    x={isBus ? rect.cx : rect.x + 12}
-                    y={rect.y + 24}
+                    x={isBus ? rect.cx : rect.x + 28}
+                    y={isBus ? rect.y + 42 : rect.y + 22}
                     textAnchor={isBus ? "middle" : "start"}
-                    style={{ fill: "var(--navytext)", fontWeight: 700, fontSize: "13px" }}
+                    style={{ fill: "var(--navytext)", fontWeight: 700, fontSize: isBus ? "13px" : "11.5px" }}
                   >
                     {nodeTitle(node.kind, lang)}
                   </text>
 
                   <text
                     x={isBus ? rect.cx : rect.x + 12}
-                    y={rect.y + 44}
+                    y={isBus ? rect.y + 60 : rect.y + 44}
                     textAnchor={isBus ? "middle" : "start"}
                     style={{
                       fill: isConnected ? color : "var(--warntext)",
@@ -667,7 +679,7 @@ export default function SchematicCanvas({
 
                   <text
                     x={isBus ? rect.cx : rect.x + 12}
-                    y={rect.y + 62}
+                    y={isBus ? rect.y + 78 : rect.y + 62}
                     textAnchor={isBus ? "middle" : "start"}
                     style={{ fill: "var(--muted)", fontSize: "10.5px" }}
                   >
