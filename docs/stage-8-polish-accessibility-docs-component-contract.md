@@ -1,6 +1,6 @@
 # Kontrak Tahap 8: Pemolesan Performa, Audit Aksesibilitas, Dokumentasi Pengguna, dan Komponen Energi Tambahan
 
-**Status dokumen:** Usulan kontrak (menunggu persetujuan pemilik proyek sebelum PR implementasi kode).
+**Status dokumen:** Tahap 8A disetujui pemilik proyek pada 2026-11-26 (keputusan 1, 2, 3, dan 5 terkonfirmasi; menunggu konfirmasi keputusan 4 mengenai pilihan komponen pertama Tahap 8B).
 **Cabang usulan kontrak:** `docs/stage-8-contract` (berbasis `main` setelah penggabungan Tahap 7, commit `ca46fac`).
 **Cakupan:** Hasil pengukuran benchmark performa dasar (backend dan frontend) beserta target optimasi yang terukur, temuan audit aksesibilitas WCAG AA dan perbaikan visual, penambahan 3 grafik katalog `AGENTS.md` 9.2 (tanpa dependensi baru), rancangan dokumentasi pengguna berbahasa Indonesia, serta usulan kontrak komponen energi tambahan pertama melalui antarmuka seragam `EnergyComponent`.
 
@@ -165,6 +165,7 @@ Dokumentasi disusun untuk pemilik proyek dan pengguna awam dengan bahasa yang se
 
 - **Berkas utama:** `docs/user-guide-id.md`
 - **Berkas contoh data beban siap unggah:** `examples/sample-load-8760.csv` (8.760 baris dengan header `waktu,load_kw` sebagai acuan langsung format CSV yang diterima engine).
+- **Halaman ringkas di UI web (`/hybrid/guide`):** Halaman **"Panduan"** yang dapat diakses dari Halaman 1 (`/hybrid`) maupun navigasi mode hybrid, menampilkan ringkasan alur 10 halaman, contoh format CSV 8.760 jam, kamus metrik teknis/keuangan, dan tombol unduh contoh `sample-load-8760.csv`.
 
 ### Kerangka Bab `docs/user-guide-id.md`
 1. **Bab 1: Memulai dengan RenewableX (Mode Cepat PV vs Desain Sistem Hybrid)**
@@ -277,21 +278,21 @@ Setiap PR implementasi kode (Tahap 8A dan Tahap 8B) baru boleh dinyatakan selesa
 
 ---
 
-## 7. Keputusan Pemilik Proyek yang Dibutuhkan Sebelum PR Implementasi
+## 7. Keputusan Pemilik Proyek
 
-Mohon konfirmasi 5 keputusan berikut sebelum penulisan kode Tahap 8 dimulai:
+Status konfirmasi keputusan Tahap 8:
 
 1. **Pembagian PR Implementasi (Tahap 8A dan 8B):**
-   Apakah pemilik menyetujui Tahap 8 dibagi menjadi **Tahap 8A** (pemolesan performa, perbaikan kontras & aksesibilitas WCAG AA, perbaikan visual `SystemSchematicSvg` + `AppHeader`, 3 grafik katalog 9.2, dan panduan pengguna) terlebih dahulu, lalu dilanjutkan **Tahap 8B** (komponen baru lewat `EnergyComponent` dengan kenaikan `contract_version: "0.7"`)? *(Direkomendasikan: Ya, dibagi 8A lalu 8B agar PR lebih kecil, terfokus, dan mudah ditinjau.)*
+   **Disetujui** (2026-11-26). Dikerjakan **Tahap 8A** lebih dulu (pemolesan performa, perbaikan kontras & aksesibilitas WCAG AA, perbaikan visual `SystemSchematicSvg` + `AppHeader`, 3 grafik katalog 9.2, dan panduan pengguna), lalu dilanjutkan **Tahap 8B** (komponen baru lewat `EnergyComponent` dengan kenaikan `contract_version: "0.7"`).
 2. **Penyesuaian 4 Token Warna Mode Terang untuk Kepatuhan WCAG AA:**
-   Apakah pemilik menyetujui penggelapan 4 warna di Mode Terang agar seluruh teks, chip status, dan label SVG lolos rasio kontras minimal `4,5:1` serta batas tombol `.ghost` lolos `3,0:1`:
+   **Disetujui** (2026-11-26). Penggelapan 4 warna di Mode Terang agar seluruh teks, chip status, dan label SVG lolos rasio kontras minimal `4,5:1` serta batas tombol `.ghost` lolos `3,0:1`:
    - `--success` & `--series-grid`: `#16A34A` menjadi `#15803D` (`5,02:1` di atas putih)
    - `--series-bess`: `#0EA5E9` menjadi `#0369A1` (`5,93:1` di atas putih)
    - `--series-biomass`: `#D97706` menjadi `#B45309` (`5,02:1` di atas putih)
-   - Border `.btn.ghost`: memakai `--field-border` (`#6B7A90`, `4,36:1`) menggantikan `#B9B9F9` (`1,85:1`)?
+   - Border `.btn.ghost`: memakai `--field-border` (`#6B7A90`, `4,36:1`) menggantikan `#B9B9F9` (`1,85:1`).
 3. **Penambahan 3 Grafik Katalog `AGENTS.md` 9.2 (Nol Dependensi Baru):**
-   Apakah pemilik menyetujui penambahan **Diagram Aliran Energi (Sankey)**, **Kurva Durasi Beban & Pembangkitan**, dan **Grafik Degradasi Kapasitas PV & BESS Umur Proyek** di Halaman 8 pada Tahap 8A?
+   **Disetujui** (2026-11-26). Menambahkan **Diagram Aliran Energi (Sankey)**, **Kurva Durasi Beban & Pembangkitan**, dan **Grafik Degradasi Kapasitas PV & BESS Umur Proyek** di Halaman 8 pada Tahap 8A.
 4. **Pilihan Komponen Energi Tambahan Pertama (Tahap 8B):**
-   Dari tiga kandidat di `AGENTS.md` bagian 6 (**Diesel Generator**, **Turbin Angin / Wind**, atau **Hidro**), komponen mana yang ingin diprioritaskan pertama di Tahap 8B? *(Direkomendasikan: **Diesel Generator**, baru disusul Turbin Angin pada tahap berikutnya.)*
+   **Menunggu konfirmasi pemilik proyek.** Dari tiga kandidat di `AGENTS.md` bagian 6 (**Diesel Generator**, **Turbin Angin / Wind**, atau **Hidro**), komponen mana yang ingin diprioritaskan pertama di Tahap 8B? *(Direkomendasikan: **Diesel Generator**, baru disusul Turbin Angin pada tahap berikutnya.)*
 5. **Lokasi dan Akses Dokumentasi Pengguna:**
-   Apakah panduan pengguna cukup berupa berkas markdown `docs/user-guide-id.md` + contoh CSV `examples/sample-load-8760.csv` di repositori, atau pemilik juga ingin ada halaman/panel ringkas **"Panduan"** di UI web yang merujuk panduan tersebut?
+   **Disetujui ditambahkan di UI** (2026-11-26). Selain berkas `docs/user-guide-id.md` dan contoh CSV `examples/sample-load-8760.csv` di repositori, disediakan halaman ringkas **"Panduan"** di UI web (`/hybrid/guide`).
