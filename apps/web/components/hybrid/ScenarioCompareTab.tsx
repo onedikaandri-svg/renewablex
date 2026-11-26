@@ -83,6 +83,7 @@ export default function ScenarioCompareTab({
     const names = selected.map((s) => s.project.project.project_name);
     const pv = selected.map((s) => Math.round(s.result.summary.pv_generation_kwh / 1000));
     const bio = selected.map((s) => Math.round(s.result.summary.biomass_generation_kwh / 1000));
+    const diesel = selected.map((s) => Math.round((s.result.summary.diesel_generation_kwh ?? 0) / 1000));
     const grid = selected.map((s) =>
       Math.round((s.result.lifetime_summary.yearly?.[0]?.grid_import_kwh ?? 0) / 1000),
     );
@@ -105,6 +106,7 @@ export default function ScenarioCompareTab({
       series: [
         { name: "PV", type: "bar", color: colors.pv, data: pv },
         { name: "Biomass", type: "bar", color: colors.biomass, data: bio },
+        { name: "Diesel", type: "bar", color: colors.diesel, data: diesel },
         { name: "Grid Import", type: "bar", color: colors.grid, data: grid },
       ],
     };
@@ -189,7 +191,8 @@ export default function ScenarioCompareTab({
                   <p className="note" style={{ marginTop: "0.35rem" }}>
                     PV {project.components.pv.capacity_kwp} kWp |{" "}
                     BESS {project.components.bess.enabled ? `${project.components.bess.nominal_capacity_kwh} kWh` : "Nonaktif"} |{" "}
-                    Biomass {project.components.biomass.enabled ? `${project.components.biomass.rated_capacity_kw} kW` : "Nonaktif"}
+                    Biomass {project.components.biomass.enabled ? `${project.components.biomass.rated_capacity_kw} kW` : "Nonaktif"} |{" "}
+                    Diesel {project.components.diesel?.enabled ? `${project.components.diesel.rated_capacity_kw} kW` : "Nonaktif"}
                   </p>
                 </label>
               );
@@ -245,7 +248,8 @@ export default function ScenarioCompareTab({
                     <td key={project.id}>
                       {formatNumber(project.components.pv.capacity_kwp, lang, 0)} kWp |{" "}
                       {project.components.bess.enabled ? `${formatNumber(project.components.bess.nominal_capacity_kwh, lang, 0)} kWh` : "0 kWh"} |{" "}
-                      {project.components.biomass.enabled ? `${formatNumber(project.components.biomass.rated_capacity_kw, lang, 0)} kW` : "0 kW"}
+                      {project.components.biomass.enabled ? `${formatNumber(project.components.biomass.rated_capacity_kw, lang, 0)} kW` : "0 kW"} |{" "}
+                      {project.components.diesel?.enabled ? `${formatNumber(project.components.diesel.rated_capacity_kw, lang, 0)} kW` : "0 kW"}
                     </td>
                   ))}
                 </tr>

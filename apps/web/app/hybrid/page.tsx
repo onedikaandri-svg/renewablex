@@ -165,6 +165,7 @@ export default function HybridProjectsPage() {
                     PV {formatNumber(p.components.pv.capacity_kwp, lang, 0)} kWp
                     {p.components.bess.enabled ? ` | BESS ${formatNumber(p.components.bess.nominal_capacity_kwh, lang, 0)} kWh` : ""}
                     {p.components.biomass.enabled ? ` | Biomass ${formatNumber(p.components.biomass.rated_capacity_kw, lang, 0)} kW` : ""}
+                    {p.components.diesel?.enabled ? ` | Diesel ${formatNumber(p.components.diesel.rated_capacity_kw, lang, 0)} kW` : ""}
                   </p>
                   <p className="note">Diperbarui: {new Date(p.updatedAt).toLocaleString("id-ID")}</p>
                 </div>

@@ -17,6 +17,7 @@ from app.hybrid.components import (
     PVWattsComponent,
     PVWattsConfig,
 )
+from app.hybrid.diesel import DieselComponent, DieselConfig
 from app.hybrid.dispatch import (
     DispatchConfig,
     DispatchContext,
@@ -42,6 +43,7 @@ class SimulationConfig:
     bess: BESSConfig | None = None
     dispatch: DispatchConfig | None = None
     biomass: BiomassConfig | None = None
+    diesel: DieselConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -61,6 +63,7 @@ class PowerBalanceSeries:
     losses_kw: np.ndarray
     pv_generation_kw: np.ndarray | None = None
     biomass_generation_kw: np.ndarray | None = None
+    diesel_generation_kw: np.ndarray | None = None
 
     @property
     def effective_pv_generation_kw(self) -> np.ndarray:
@@ -70,6 +73,12 @@ class PowerBalanceSeries:
     def effective_biomass_generation_kw(self) -> np.ndarray:
         if self.biomass_generation_kw is not None:
             return self.biomass_generation_kw
+        return np.zeros_like(self.generation_kw)
+
+    @property
+    def effective_diesel_generation_kw(self) -> np.ndarray:
+        if self.diesel_generation_kw is not None:
+            return self.diesel_generation_kw
         return np.zeros_like(self.generation_kw)
 
     def balance_residuals_kw(self) -> np.ndarray:
@@ -123,6 +132,7 @@ class AnnualSummary:
     pv_capacity_factor: float
     pv_specific_yield_kwh_per_kwp: float
     max_balance_error_kw: float
+    diesel_generation_kwh: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -161,6 +171,23 @@ class BiomassSummary:
 
 
 @dataclass(frozen=True)
+class DieselSummary:
+    """Ringkasan tahunan kinerja, konsumsi solar, biaya operasi, dan emisi diesel generator."""
+
+    total_generation_kwh: float
+    total_operating_hours: float
+    startup_count: int
+    overhaul_count: int
+    total_fuel_liters: float
+    total_fuel_cost: float
+    total_variable_om_cost: float
+    total_fixed_om_cost: float
+    total_startup_cost: float
+    total_co2e_kg: float
+    is_renewable: bool = False
+
+
+@dataclass(frozen=True)
 class SimulationResult:
     """Keluaran lengkap simulasi hybrid beserta provenance dan ringkasan berjenjang."""
 
@@ -187,6 +214,11 @@ class SimulationResult:
     biomass_summary: BiomassSummary | None = None
     final_bess_state: dict[str, Any] | None = None
     final_biomass_state: dict[str, Any] | None = None
+    diesel_generation_kw: np.ndarray | None = None
+    diesel_fuel_liters: np.ndarray | None = None
+    diesel_status: tuple[str, ...] = ()
+    diesel_summary: DieselSummary | None = None
+    final_diesel_state: dict[str, Any] | None = None
 
     def to_summary_dict(self) -> dict[str, Any]:
         """Mengembalikan ringkasan terstruktur siap serialisasi JSON."""
@@ -217,19 +249,22 @@ class SimulationResult:
             out["bess_summary"] = asdict(self.bess_summary)
         if self.biomass_summary is not None:
             out["biomass_summary"] = asdict(self.biomass_summary)
+        if self.diesel_summary is not None:
+            out["diesel_summary"] = asdict(self.diesel_summary)
         if self.lifecycle_events:
             out["lifecycle_events"] = [asdict(ev) for ev in self.lifecycle_events]
         return out
 
 
 def _compute_config_hash(config: SimulationConfig, weather: WeatherDataset, load_profile: LoadProfile) -> str:
-    # Jaga hash Tahap 1 dan Tahap 2 tetap identik bila Biomass tidak dipakai.
+    # Jaga hash Tahap 1 dan Tahap 2 tetap identik bila Biomass dan Diesel tidak dipakai.
     is_stage_1_only = (
         config.contract_version == "0.1"
         and isinstance(config.pv, PVWattsConfig)
         and config.bess is None
         and config.dispatch is None
         and config.biomass is None
+        and config.diesel is None
     )
     payload: dict[str, Any] = {
         "contract_version": config.contract_version,
@@ -246,6 +281,8 @@ def _compute_config_hash(config: SimulationConfig, weather: WeatherDataset, load
         payload["dispatch"] = asdict(config.dispatch) if config.dispatch is not None else None
         if config.biomass is not None:
             payload["biomass"] = asdict(config.biomass)
+        if config.diesel is not None:
+            payload["diesel"] = asdict(config.diesel)
 
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
@@ -315,6 +352,7 @@ def run_simulation(
     initial_biomass_state: dict[str, Any] | None = None,
     simulation_year: int | None = None,
     pv_output_cache: dict[tuple[Any, int], PVHourlyOutput] | None = None,
+    initial_diesel_state: dict[str, Any] | None = None,
 ) -> SimulationResult:
     """Menjalankan simulasi hybrid per langkah waktu dan memverifikasi neraca energi."""
     if weather.time_config != config.time_config:
@@ -382,9 +420,27 @@ def run_simulation(
         else:
             biomass_state = biomass_component.initial_state(year=sim_year)
 
+    diesel_component: DieselComponent | None = None
+    diesel_state: dict[str, Any] = {}
+    if config.diesel is not None:
+        diesel_component = DieselComponent(config.diesel)
+        if initial_diesel_state is not None:
+            diesel_component.validate()
+            diesel_state = dict(initial_diesel_state)
+            diesel_state["total_operating_hours"] = 0.0
+            diesel_state["startup_count"] = 0
+            diesel_state["overhaul_count"] = 0
+            diesel_state["fuel_consumed_total_liters"] = 0.0
+            diesel_state["co2e_emitted_kg"] = 0.0
+            diesel_state["current_year"] = sim_year
+            diesel_state["events"] = []
+        else:
+            diesel_state = diesel_component.initial_state(year=sim_year)
+
     is_stage_1_loop = (
         bess_component is None
         and biomass_component is None
+        and diesel_component is None
         and config.dispatch is None
         and isinstance(config.pv, PVWattsConfig)
     )
@@ -398,6 +454,7 @@ def run_simulation(
     pv_available = np.zeros(n, dtype=np.float64)
     pv_generation_kw = np.zeros(n, dtype=np.float64)
     biomass_generation_kw = np.zeros(n, dtype=np.float64)
+    diesel_generation_kw = np.zeros(n, dtype=np.float64)
     generation_kw = np.zeros(n, dtype=np.float64)
     charge_kw = np.zeros(n, dtype=np.float64)
     discharge_kw = np.zeros(n, dtype=np.float64)
@@ -420,6 +477,13 @@ def run_simulation(
     bio_total_var_om_cost = 0.0
     bio_total_startup_cost = 0.0
     bio_total_thermal_kwh_th = 0.0
+
+    diesel_fuel_series = np.zeros(n, dtype=np.float64) if diesel_component is not None else None
+    diesel_status_list: list[str] = []
+    diesel_total_fuel_cost = 0.0
+    diesel_total_var_om_cost = 0.0
+    diesel_total_startup_cost = 0.0
+
     trace_reasons: list[str] = []
 
     hours_local = config.time_config.hour_of_day()
@@ -479,6 +543,23 @@ def run_simulation(
                 bio_can_stop = True
                 bio_fuel_rem = None
 
+            if diesel_component is not None:
+                diesel_limits = diesel_component.inspect_step_limits(t, weather, diesel_state)
+                diesel_status_now = str(diesel_limits["status"])
+                diesel_avail = float(diesel_limits["available_kw"])
+                diesel_curr = float(diesel_limits["current_power_kw"])
+                diesel_min_kw = float(diesel_limits["min_load_kw"])
+                diesel_can_start = bool(diesel_limits["can_start"])
+                diesel_can_stop = bool(diesel_limits["can_stop"])
+            else:
+                diesel_limits = None
+                diesel_status_now = "off"
+                diesel_avail = 0.0
+                diesel_curr = 0.0
+                diesel_min_kw = 0.0
+                diesel_can_start = False
+                diesel_can_stop = True
+
             ctx = DispatchContext(
                 step_idx=t,
                 hour_of_day=int(hours_local[t]),
@@ -498,6 +579,12 @@ def run_simulation(
                 biomass_can_start=bio_can_start,
                 biomass_can_stop=bio_can_stop,
                 biomass_fuel_remaining_tons=bio_fuel_rem,
+                diesel_status=diesel_status_now,
+                diesel_available_kw=diesel_avail,
+                diesel_current_power_kw=diesel_curr,
+                diesel_min_load_kw=diesel_min_kw,
+                diesel_can_start=diesel_can_start,
+                diesel_can_stop=diesel_can_stop,
             )
             decision = strategy.decide(ctx)
 
@@ -532,9 +619,31 @@ def run_simulation(
                 bio_total_thermal_kwh_th += float(biomass_state["thermal_output_kw_th"]) * h
                 if biomass_state.get("last_step_note"):
                     step_reason = f"{step_reason} ({biomass_state['last_step_note']})"
+
+            diesel_gen = 0.0
+            diesel_losses = 0.0
+            if diesel_component is not None:
+                assert diesel_limits is not None
+                diesel_step = diesel_component.step(
+                    t,
+                    decision.diesel_command_kw,
+                    weather,
+                    diesel_state,
+                    precomputed_limits=diesel_limits,
+                )
+                diesel_state = diesel_step.state_out
+                diesel_gen = diesel_step.generation_kw
+                diesel_losses = diesel_step.losses_kw
+                assert diesel_fuel_series is not None
+                diesel_fuel_series[t] = float(diesel_state["last_step_fuel_liters"])
+                diesel_status_list.append(str(diesel_state["status"]))
+                diesel_total_fuel_cost += float(diesel_state["last_step_fuel_cost"])
+                diesel_total_var_om_cost += float(diesel_state["last_step_om_cost"])
+                diesel_total_startup_cost += float(diesel_state["last_step_startup_cost"])
+
             trace_reasons.append(step_reason)
 
-            total_gen = pv_gen + bio_gen
+            total_gen = pv_gen + bio_gen + diesel_gen
 
             chg = 0.0
             dis = 0.0
@@ -542,7 +651,9 @@ def run_simulation(
                 cmd = decision.bess_command_kw
                 if cmd > 0.0 and not dispatch_cfg.allow_grid_import:
                     cmd = min(cmd, max(total_gen - demand - parasitic, 0.0))
-                elif cmd < 0.0 and not dispatch_cfg.allow_grid_export and biomass_component is not None:
+                elif cmd < 0.0 and not dispatch_cfg.allow_grid_export and (
+                    biomass_component is not None or diesel_component is not None
+                ):
                     cmd = -min(-cmd, max(demand + parasitic - total_gen, 0.0))
                 bess_step = bess_component.step(t, cmd, weather, bess_state)
                 bess_state = bess_step.state_out
@@ -579,6 +690,7 @@ def run_simulation(
             pv_available[t] = pv_step.available_kw
             pv_generation_kw[t] = pv_gen
             biomass_generation_kw[t] = bio_gen
+            diesel_generation_kw[t] = diesel_gen
             generation_kw[t] = total_gen
             charge_kw[t] = chg
             discharge_kw[t] = dis
@@ -587,7 +699,7 @@ def run_simulation(
             served_load_kw[t] = served
             unmet_load_kw[t] = max(demand - served, 0.0)
             curtailment_kw[t] = curtail
-            losses_kw[t] = pv_step.losses_kw + bio_losses + served_parasitic
+            losses_kw[t] = pv_step.losses_kw + bio_losses + diesel_losses + served_parasitic
 
     balance = PowerBalanceSeries(
         load_kw=load_kw,
@@ -603,6 +715,7 @@ def run_simulation(
         losses_kw=losses_kw,
         pv_generation_kw=pv_generation_kw,
         biomass_generation_kw=biomass_generation_kw,
+        diesel_generation_kw=diesel_generation_kw,
     )
 
     max_err = balance.max_balance_error_kw()
@@ -615,6 +728,7 @@ def run_simulation(
     total_load_kwh = float(np.sum(load_kw) * h)
     pv_gen_kwh = float(np.sum(pv_generation_kw) * h)
     bio_gen_kwh = float(np.sum(biomass_generation_kw) * h)
+    diesel_gen_kwh = float(np.sum(diesel_generation_kw) * h)
     served_kwh = float(np.sum(served_load_kw) * h)
     unmet_kwh = float(np.sum(unmet_load_kw) * h)
     curtail_kwh = float(np.sum(curtailment_kw) * h)
@@ -623,8 +737,14 @@ def run_simulation(
     non_renewable_bio_kwh = (
         bio_gen_kwh if (biomass_component is not None and not biomass_component.config.effective_is_renewable) else 0.0
     )
+    non_renewable_diesel_kwh = (
+        diesel_gen_kwh if (diesel_component is not None and not diesel_component.config.is_renewable) else 0.0
+    )
     if total_load_kwh > 0.0:
-        renewable_fraction = min(max((served_kwh - grid_imp_kwh - non_renewable_bio_kwh) / total_load_kwh, 0.0), 1.0)
+        renewable_fraction = min(
+            max((served_kwh - grid_imp_kwh - non_renewable_bio_kwh - non_renewable_diesel_kwh) / total_load_kwh, 0.0),
+            1.0,
+        )
     else:
         renewable_fraction = 0.0
     total_hours = n * h
@@ -643,6 +763,7 @@ def run_simulation(
         pv_capacity_factor=capacity_factor,
         pv_specific_yield_kwh_per_kwp=specific_yield,
         max_balance_error_kw=max_err,
+        diesel_generation_kwh=diesel_gen_kwh,
     )
 
     bess_summary: BESSSummary | None = None
@@ -687,6 +808,24 @@ def run_simulation(
         )
         events.extend(biomass_state.get("events", []))
 
+    diesel_summary: DieselSummary | None = None
+    if diesel_component is not None:
+        diesel_fixed_om_cost = diesel_component.config.rated_capacity_kw * diesel_component.config.fixed_om_per_kw_year
+        diesel_summary = DieselSummary(
+            total_generation_kwh=diesel_gen_kwh,
+            total_operating_hours=float(diesel_state["total_operating_hours"]),
+            startup_count=int(diesel_state["startup_count"]),
+            overhaul_count=int(diesel_state["overhaul_count"]),
+            total_fuel_liters=float(diesel_state["fuel_consumed_total_liters"]),
+            total_fuel_cost=diesel_total_fuel_cost,
+            total_variable_om_cost=diesel_total_var_om_cost,
+            total_fixed_om_cost=diesel_fixed_om_cost,
+            total_startup_cost=diesel_total_startup_cost,
+            total_co2e_kg=float(diesel_state["co2e_emitted_kg"]),
+            is_renewable=diesel_component.config.is_renewable,
+        )
+        events.extend(diesel_state.get("events", []))
+
     return SimulationResult(
         engine_version=ENGINE_VERSION,
         contract_version=config.contract_version,
@@ -711,4 +850,9 @@ def run_simulation(
         biomass_summary=biomass_summary,
         final_bess_state=dict(bess_state) if bess_component is not None else None,
         final_biomass_state=dict(biomass_state) if biomass_component is not None else None,
+        diesel_generation_kw=diesel_generation_kw if diesel_component is not None else None,
+        diesel_fuel_liters=diesel_fuel_series,
+        diesel_status=tuple(diesel_status_list),
+        diesel_summary=diesel_summary,
+        final_diesel_state=dict(diesel_state) if diesel_component is not None else None,
     )

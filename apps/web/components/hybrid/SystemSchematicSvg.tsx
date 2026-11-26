@@ -18,6 +18,7 @@ const SERIES_COLOR_BY_KIND: Record<TopologyNodeKind, string> = {
   pv: "var(--series-pv)",
   bess: "var(--series-bess)",
   biomass: "var(--series-biomass)",
+  diesel: "var(--series-diesel)",
   ac_bus: "var(--accent)",
   load: "var(--series-load)",
   grid: "var(--series-grid)",
@@ -31,6 +32,8 @@ function nodeHeading(kind: TopologyNodeKind, lang: "id" | "en", config: HybridPr
       return lang === "en" ? "BESS (Battery)" : "BESS (Baterai)";
     case "biomass":
       return `Biomass (${config.components.biomass.fuel_preset.toUpperCase()})`;
+    case "diesel":
+      return "Diesel Generator";
     case "ac_bus":
       return "AC BUS";
     case "load":
@@ -92,7 +95,7 @@ export default function SystemSchematicSvg({
   const gridExportKwh = year1Grid?.grid_export_kwh ?? 0;
 
   function nodeLines(node: TopologyNode, connected: boolean): { primary: string; secondary: string; isAlert?: boolean } {
-    const { pv, bess, biomass } = config.components;
+    const { pv, bess, biomass, diesel } = config.components;
     if (node.kind === "ac_bus") {
       return {
         primary: "EMS Dispatch",
@@ -143,6 +146,16 @@ export default function SystemSchematicSvg({
               primary: `${formatNumber(biomass.rated_capacity_kw, lang, 0)} kW`,
               secondary: biomass.fuel_preset.toUpperCase(),
             };
+      case "diesel":
+        return result && result.diesel_summary
+          ? {
+              primary: formatMwh(result.diesel_summary.total_generation_kwh, lang),
+              secondary: `${formatNumber(result.diesel_summary.total_operating_hours, lang, 0)} jam | ${formatNumber(result.diesel_summary.total_fuel_liters, lang, 0)} L`,
+            }
+          : {
+              primary: `${formatNumber(diesel.rated_capacity_kw, lang, 0)} kW`,
+              secondary: `${formatNumber(diesel.min_load_fraction * 100, lang, 0)}% min | ${formatNumber(diesel.fuel_price_per_liter, lang, 0)}/L`,
+            };
       case "load":
         return result
           ? {
@@ -181,6 +194,8 @@ export default function SystemSchematicSvg({
           : null;
       case "biomass":
         return result.biomass_summary ? formatMwh(result.biomass_summary.total_generation_kwh, lang) : null;
+      case "diesel":
+        return result.diesel_summary ? formatMwh(result.diesel_summary.total_generation_kwh, lang) : null;
       case "load":
         return formatMwh(result.summary.served_load_kwh, lang);
       case "grid":

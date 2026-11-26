@@ -254,6 +254,37 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
               />
             </div>
             <div className="fld">
+              <label htmlFor="econ-diesel-capex">CAPEX Diesel Generator ({project.project.currency_code}/kW)</label>
+              <input
+                id="econ-diesel-capex"
+                type="number"
+                min={0}
+                value={fin.diesel_capex_per_kw}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) patchFinance({ diesel_capex_per_kw: v });
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="fld">
+              <label htmlFor="econ-diesel-overhaul-life">Umur Overhaul Diesel untuk Nilai Sisa (Tahun)</label>
+              <input
+                id="econ-diesel-overhaul-life"
+                type="number"
+                min={0.5}
+                max={30}
+                step={0.5}
+                value={fin.diesel_overhaul_life_years}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) patchFinance({ diesel_overhaul_life_years: v });
+                }}
+              />
+            </div>
+            <div className="fld">
               <label htmlFor="econ-grant">Hibah Modal / Grant Tahun 0</label>
               <input
                 id="econ-grant"

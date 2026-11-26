@@ -55,7 +55,7 @@ export default function ComponentInspector({
   const isBus = selectedNode.kind === "ac_bus";
   const isRequired = isRequiredNodeKind(selectedNode.kind);
   const isConnected = isKindConnectedToBus(topology, selectedNode.kind);
-  const { pv, bess, biomass } = project.components;
+  const { pv, bess, biomass, diesel } = project.components;
 
   const nodeIssues = [...validation.errors, ...validation.warnings].filter(
     (issue) => issue.nodeId === selectedNode.id,
@@ -127,6 +127,7 @@ export default function ComponentInspector({
     pv: "Inspektor Solar PV",
     bess: "Inspektor BESS (Baterai)",
     biomass: "Inspektor Pembangkit Biomass",
+    diesel: "Inspektor Diesel Generator",
     ac_bus: "Inspektor AC Bus & EMS",
     load: "Inspektor Beban Listrik",
     grid: "Inspektor Jaringan Listrik (Grid)",
@@ -467,6 +468,168 @@ export default function ComponentInspector({
                 />
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {selectedNode.kind === "diesel" && (
+        <div>
+          <p className="note" style={{ marginBottom: "0.75rem" }}>
+            Sumber pembangkit fosil non-terbarukan (tidak dihitung ke Pangsa Terbarukan; emisi dihitung langsung dari konsumsi solar).
+          </p>
+
+          <RangeNumberField
+            id="diesel-kw"
+            label="Kapasitas Terpasang Diesel"
+            unit="kW"
+            min={10}
+            max={10000}
+            step={10}
+            value={diesel.rated_capacity_kw}
+            error={diesel.rated_capacity_kw <= 0 ? "Kapasitas Diesel harus lebih besar dari 0 kW." : undefined}
+            onChange={(v) =>
+              update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, rated_capacity_kw: v } } }))
+            }
+          />
+
+          <div className="grid-2">
+            <div className="fld">
+              <label htmlFor="diesel-min-load">Beban Minimum (%, hindari wet stacking)</label>
+              <input
+                id="diesel-min-load"
+                type="number"
+                min={0}
+                max={100}
+                value={Math.round(diesel.min_load_fraction * 100)}
+                onChange={(e) => {
+                  const v = Number(e.target.value) / 100;
+                  if (Number.isFinite(v)) {
+                    update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, min_load_fraction: v } } }));
+                  }
+                }}
+              />
+            </div>
+            <div className="fld">
+              <label htmlFor="diesel-slope">Slope Konsumsi Solar (L/kWh)</label>
+              <input
+                id="diesel-slope"
+                type="number"
+                min={0.05}
+                step={0.01}
+                value={diesel.slope_liters_per_kwh}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) {
+                    update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, slope_liters_per_kwh: v } } }));
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="fld">
+              <label htmlFor="diesel-fuel-price">Harga Solar ({project.project.currency_code}/L) [REAL DATA]</label>
+              <input
+                id="diesel-fuel-price"
+                type="number"
+                min={0}
+                value={diesel.fuel_price_per_liter}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) {
+                    update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, fuel_price_per_liter: v } } }));
+                  }
+                }}
+              />
+            </div>
+            <div className="fld">
+              <label htmlFor="diesel-em">Faktor Emisi (kg CO2e/L, IPCC/DEFRA)</label>
+              <input
+                id="diesel-em"
+                type="number"
+                min={0}
+                step={0.01}
+                value={diesel.emission_factor_kg_co2e_per_liter}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) {
+                    update((p) => ({
+                      ...p,
+                      components: { ...p.components, diesel: { ...p.components.diesel, emission_factor_kg_co2e_per_liter: v } },
+                    }));
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="fld">
+              <label htmlFor="diesel-min-run">Min. Run Time (jam)</label>
+              <input
+                id="diesel-min-run"
+                type="number"
+                min={0}
+                step={1}
+                value={diesel.min_run_time_hours}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) {
+                    update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, min_run_time_hours: v } } }));
+                  }
+                }}
+              />
+            </div>
+            <div className="fld">
+              <label htmlFor="diesel-min-down">Min. Down Time (jam)</label>
+              <input
+                id="diesel-min-down"
+                type="number"
+                min={0}
+                step={1}
+                value={diesel.min_down_time_hours}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) {
+                    update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, min_down_time_hours: v } } }));
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="fld">
+              <label htmlFor="diesel-fixed-om">O&amp;M Tetap ({project.project.currency_code}/kW/thn)</label>
+              <input
+                id="diesel-fixed-om"
+                type="number"
+                min={0}
+                value={diesel.fixed_om_per_kw_year}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) {
+                    update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, fixed_om_per_kw_year: v } } }));
+                  }
+                }}
+              />
+            </div>
+            <div className="fld">
+              <label htmlFor="diesel-oh-cost">Biaya Overhaul ({project.project.currency_code})</label>
+              <input
+                id="diesel-oh-cost"
+                type="number"
+                min={0}
+                value={diesel.overhaul_cost}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) {
+                    update((p) => ({ ...p, components: { ...p.components, diesel: { ...p.components.diesel, overhaul_cost: v } } }));
+                  }
+                }}
+              />
+            </div>
           </div>
         </div>
       )}

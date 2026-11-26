@@ -139,10 +139,13 @@ function makeSampleResponse(): HybridSimulateResponse {
 }
 
 describe("hybrid-charts: Sankey, Kurva Durasi, dan Degradasi", () => {
-  it("membangun graf Sankey bebas siklus (DAG) dan merangkum aliran MWh", () => {
+  it("membangun graf Sankey bebas siklus (DAG) termasuk node Diesel Generator dan merangkum aliran MWh", () => {
     const res = makeSampleResponse();
+    res.summary.diesel_generation_kwh = 120000;
     const sankey = buildSankeyEnergyData(res, "id");
     expect(sankey.links.length).toBeGreaterThan(0);
+    expect(sankey.nodes.some((n) => n.name === "Diesel Generator")).toBe(true);
+    expect(sankey.links.some((l) => l.source === "Diesel Generator" && l.value === 120)).toBe(true);
 
     // Pastikan tidak ada siklus (setiap simpul tidak bisa kembali ke dirinya sendiri)
     const adj = new Map<string, string[]>();
@@ -171,6 +174,7 @@ describe("hybrid-charts: Sankey, Kurva Durasi, dan Degradasi", () => {
 
   it("melakukan decimation kurva durasi sambil mempertahankan puncak dan minimum eksak", () => {
     const res = makeSampleResponse();
+    res.hourly_year_1!.diesel_generation_kw = res.hourly_year_1!.load_kw.map((v, i) => (i % 5 === 0 ? Math.min(200, v) : 0));
     const dur = buildDurationCurveSeries(res.hourly_year_1!, 240);
     expect(dur.percentLabels.length).toBeLessThanOrEqual(240);
     expect(dur.percentLabels[0]).toBe("0.0%");
@@ -179,6 +183,8 @@ describe("hybrid-charts: Sankey, Kurva Durasi, dan Degradasi", () => {
     expect(dur.loadKw[dur.loadKw.length - 1]).toBe(100);
     expect(dur.pvKw[0]).toBe(420);
     expect(dur.pvKw[dur.pvKw.length - 1]).toBe(0);
+    expect(dur.dieselKw[0]).toBe(200);
+    expect(dur.dieselKw[dur.dieselKw.length - 1]).toBe(0);
   });
 
   it("mengekstrak deret degradasi kapasitas PV dan BESS beserta penanda kejadian umur", () => {

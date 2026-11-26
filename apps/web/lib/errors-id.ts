@@ -81,6 +81,7 @@ const CODE_MESSAGES: Record<string, string> = {
   invalid_pv_config: "Konfigurasi komponen PV tidak valid. Periksa kapasitas, inverter, dan batas rugi.",
   invalid_bess_config: "Konfigurasi baterai BESS tidak valid. Periksa kapasitas, daya charge/discharge, dan batas SOC.",
   invalid_biomass_config: "Konfigurasi pembangkit biomass tidak valid. Periksa kapasitas, kurva bahan bakar, dan parameter pasokan.",
+  invalid_diesel_config: "Konfigurasi diesel generator tidak valid. Periksa kapasitas, beban minimum, kurva solar, dan parameter operasi.",
   invalid_dispatch_config: "Konfigurasi strategi dispatch EMS tidak valid. Periksa jam puncak atau batas beban puncak.",
   invalid_finance_config: "Parameter keuangan tidak valid. Periksa tingkat diskonto, eskalasi, CAPEX, dan tarif.",
   invalid_lifetime_config: "Umur proyek harus antara 1 sampai 40 tahun dan mode multi-tahun harus valid.",
@@ -90,7 +91,7 @@ const CODE_MESSAGES: Record<string, string> = {
   // Kode untuk Tahap 7 (sapuan kombinasi, sensitivitas hybrid, dan ekspor Excel)
   sweep_combinations_exceeded: "Jumlah total kombinasi melebihi batas aman (maksimal 64 kombinasi untuk mode cepat).",
   sweep_full_hourly_limit_exceeded: "Mode simulasi penuh (full_hourly) dibatasi maksimal 12 kombinasi dalam satu sapuan.",
-  invalid_sweep_axis: "Daftar ukuran komponen tidak valid. Isi 1 sampai 10 nilai unik (PV > 0, BESS/Biomass >= 0).",
+  invalid_sweep_axis: "Daftar ukuran komponen tidak valid. Isi 1 sampai 10 nilai unik (PV > 0, BESS/Biomass/Diesel >= 0).",
   sweep_job_not_found: "Sesi job sapuan tidak ditemukan atau server baru saja terbangun ulang. Anda dapat menjalankan ulang sapuan.",
   sweep_job_cancelled: "Job sapuan kombinasi telah dibatalkan.",
   duplicate_sensitivity_variables: "Daftar variabel sensitivitas tidak boleh berulang.",

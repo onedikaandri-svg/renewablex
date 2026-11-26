@@ -101,7 +101,7 @@ export default function PrintReportPreview({
           </div>
 
           <p className="print-note">
-            <strong>Kinerja Tahun 1:</strong> Total beban {formatNumber(result.summary.total_load_kwh / 1000, lang, 1)} MWh, produksi PV {formatNumber(result.summary.pv_generation_kwh / 1000, lang, 1)} MWh, produksi Biomass {formatNumber(result.summary.biomass_generation_kwh / 1000, lang, 1)} MWh, beban terpenuhi {formatNumber(result.summary.served_load_kwh / 1000, lang, 1)} MWh, unmet load {formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} MWh, galat neraca daya maks {result.summary.max_balance_error_kw.toExponential(2)} kW.
+            <strong>Kinerja Tahun 1:</strong> Total beban {formatNumber(result.summary.total_load_kwh / 1000, lang, 1)} MWh, produksi PV {formatNumber(result.summary.pv_generation_kwh / 1000, lang, 1)} MWh, produksi Biomass {formatNumber(result.summary.biomass_generation_kwh / 1000, lang, 1)} MWh, produksi Diesel {formatNumber((result.summary.diesel_generation_kwh ?? 0) / 1000, lang, 1)} MWh, beban terpenuhi {formatNumber(result.summary.served_load_kwh / 1000, lang, 1)} MWh, unmet load {formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} MWh, galat neraca daya maks {result.summary.max_balance_error_kw.toExponential(2)} kW.
           </p>
         </section>
       )}
@@ -130,6 +130,7 @@ export default function PrintReportPreview({
                 <th>Beban</th>
                 <th>PV</th>
                 <th>Biomass</th>
+                <th>Diesel</th>
                 <th>BESS Dis.</th>
                 <th>Grid Imp.</th>
                 <th>Unmet</th>
@@ -142,6 +143,7 @@ export default function PrintReportPreview({
                   <td>{formatNumber(m.load_kwh / 1000, lang, 1)}</td>
                   <td>{formatNumber(m.pv_generation_kwh / 1000, lang, 1)}</td>
                   <td>{formatNumber(m.biomass_generation_kwh / 1000, lang, 1)}</td>
+                  <td>{formatNumber((m.diesel_generation_kwh ?? 0) / 1000, lang, 1)}</td>
                   <td>{formatNumber(m.bess_discharge_kwh / 1000, lang, 1)}</td>
                   <td>{formatNumber(m.grid_import_kwh / 1000, lang, 1)}</td>
                   <td>{formatNumber(m.unmet_load_kwh / 1000, lang, 1)}</td>
@@ -195,6 +197,9 @@ export default function PrintReportPreview({
           </p>
           <p className="print-note">
             <strong>Biomass:</strong> {project.components.biomass.enabled ? `${project.components.biomass.rated_capacity_kw} kW, bahan bakar ${project.components.biomass.fuel_preset}, pasokan ${project.components.biomass.supply_period}` : "Nonaktif"} [REAL DATA].
+          </p>
+          <p className="print-note">
+            <strong>Diesel Generator:</strong> {project.components.diesel?.enabled ? `${project.components.diesel.rated_capacity_kw} kW, kurva ${project.components.diesel.fuel_curve_model}, bahan bakar ${formatCurrency(project.components.diesel.fuel_price_per_liter, curr, lang, 0)}/L, emisi ${project.components.diesel.emission_factor_kg_co2e_per_liter} kg CO2e/L (non-terbarukan)` : "Nonaktif"} [REAL DATA].
           </p>
           <p className="print-note">
             <strong>EMS &amp; Ekonomi:</strong> Strategi {project.simulation.dispatch_strategy}, umur {project.simulation.project_lifetime_years} tahun ({project.simulation.multi_year_mode}), WACC {formatPercent(project.finance.discount_rate, lang, 1)}, tarif {formatCurrency(project.finance.electricity_tariff_per_kwh, curr, lang, 0)}/kWh, faktor emisi grid {project.finance.grid_emission_factor_kg_co2e_per_kwh} kg CO2e/kWh [REAL DATA].

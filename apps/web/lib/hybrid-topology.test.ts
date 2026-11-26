@@ -185,9 +185,18 @@ describe("hybrid-topology: geometri SVG dan serialisasi tema terang untuk PDF Ta
     const geo = getEdgeGeometry(pvNode, busNode);
     expect(geo.pathD.startsWith("M ")).toBe(true);
 
-    // Pastikan seluruh pill aliran energi pada topologi default tidak menyentuh tepi kotak node maupun AC BUS
-    const nodeMap = new Map(topo.nodes.map((n) => [n.id, n]));
-    for (const edge of topo.edges) {
+    // Pastikan seluruh pill aliran energi pada topologi default + diesel tidak menyentuh tepi kotak node maupun AC BUS
+    const withDiesel: HybridProjectConfig = {
+      ...p,
+      components: {
+        ...p.components,
+        diesel: { ...p.components.diesel, enabled: true, rated_capacity_kw: 250 },
+      },
+    };
+    const topoWithDiesel = deriveDefaultTopology(withDiesel);
+    expect(topoWithDiesel.nodes.some((n) => n.kind === "diesel")).toBe(true);
+    const nodeMap = new Map(topoWithDiesel.nodes.map((n) => [n.id, n]));
+    for (const edge of topoWithDiesel.edges) {
       const src = nodeMap.get(edge.source)!;
       const tgt = nodeMap.get(edge.target)!;
       const eGeo = getEdgeGeometry(src, tgt);

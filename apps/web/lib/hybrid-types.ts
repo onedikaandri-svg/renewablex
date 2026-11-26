@@ -8,8 +8,9 @@ export type DispatchStrategyId =
 export type MultiYearMode = "scaled_year_1" | "full_hourly";
 export type BiomassPresetId = "efb" | "wood_pellet" | "pks" | "woodchip" | "rice_husk";
 export type BiomassPlantSampleId = "sample_gasifier_250kw" | "sample_steam_turbine_1000kw";
+export type DieselFuelCurveModel = "willans_linear" | "piecewise_sfc";
 
-export type TopologyNodeKind = "ac_bus" | "pv" | "bess" | "biomass" | "load" | "grid";
+export type TopologyNodeKind = "ac_bus" | "pv" | "bess" | "biomass" | "diesel" | "load" | "grid";
 
 export type TopologyEdgeFlowType =
   | "dc_ac_generation"
@@ -74,9 +75,27 @@ export interface TopologyValidationResult {
   warnings: TopologyIssue[];
 }
 
+export interface HybridDieselComponentConfig {
+  enabled: boolean;
+  rated_capacity_kw: number;
+  min_load_fraction: number;
+  fuel_curve_model: DieselFuelCurveModel;
+  no_load_fuel_liters_per_hour: number | null;
+  slope_liters_per_kwh: number;
+  min_run_time_hours: number;
+  min_down_time_hours: number;
+  fuel_price_per_liter: number;
+  fixed_om_per_kw_year: number;
+  variable_om_per_operating_hour: number;
+  startup_cost: number;
+  overhaul_interval_operating_hours: number;
+  overhaul_cost: number;
+  emission_factor_kg_co2e_per_liter: number;
+}
+
 export interface HybridProjectConfig {
   id: string;
-  schemaVersion: "0.5" | "0.6";
+  schemaVersion: "0.5" | "0.6" | "0.7";
   updatedAt: string;
   topology?: HybridSystemTopology;
   project: {
@@ -162,6 +181,7 @@ export interface HybridProjectConfig {
       overhaul_interval_operating_hours: number;
       overhaul_cost: number;
     };
+    diesel: HybridDieselComponentConfig;
   };
   finance: {
     tax_model: "pre_tax" | "after_tax";
@@ -177,6 +197,7 @@ export interface HybridProjectConfig {
     pv_capex_per_kwp: number;
     bess_capex_per_kwh: number;
     biomass_capex_per_kw: number;
+    diesel_capex_per_kw: number;
     bos_and_other_capex: number;
     pv_om_fraction_of_capex: number;
     bess_fixed_om_per_kwh_year: number;
@@ -188,6 +209,7 @@ export interface HybridProjectConfig {
     bess_design_life_years: number;
     inverter_design_life_years: number;
     biomass_overhaul_life_years: number;
+    diesel_overhaul_life_years: number;
     grid_emission_factor_kg_co2e_per_kwh: number;
   };
   weatherPreview?: HybridWeatherPreviewResponse | null;
@@ -273,6 +295,7 @@ export interface HybridPresetsResponse {
     min_load_fraction: number;
     overhaul_interval_operating_hours: number;
   }>;
+  diesel_defaults?: Record<string, unknown>;
   dispatch_strategies: Array<{
     id: DispatchStrategyId;
     name_id: string;
@@ -297,6 +320,7 @@ export interface HybridMonthlyRow {
   load_kwh: number;
   pv_generation_kwh: number;
   biomass_generation_kwh: number;
+  diesel_generation_kwh?: number;
   bess_charge_kwh: number;
   bess_discharge_kwh: number;
   grid_import_kwh: number;
@@ -311,6 +335,7 @@ export interface HybridCashFlowRow {
   served_load_kwh: number;
   pv_generation_kwh: number;
   biomass_generation_kwh: number;
+  diesel_generation_kwh?: number;
   grid_import_kwh: number;
   capex_outflow: number;
   gross_revenue_or_savings: number;
@@ -342,6 +367,7 @@ export interface HybridSimulateResponse {
     total_load_kwh: number;
     pv_generation_kwh: number;
     biomass_generation_kwh: number;
+    diesel_generation_kwh?: number;
     served_load_kwh: number;
     unmet_load_kwh: number;
     curtailment_kwh: number;
@@ -379,12 +405,26 @@ export interface HybridSimulateResponse {
     total_thermal_output_kwh_th: number;
     is_renewable: boolean;
   } | null;
+  diesel_summary?: {
+    total_generation_kwh: number;
+    total_operating_hours: number;
+    startup_count: number;
+    overhaul_count: number;
+    total_fuel_liters: number;
+    total_fuel_cost: number;
+    total_variable_om_cost: number;
+    total_fixed_om_cost: number;
+    total_startup_cost: number;
+    total_co2e_kg: number;
+    is_renewable: boolean;
+  } | null;
   lifetime_summary: {
     project_lifetime_years: number;
     multi_year_mode: MultiYearMode;
     total_load_kwh: number;
     total_pv_generation_kwh: number;
     total_biomass_generation_kwh: number;
+    total_diesel_generation_kwh?: number;
     total_served_load_kwh: number;
     total_unmet_load_kwh: number;
     total_curtailment_kwh: number;
@@ -392,6 +432,7 @@ export interface HybridSimulateResponse {
     total_grid_export_kwh: number;
     total_bess_replacements: number;
     total_biomass_overhauls: number;
+    total_diesel_overhauls?: number;
     max_balance_error_kw: number;
     lifecycle_events: Array<{
       year: number;
@@ -405,6 +446,7 @@ export interface HybridSimulateResponse {
       total_load_kwh: number;
       pv_generation_kwh: number;
       biomass_generation_kwh: number;
+      diesel_generation_kwh?: number;
       served_load_kwh: number;
       unmet_load_kwh: number;
       curtailment_kwh: number;
@@ -416,6 +458,8 @@ export interface HybridSimulateResponse {
       bess_replacement_count: number;
       biomass_fuel_tons: number;
       biomass_overhaul_count: number;
+      diesel_fuel_liters?: number;
+      diesel_overhaul_count?: number;
     }>;
   };
   finance_summary: {
@@ -459,6 +503,8 @@ export interface HybridSimulateResponse {
     load_kw: number[];
     pv_generation_kw: number[];
     biomass_generation_kw: number[];
+    diesel_generation_kw?: number[];
+    diesel_fuel_liters?: number[];
     bess_charge_kw: number[];
     bess_discharge_kw: number[];
     grid_import_kw: number[];
@@ -469,6 +515,7 @@ export interface HybridSimulateResponse {
     losses_kw: number[];
     bess_soc_fraction: number[] | null;
     biomass_status: string[] | null;
+    diesel_status?: string[] | null;
     trace_reason: string[] | null;
   };
   warnings: string[];
@@ -506,10 +553,13 @@ export interface HybridSweepCombination {
     bess_max_discharge_kw: number;
     biomass_enabled: boolean;
     biomass_rated_capacity_kw: number;
+    diesel_enabled?: boolean;
+    diesel_rated_capacity_kw?: number;
   };
   technical: {
     pv_generation_kwh: number;
     biomass_generation_kwh: number;
+    diesel_generation_kwh?: number;
     served_load_kwh: number;
     unmet_load_kwh: number;
     unmet_load_fraction: number;
@@ -517,6 +567,7 @@ export interface HybridSweepCombination {
     renewable_fraction: number;
     bess_equivalent_full_cycles: number;
     biomass_fuel_tons: number;
+    diesel_fuel_liters?: number;
     avoided_emissions_tons_co2e: number;
   };
   finance: {
@@ -561,6 +612,7 @@ export interface HybridSweepRequestInput {
   pv_capacity_kwp_values: number[];
   bess_capacity_kwh_values: number[];
   biomass_capacity_kw_values: number[];
+  diesel_capacity_kw_values?: number[];
   pv_inverter_sizing_mode: "keep_dc_ac_ratio" | "fixed";
   scale_replacement_costs: boolean;
   max_unmet_load_fraction: number | null;
@@ -574,6 +626,7 @@ export type HybridSensitivityVariableId =
   | "electricity_tariff"
   | "discount_rate"
   | "biomass_fuel_price"
+  | "diesel_fuel_price"
   | "om_total"
   | "pv_degradation_rate"
   | "load_scale"

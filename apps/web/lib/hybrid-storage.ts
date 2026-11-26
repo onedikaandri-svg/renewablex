@@ -9,6 +9,7 @@ import {
   syncProjectFromTopology,
 } from "@/lib/hybrid-topology";
 import type {
+  HybridDieselComponentConfig,
   HybridProjectConfig,
   HybridSensitivityResponse,
   HybridSimulateResponse,
@@ -21,6 +22,24 @@ const RESULT_KEY_PREFIX = "renewablex.hybrid.result.v1.";
 const SWEEP_KEY_PREFIX = "renewablex.hybrid.sweep.v1.";
 const SENSITIVITY_KEY_PREFIX = "renewablex.hybrid.sensitivity.v1.";
 
+export const DEFAULT_DIESEL_COMPONENT: HybridDieselComponentConfig = {
+  enabled: false,
+  rated_capacity_kw: 250.0,
+  min_load_fraction: 0.30,
+  fuel_curve_model: "willans_linear",
+  no_load_fuel_liters_per_hour: null,
+  slope_liters_per_kwh: 0.25,
+  min_run_time_hours: 1.0,
+  min_down_time_hours: 1.0,
+  fuel_price_per_liter: 18500.0,
+  fixed_om_per_kw_year: 150000.0,
+  variable_om_per_operating_hour: 0.0,
+  startup_cost: 0.0,
+  overhaul_interval_operating_hours: 15000.0,
+  overhaul_cost: 120000000.0,
+  emission_factor_kg_co2e_per_liter: 2.68,
+};
+
 function makeId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -32,7 +51,7 @@ function makeId(): string {
 export function buildSampleProject(id = makeId()): HybridProjectConfig {
   const base: HybridProjectConfig = {
     id,
-    schemaVersion: "0.6",
+    schemaVersion: "0.7",
     updatedAt: new Date().toISOString(),
     project: {
       project_name: "Pabrik Hybrid Cikarang [REAL DATA]",
@@ -117,6 +136,7 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
         overhaul_interval_operating_hours: 8000.0,
         overhaul_cost: 150_000_000.0,
       },
+      diesel: { ...DEFAULT_DIESEL_COMPONENT },
     },
     finance: {
       tax_model: "pre_tax",
@@ -132,6 +152,7 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
       pv_capex_per_kwp: 11_500_000.0,
       bess_capex_per_kwh: 3_500_000.0,
       biomass_capex_per_kw: 18_000_000.0,
+      diesel_capex_per_kw: 4_500_000.0,
       bos_and_other_capex: 0.0,
       pv_om_fraction_of_capex: 0.015,
       bess_fixed_om_per_kwh_year: 50_000.0,
@@ -143,6 +164,7 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
       bess_design_life_years: 10.0,
       inverter_design_life_years: 12.0,
       biomass_overhaul_life_years: 5.0,
+      diesel_overhaul_life_years: 5.0,
       grid_emission_factor_kg_co2e_per_kwh: 0.78,
     },
     weatherPreview: null,
@@ -167,11 +189,34 @@ export function buildBlankProject(name = "Proyek Hybrid Baru", id = makeId()): H
       pv: { ...sample.components.pv, capacity_kwp: 100.0, inverter_ac_kw: 85.0 },
       bess: { ...sample.components.bess, enabled: false },
       biomass: { ...sample.components.biomass, enabled: false },
+      diesel: { ...sample.components.diesel, enabled: false },
     },
   };
   return {
     ...blank,
     topology: deriveDefaultTopology(blank),
+  };
+}
+
+function normalizeProject(raw: HybridProjectConfig): HybridProjectConfig {
+  const sample = buildSampleProject(raw.id || makeId());
+  return {
+    ...sample,
+    ...raw,
+    project: { ...sample.project, ...raw.project },
+    simulation: {
+      ...sample.simulation,
+      ...raw.simulation,
+      dispatch_params: { ...sample.simulation.dispatch_params, ...(raw.simulation?.dispatch_params ?? {}) },
+    },
+    load_profile: { ...sample.load_profile, ...raw.load_profile },
+    components: {
+      pv: { ...sample.components.pv, ...(raw.components?.pv ?? {}) },
+      bess: { ...sample.components.bess, ...(raw.components?.bess ?? {}) },
+      biomass: { ...sample.components.biomass, ...(raw.components?.biomass ?? {}) },
+      diesel: { ...DEFAULT_DIESEL_COMPONENT, ...(raw.components?.diesel ?? {}) },
+    },
+    finance: { ...sample.finance, ...(raw.finance ?? {}) },
   };
 }
 
@@ -181,7 +226,7 @@ function readAllRaw(): HybridProjectConfig[] {
     const raw = window.localStorage.getItem(PROJECTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map((item) => normalizeProject(item as HybridProjectConfig)) : [];
   } catch {
     return [];
   }
@@ -202,7 +247,7 @@ export function getProject(projectId: string): HybridProjectConfig | null {
 
 export function saveProject(project: HybridProjectConfig): HybridProjectConfig {
   const updated: HybridProjectConfig = {
-    ...project,
+    ...normalizeProject(project),
     updatedAt: new Date().toISOString(),
   };
   const all = readAllRaw();
@@ -276,7 +321,7 @@ export function importProjectJson(jsonText: string): HybridProjectConfig {
     ...base,
     ...obj,
     id: makeId(),
-    schemaVersion: "0.6",
+    schemaVersion: "0.7",
     updatedAt: new Date().toISOString(),
     project: { ...base.project, ...obj.project },
     simulation: {
@@ -289,6 +334,7 @@ export function importProjectJson(jsonText: string): HybridProjectConfig {
       pv: { ...base.components.pv, ...obj.components.pv },
       bess: { ...base.components.bess, ...(obj.components.bess ?? {}) },
       biomass: { ...base.components.biomass, ...(obj.components.biomass ?? {}) },
+      diesel: { ...DEFAULT_DIESEL_COMPONENT, ...(obj.components.diesel ?? {}) },
     },
     finance: { ...base.finance, ...obj.finance },
     weatherPreview: null,
@@ -382,7 +428,7 @@ export function getSensitivityResult(projectId: string): HybridSensitivityRespon
 
 function ensureOptionalNodeConnected(
   project: HybridProjectConfig,
-  kind: "bess" | "biomass",
+  kind: "bess" | "biomass" | "diesel",
   enabled: boolean,
 ): HybridProjectConfig {
   const topo = resolveProjectTopology(project);
@@ -427,6 +473,15 @@ export function applySweepCombinationToProject(
       : project.components.biomass.overhaul_cost)
     : project.components.biomass.overhaul_cost;
 
+  const dieselEnabled = Boolean(combo.sizing.diesel_enabled);
+  const dieselKw = combo.sizing.diesel_rated_capacity_kw ?? project.components.diesel.rated_capacity_kw;
+  const prevDieselKw = project.components.diesel.rated_capacity_kw;
+  const nextDieselOverhaul = dieselEnabled
+    ? (prevDieselKw > 0
+      ? project.components.diesel.overhaul_cost * (dieselKw / prevDieselKw)
+      : project.components.diesel.overhaul_cost)
+    : project.components.diesel.overhaul_cost;
+
   let next: HybridProjectConfig = {
     ...structuredClone(project),
     components: {
@@ -459,6 +514,12 @@ export function applySweepCombinationToProject(
           : project.components.biomass.rated_capacity_kw,
         overhaul_cost: nextBioOverhaul,
       },
+      diesel: {
+        ...project.components.diesel,
+        enabled: dieselEnabled,
+        rated_capacity_kw: dieselEnabled ? dieselKw : project.components.diesel.rated_capacity_kw,
+        overhaul_cost: nextDieselOverhaul,
+      },
     },
     finance: {
       ...project.finance,
@@ -471,6 +532,7 @@ export function applySweepCombinationToProject(
 
   next = ensureOptionalNodeConnected(next, "bess", combo.sizing.bess_enabled);
   next = ensureOptionalNodeConnected(next, "biomass", combo.sizing.biomass_enabled);
+  next = ensureOptionalNodeConnected(next, "diesel", dieselEnabled);
   return next;
 }
 

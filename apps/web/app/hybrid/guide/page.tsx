@@ -7,7 +7,7 @@ const STEPS_GUIDE = [
   { num: 1, titleId: "Proyek", titleEn: "Projects", descId: "Buat proyek baru, muat contoh [REAL DATA], duplikat skenario, atau impor/ekspor berkas .hybrid.json.", descEn: "Create a project, load the [REAL DATA] sample, duplicate scenarios, or import/export .hybrid.json." },
   { num: 2, titleId: "Lokasi & Cuaca", titleEn: "Location & Weather", descId: "Isi koordinat dan zona waktu, lalu ambil data radiasi surya dan suhu per jam dari PVGIS v5.3 TMY.", descEn: "Set coordinates and timezone, then fetch hourly solar irradiance and temperature from PVGIS v5.3 TMY." },
   { num: 3, titleId: "Profil Beban", titleEn: "Load Profile", descId: "Bangun beban sintetis deterministik atau unggah CSV 8.760 jam untuk memeriksa profil harian dan peta panas.", descEn: "Build a deterministic synthetic load or upload an 8,760-hour CSV to preview daily profile and heatmap." },
-  { num: 4, titleId: "Desain Sistem (Kanvas)", titleEn: "System Design (Canvas)", descId: "Susun PV, BESS, Biomass, dan Grid pada kanvas interaktif yang terhubung ke AC Bus dan atur parameternya.", descEn: "Arrange PV, BESS, Biomass, and Grid on the interactive canvas connected to AC Bus and tune parameters." },
+  { num: 4, titleId: "Desain Sistem (Kanvas)", titleEn: "System Design (Canvas)", descId: "Susun PV, BESS, Biomass, Diesel Generator, dan Grid pada kanvas interaktif yang terhubung ke AC Bus dan atur parameternya.", descEn: "Arrange PV, BESS, Biomass, Diesel Generator, and Grid on the interactive canvas connected to AC Bus and tune parameters." },
   { num: 5, titleId: "Strategi EMS", titleEn: "EMS Strategy", descId: "Pilih 1 dari 5 strategi dispatch bawaan (Self-Consumption, Load Following, Cycle Charging, Peak Shaving, TOU).", descEn: "Choose 1 of 5 built-in dispatch strategies and set grid import/export permissions." },
   { num: 6, titleId: "Ekonomi & Tarif", titleEn: "Economics & Tariffs", descId: "Tetapkan mata uang (IDR/USD), umur proyek, WACC, CAPEX, O&M, penggantian komponen, dan tarif listrik.", descEn: "Configure currency, lifetime, WACC, CAPEX, O&M, replacements, and electricity tariffs." },
   { num: 7, titleId: "Jalankan Simulasi", titleEn: "Run Simulation", descId: "Pilih mode cepat scaled_year_1 atau full_hourly via job asinkron di mesin hitung Python.", descEn: "Choose fast scaled_year_1 or full_hourly via async jobs on the Python calculation engine." },
@@ -21,7 +21,7 @@ const METRICS_GUIDE = [
   { term: "Total NPC", descId: "Total biaya bersih proyek saat ini (terdiskonto WACC) sepanjang umur proyek.", descEn: "Total discounted Net Present Cost over the project lifetime." },
   { term: "NPV & IRR", descId: "NPV > 0 menandakan nilai tambah finansial di atas tingkat diskonto. Proyek Layak bila NPV > 0 dan IRR >= WACC + margin kelayakan (2%).", descEn: "NPV > 0 indicates net financial value above discount rate. Viable when NPV > 0 and IRR >= WACC + margin." },
   { term: "Payback Sederhana / Terdiskonto", descId: "Waktu kembali modal investasi. Payback terdiskonto menghitung nilai waktu uang sehingga lebih konservatif.", descEn: "Years to recover net capital. Discounted payback accounts for time value of money." },
-  { term: "Pangsa Terbarukan", descId: "Persentase beban terlayani oleh sumber terbarukan (PV dan Biomass terbarukan), di luar impor grid fosil.", descEn: "Share of served load met by renewable sources excluding fossil grid import." },
+  { term: "Pangsa Terbarukan", descId: "Persentase beban terlayani oleh sumber terbarukan (PV dan Biomass terbarukan), di luar impor grid fosil dan Diesel Generator non-terbarukan.", descEn: "Share of served load met by renewable sources (PV and Biomass), excluding fossil grid import and non-renewable Diesel Generator." },
   { term: "Unmet Load & Curtailment", descId: "Unmet Load adalah beban gagal terlayani karena pasokan/baterai kurang; Curtailment adalah surplus pembangkit yang terpaksa dibuang.", descEn: "Unmet Load is unserved demand; Curtailment is excess generation spilled when storage/export is full." },
 ];
 
@@ -65,8 +65,8 @@ export default function HybridGuidePage() {
           <p className="note" style={{ marginTop: "0.5rem" }}>
             <strong>{isEn ? "Hybrid Studio (/hybrid):" : "Desain Sistem Hybrid (/hybrid):"}</strong>{" "}
             {isEn
-              ? "Runs full 8,760-step hourly energy balance (PV + BESS + Biomass + EMS) up to 40 years, HOMER-style sweeps, and multi-sheet Excel/PDF reports."
-              : "Menjalankan neraca daya per jam (8.760 langkah/tahun) hingga 40 tahun untuk PV, BESS, Biomass, dan EMS, lengkap dengan sapuan HOMER serta ekspor PDF/Excel."}
+              ? "Runs full 8,760-step hourly energy balance (PV + BESS + Biomass + Diesel + EMS) up to 40 years, HOMER-style sweeps, and multi-sheet Excel/PDF reports."
+              : "Menjalankan neraca daya per jam (8.760 langkah/tahun) hingga 40 tahun untuk PV, BESS, Biomass, Diesel Generator, dan EMS, lengkap dengan sapuan HOMER serta ekspor PDF/Excel."}
           </p>
           <div className="warn" role="note" style={{ marginTop: "1rem", marginBottom: 0 }}>
             <h3>{isEn ? "Server Cold Start Note & Local Backup" : "Catatan Cold Start Server & Cadangan Data"}</h3>

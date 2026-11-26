@@ -169,6 +169,12 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
               ? `${formatNumber(project.components.biomass.rated_capacity_kw, lang, 0)} kW (${project.components.biomass.fuel_preset})`
               : "Nonaktif"}
           </p>
+          <p className="note">
+            <strong>Diesel Generator:</strong>{" "}
+            {project.components.diesel?.enabled
+              ? `${formatNumber(project.components.diesel.rated_capacity_kw, lang, 0)} kW (non-terbarukan)`
+              : "Nonaktif"}
+          </p>
           <p className="note"><strong>Strategi EMS:</strong> {project.simulation.dispatch_strategy}</p>
           <p className="note">
             <strong>Ekonomi:</strong> Umur {project.simulation.project_lifetime_years} tahun, WACC {formatPercent(project.finance.discount_rate, lang, 1)}, tarif {formatNumber(project.finance.electricity_tariff_per_kwh, lang, 0)} {project.project.currency_code}/kWh

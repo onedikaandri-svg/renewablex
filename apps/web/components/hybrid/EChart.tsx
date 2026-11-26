@@ -41,6 +41,7 @@ export interface ChartThemeColors {
   pv: string;
   bess: string;
   biomass: string;
+  diesel: string;
   load: string;
   grid: string;
   unmet: string;
@@ -57,6 +58,7 @@ export function getChartThemeColors(theme: "light" | "dark"): ChartThemeColors {
       pv: "#A78BFA",
       bess: "#38BDF8",
       biomass: "#FBBF24",
+      diesel: "#94A3B8",
       load: "#E2E8F0",
       grid: "#4ADE80",
       unmet: "#F87171",
@@ -71,6 +73,7 @@ export function getChartThemeColors(theme: "light" | "dark"): ChartThemeColors {
     pv: "#533AFD",
     bess: "#0369A1",
     biomass: "#B45309",
+    diesel: "#475569",
     load: "#061B31",
     grid: "#15803D",
     unmet: "#B42318",

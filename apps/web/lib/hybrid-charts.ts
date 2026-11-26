@@ -26,6 +26,7 @@ export function buildSankeyEnergyData(
 ): SankeyEnergyData {
   const pvMwh = Math.max(0, result.summary.pv_generation_kwh / 1000);
   const bioMwh = Math.max(0, result.summary.biomass_generation_kwh / 1000);
+  const dieselMwh = Math.max(0, (result.summary.diesel_generation_kwh ?? 0) / 1000);
   const gridImpMwh = Math.max(0, (result.lifetime_summary.yearly?.[0]?.grid_import_kwh ?? 0) / 1000);
   const gridExpMwh = Math.max(0, (result.lifetime_summary.yearly?.[0]?.grid_export_kwh ?? 0) / 1000);
   const bessChgMwh = Math.max(0, (result.bess_summary?.total_charge_kwh ?? 0) / 1000);
@@ -33,7 +34,7 @@ export function buildSankeyEnergyData(
   const bessLossMwh = Math.max(0, (result.bess_summary?.conversion_losses_kwh ?? 0) / 1000);
   const servedMwh = Math.max(0, result.summary.served_load_kwh / 1000);
   const curtailMwh = Math.max(0, result.summary.curtailment_kwh / 1000);
-  const totalSupplyMwh = pvMwh + bioMwh + gridImpMwh;
+  const totalSupplyMwh = pvMwh + bioMwh + dieselMwh + gridImpMwh;
   const bessAuxMwh = Math.max(0, (result.bess_summary?.aux_load_kwh ?? 0) / 1000);
   const directSupplyToBusMwh = Math.max(0, totalSupplyMwh - bessChgMwh);
 
@@ -42,6 +43,7 @@ export function buildSankeyEnergyData(
       ? {
           pv: "Solar PV",
           biomass: "Biomass",
+          diesel: "Diesel Generator",
           gridImp: "Grid Import",
           supplyBus: "Supply Bus",
           bessChg: "BESS Storage",
@@ -55,6 +57,7 @@ export function buildSankeyEnergyData(
       : {
           pv: "Solar PV",
           biomass: "Biomass",
+          diesel: "Diesel Generator",
           gridImp: "Impor Grid",
           supplyBus: "Bus Pasokan AC",
           bessChg: "Penyimpanan BESS",
@@ -69,6 +72,7 @@ export function buildSankeyEnergyData(
   const candidates: Array<{ source: string; target: string; raw: number }> = [
     { source: labels.pv, target: labels.supplyBus, raw: pvMwh },
     { source: labels.biomass, target: labels.supplyBus, raw: bioMwh },
+    { source: labels.diesel, target: labels.supplyBus, raw: dieselMwh },
     { source: labels.gridImp, target: labels.supplyBus, raw: gridImpMwh },
     { source: labels.supplyBus, target: labels.bessChg, raw: bessChgMwh },
     { source: labels.supplyBus, target: labels.distBus, raw: directSupplyToBusMwh },
@@ -104,8 +108,9 @@ export interface DurationCurveSeriesData {
   servedKw: number[];
   pvKw: number[];
   biomassKw: number[];
+  dieselKw: number[];
   stats: Array<{
-    key: "load" | "served" | "pv" | "biomass";
+    key: "load" | "served" | "pv" | "biomass" | "diesel";
     peakKw: number;
     medianKw: number;
     minKw: number;
@@ -142,11 +147,13 @@ export function buildDurationCurveSeries(
   hourly: NonNullable<HybridSimulateResponse["hourly_year_1"]>,
   maxPoints = 240,
 ): DurationCurveSeriesData {
+  const dieselArr = hourly.diesel_generation_kw ?? new Array(hourly.load_kw.length).fill(0);
   const rawSeries = [
     { key: "load" as const, arr: hourly.load_kw },
     { key: "served" as const, arr: hourly.served_load_kw },
     { key: "pv" as const, arr: hourly.pv_generation_kw },
     { key: "biomass" as const, arr: hourly.biomass_generation_kw },
+    { key: "diesel" as const, arr: dieselArr },
   ];
 
   const sortedMap = new Map<string, number[]>();
@@ -175,6 +182,7 @@ export function buildDurationCurveSeries(
     servedKw: baseDecimated.indices.map((idx) => Math.round(((sortedMap.get("served") ?? [])[idx] ?? 0) * 100) / 100),
     pvKw: baseDecimated.indices.map((idx) => Math.round(((sortedMap.get("pv") ?? [])[idx] ?? 0) * 100) / 100),
     biomassKw: baseDecimated.indices.map((idx) => Math.round(((sortedMap.get("biomass") ?? [])[idx] ?? 0) * 100) / 100),
+    dieselKw: baseDecimated.indices.map((idx) => Math.round(((sortedMap.get("diesel") ?? [])[idx] ?? 0) * 100) / 100),
     stats,
   };
 }

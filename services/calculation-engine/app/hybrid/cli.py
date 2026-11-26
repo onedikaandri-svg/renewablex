@@ -11,6 +11,7 @@ from app.errors import EngineError
 from app.hybrid.bess import BESSConfig
 from app.hybrid.biomass import BiomassConfig, resolve_biomass_config
 from app.hybrid.components import PVWattsConfig
+from app.hybrid.diesel import DieselConfig, resolve_diesel_config
 from app.hybrid.dispatch import DispatchConfig
 from app.hybrid.finance import (
     FinanceResult,
@@ -173,6 +174,14 @@ def _parse_biomass_config(biomass_raw: dict[str, Any] | None) -> BiomassConfig |
     return resolve_biomass_config(biomass_raw)
 
 
+def _parse_diesel_config(diesel_raw: dict[str, Any] | None) -> DieselConfig | None:
+    if not diesel_raw or diesel_raw.get("enabled") is False:
+        return None
+    if diesel_raw.get("rated_capacity_kw") is None:
+        raise EngineError("invalid_diesel_config", "rated_capacity_kw diesel wajib diisi saat Diesel diaktifkan.")
+    return resolve_diesel_config(diesel_raw)
+
+
 def _parse_dispatch_config(sim_raw: dict[str, Any]) -> DispatchConfig | None:
     if "dispatch_strategy" not in sim_raw and "dispatch_params" not in sim_raw:
         return None
@@ -211,6 +220,7 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
     pv_config = _parse_pv_config(pv_raw)
     bess_config = _parse_bess_config(components_raw.get("bess"))
     biomass_config = _parse_biomass_config(components_raw.get("biomass"))
+    diesel_config = _parse_diesel_config(components_raw.get("diesel"))
     dispatch_config = _parse_dispatch_config(sim_raw)
 
     sim_config = SimulationConfig(
@@ -221,6 +231,7 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
         bess=bess_config,
         dispatch=dispatch_config,
         biomass=biomass_config,
+        diesel=diesel_config,
     )
 
     weather = _load_weather_from_config(cfg, base_dir, time_config)
@@ -306,6 +317,7 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
     pv_gen_series = b.effective_pv_generation_kw
     include_stage2_cols = result.bess_soc is not None or result.dispatch_strategy is not None
     include_biomass_cols = result.biomass_summary is not None
+    include_diesel_cols = result.diesel_summary is not None
 
     with csv_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
@@ -324,6 +336,8 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
             header.extend(["charge_kw", "discharge_kw", "grid_import_kw", "grid_export_kw", "bess_soc", "trace_reason"])
         if include_biomass_cols:
             header.extend(["biomass_generation_kw", "biomass_status", "biomass_fuel_tons"])
+        if include_diesel_cols:
+            header.extend(["diesel_generation_kw", "diesel_status", "diesel_fuel_liters"])
         writer.writerow(header)
 
         for i in range(time_config.steps_per_year):
@@ -354,6 +368,11 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
                 bio_stat_val = result.biomass_status[i] if i < len(result.biomass_status) else "off"
                 bio_fuel_val = round(float(result.biomass_fuel_tons[i]), 6) if result.biomass_fuel_tons is not None else 0.0
                 row.extend([bio_gen_val, bio_stat_val, bio_fuel_val])
+            if include_diesel_cols:
+                dsl_gen_val = round(float(result.diesel_generation_kw[i]), 6) if result.diesel_generation_kw is not None else 0.0
+                dsl_stat_val = result.diesel_status[i] if i < len(result.diesel_status) else "off"
+                dsl_fuel_val = round(float(result.diesel_fuel_liters[i]), 6) if result.diesel_fuel_liters is not None else 0.0
+                row.extend([dsl_gen_val, dsl_stat_val, dsl_fuel_val])
             writer.writerow(row)
 
     return result

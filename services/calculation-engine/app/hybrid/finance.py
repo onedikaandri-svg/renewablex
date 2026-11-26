@@ -105,6 +105,8 @@ class FinanceConfig:
     bess_capex_per_kwh: float = 0.0
     biomass_capex: float | None = None
     biomass_capex_per_kw: float = 0.0
+    diesel_capex: float | None = None
+    diesel_capex_per_kw: float = 0.0
     bos_and_other_capex: float = 0.0
 
     capital_grant_amount: float = 0.0
@@ -116,10 +118,12 @@ class FinanceConfig:
     bess_fixed_om_per_kwh_year: float = 0.0
     bess_om_fraction_of_capex: float | None = None
     biomass_fixed_om_override: float | None = None
+    diesel_fixed_om_override: float | None = None
 
     bess_design_life_years: float | None = None
     inverter_design_life_years: float | None = None
     biomass_overhaul_life_years: float | None = None
+    diesel_overhaul_life_years: float | None = None
     residual_salvage_fraction_of_capex: float = 0.0
 
     corporate_tax_rate: float = 0.22  # [REAL DATA] tarif umum PPh Badan Indonesia jika after_tax dipilih
@@ -158,6 +162,7 @@ def validate_finance_config(config: FinanceConfig) -> None:
         ("pv_capex_per_kwp", config.pv_capex_per_kwp),
         ("bess_capex_per_kwh", config.bess_capex_per_kwh),
         ("biomass_capex_per_kw", config.biomass_capex_per_kw),
+        ("diesel_capex_per_kw", config.diesel_capex_per_kw),
         ("bos_and_other_capex", config.bos_and_other_capex),
         ("capital_grant_amount", config.capital_grant_amount),
         ("pv_fixed_om_per_kwp_year", config.pv_fixed_om_per_kwp_year),
@@ -172,7 +177,9 @@ def validate_finance_config(config: FinanceConfig) -> None:
         ("pv_capex", config.pv_capex),
         ("bess_capex", config.bess_capex),
         ("biomass_capex", config.biomass_capex),
+        ("diesel_capex", config.diesel_capex),
         ("biomass_fixed_om_override", config.biomass_fixed_om_override),
+        ("diesel_fixed_om_override", config.diesel_fixed_om_override),
     ):
         if opt_val is not None and (not math.isfinite(opt_val) or opt_val < 0.0):
             raise EngineError("invalid_finance_config", f"{name} tidak boleh negatif.")
@@ -197,6 +204,7 @@ def validate_finance_config(config: FinanceConfig) -> None:
         ("bess_design_life_years", config.bess_design_life_years),
         ("inverter_design_life_years", config.inverter_design_life_years),
         ("biomass_overhaul_life_years", config.biomass_overhaul_life_years),
+        ("diesel_overhaul_life_years", config.diesel_overhaul_life_years),
     ):
         if life is not None and (not math.isfinite(life) or life <= 0.0):
             raise EngineError("invalid_finance_config", f"{name} harus lebih besar dari 0.")
@@ -232,6 +240,7 @@ class YearlyCashFlowRow:
     discounted_cash_flow: float
     cumulative_cash_flow: float
     cumulative_discounted_cash_flow: float
+    diesel_generation_kwh: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -250,6 +259,7 @@ class LCOEBreakdown:
     tax_net_credit: float
     salvage_credit: float
     export_credit: float
+    capex_diesel: float = 0.0
 
     @property
     def total(self) -> float:
@@ -258,6 +268,7 @@ class LCOEBreakdown:
             self.capex_pv
             + self.capex_bess
             + self.capex_biomass
+            + self.capex_diesel
             + self.capex_bos
             + self.om
             + self.fuel_and_logistics
@@ -334,7 +345,8 @@ def _resolve_component_capex(
     pv_capacity_kwp: float,
     bess_capacity_kwh: float,
     biomass_capacity_kw: float,
-) -> tuple[float, float, float, float]:
+    diesel_capacity_kw: float,
+) -> tuple[float, float, float, float, float]:
     pv_cap = (
         float(finance_config.pv_capex)
         if finance_config.pv_capex is not None
@@ -350,8 +362,13 @@ def _resolve_component_capex(
         if finance_config.biomass_capex is not None
         else biomass_capacity_kw * finance_config.biomass_capex_per_kw
     )
+    diesel_cap = (
+        float(finance_config.diesel_capex)
+        if finance_config.diesel_capex is not None
+        else diesel_capacity_kw * finance_config.diesel_capex_per_kw
+    )
     bos_cap = float(finance_config.bos_and_other_capex)
-    return pv_cap, bess_cap, bio_cap, bos_cap
+    return pv_cap, bess_cap, bio_cap, diesel_cap, bos_cap
 
 
 def _event_design_life(event_type: str, fc: FinanceConfig) -> float | None:
@@ -361,6 +378,8 @@ def _event_design_life(event_type: str, fc: FinanceConfig) -> float | None:
         return fc.inverter_design_life_years
     if event_type == "biomass_overhaul":
         return fc.biomass_overhaul_life_years
+    if event_type == "diesel_overhaul":
+        return fc.diesel_overhaul_life_years
     return None
 
 
@@ -370,6 +389,7 @@ def run_financial_analysis_from_yearly(
     pv_capacity_kwp: float = 0.0,
     bess_capacity_kwh: float = 0.0,
     biomass_capacity_kw: float = 0.0,
+    diesel_capacity_kw: float = 0.0,
 ) -> FinanceResult:
     """Menjalankan analisis arus kas, NPC, LCOE, IRR, payback, dan emisi dari hasil tahunan."""
     validate_finance_config(finance_config)
@@ -378,13 +398,14 @@ def run_financial_analysis_from_yearly(
 
     fc = finance_config
     n_years = len(yearly)
-    pv_capex, bess_capex, bio_capex, bos_capex = _resolve_component_capex(
+    pv_capex, bess_capex, bio_capex, diesel_capex, bos_capex = _resolve_component_capex(
         fc,
         pv_capacity_kwp,
         bess_capacity_kwh,
         biomass_capacity_kw,
+        diesel_capacity_kw,
     )
-    gross_capex = pv_capex + bess_capex + bio_capex + bos_capex
+    gross_capex = pv_capex + bess_capex + bio_capex + diesel_capex + bos_capex
     grant_total = min(
         fc.capital_grant_amount + gross_capex * fc.capital_grant_fraction,
         gross_capex,
@@ -433,6 +454,7 @@ def run_financial_analysis_from_yearly(
             discounted_cash_flow=-net_capex,
             cumulative_cash_flow=cum_cf,
             cumulative_discounted_cash_flow=cum_dcf,
+            diesel_generation_kwh=0.0,
         )
     )
 
@@ -490,8 +512,22 @@ def run_financial_analysis_from_yearly(
             if fc.biomass_fixed_om_override is not None
             else row.biomass_fixed_om_cost
         )
-        om_cost = (pv_base_om + bess_base_om + bio_fix + row.biomass_variable_om_cost + row.biomass_startup_cost) * om_esc
-        fuel_cost = (row.biomass_fuel_cost + row.biomass_logistics_cost) * fuel_esc
+        diesel_fix = (
+            fc.diesel_fixed_om_override
+            if fc.diesel_fixed_om_override is not None
+            else row.diesel_fixed_om_cost
+        )
+        om_cost = (
+            pv_base_om
+            + bess_base_om
+            + bio_fix
+            + row.biomass_variable_om_cost
+            + row.biomass_startup_cost
+            + diesel_fix
+            + row.diesel_variable_om_cost
+            + row.diesel_startup_cost
+        ) * om_esc
+        fuel_cost = (row.biomass_fuel_cost + row.biomass_logistics_cost + row.diesel_fuel_cost) * fuel_esc
         repl_cost = sum(ev.cost_amount for ev in row.lifecycle_events) * repl_esc
 
         salvage_inflow = (salvage_from_replacements + residual_salvage) if y == n_years else 0.0
@@ -540,7 +576,7 @@ def run_financial_analysis_from_yearly(
 
         ef = fc.grid_emission_factor_kg_co2e_per_kwh
         baseline_emissions_kg += row.served_load_kwh * ef
-        project_emissions_kg += row.grid_import_kwh * ef + row.biomass_co2e_kg
+        project_emissions_kg += row.grid_import_kwh * ef + row.biomass_co2e_kg + row.diesel_co2e_kg
 
         schedule.append(
             YearlyCashFlowRow(
@@ -563,6 +599,7 @@ def run_financial_analysis_from_yearly(
                 discounted_cash_flow=dcf,
                 cumulative_cash_flow=cum_cf,
                 cumulative_discounted_cash_flow=cum_dcf,
+                diesel_generation_kwh=row.diesel_generation_kwh,
             )
         )
 
@@ -593,10 +630,11 @@ def run_financial_analysis_from_yearly(
             tax_net_credit=pv_tax_total / pv_energy_denom,
             salvage_credit=-pv_salvage_total / pv_energy_denom,
             export_credit=-pv_export_total / pv_energy_denom,
+            capex_diesel=(diesel_capex * net_capex_factor) / pv_energy_denom,
         )
     else:
         lcoe = 0.0
-        breakdown = LCOEBreakdown(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        breakdown = LCOEBreakdown(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     npv_val = cum_dcf
     irr_val, irr_status = compute_irr(cash_flows)
@@ -666,12 +704,14 @@ def run_financial_analysis(
     )
     bess_kwh = sim_cfg.bess.nominal_capacity_kwh if sim_cfg.bess is not None else 0.0
     bio_kw = sim_cfg.biomass.rated_capacity_kw if sim_cfg.biomass is not None else 0.0
+    diesel_kw = sim_cfg.diesel.rated_capacity_kw if sim_cfg.diesel is not None else 0.0
     return run_financial_analysis_from_yearly(
         yearly=lifetime_result.yearly,
         finance_config=finance_config,
         pv_capacity_kwp=pv_kwp,
         bess_capacity_kwh=bess_kwh,
         biomass_capacity_kw=bio_kw,
+        diesel_capacity_kw=diesel_kw,
     )
 
 
@@ -702,6 +742,11 @@ def resolve_lifetime_config(
             None
             if sim_raw.get("scaled_biomass_overhaul_interval_years") is None
             else int(sim_raw["scaled_biomass_overhaul_interval_years"])
+        ),
+        scaled_diesel_overhaul_interval_years=(
+            None
+            if sim_raw.get("scaled_diesel_overhaul_interval_years") is None
+            else int(sim_raw["scaled_diesel_overhaul_interval_years"])
         ),
     )
     validate_lifetime_config(cfg)

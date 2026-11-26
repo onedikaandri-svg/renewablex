@@ -1,4 +1,4 @@
-"""Skema Pydantic ketat untuk endpoint sistem hybrid Tahap 5."""
+"""Skema Pydantic ketat untuk endpoint sistem hybrid Tahap 5 sampai 8B."""
 
 from typing import Any, Literal
 
@@ -73,6 +73,7 @@ class HybridSimulationInput(HybridStrictModel):
     pv_annual_degradation_fraction: float | None = None
     scaled_bess_replacement_interval_years: int | None = None
     scaled_biomass_overhaul_interval_years: int | None = None
+    scaled_diesel_overhaul_interval_years: int | None = None
 
 
 class HybridPVInput(HybridStrictModel):
@@ -186,10 +187,31 @@ class HybridBiomassInput(HybridStrictModel):
     thermal_efficiency_fraction: float | None = None
 
 
+class HybridDieselInput(HybridStrictModel):
+    enabled: bool = False
+    rated_capacity_kw: float | None = None
+    min_load_fraction: float | None = None
+    fuel_curve_model: Literal["willans_linear", "piecewise_sfc"] | None = None
+    no_load_fuel_liters_per_hour: float | None = None
+    slope_liters_per_kwh: float | None = None
+    fuel_curve_points: list[list[float]] | None = None
+    min_run_time_hours: float | None = None
+    min_down_time_hours: float | None = None
+    fuel_price_per_liter: float | None = None
+    fixed_om_per_kw_year: float | None = None
+    variable_om_per_operating_hour: float | None = None
+    startup_cost: float | None = None
+    overhaul_interval_operating_hours: float | None = None
+    overhaul_cost: float | None = None
+    emission_factor_kg_co2e_per_liter: float | None = None
+    is_renewable: bool | None = None
+
+
 class HybridComponentsInput(HybridStrictModel):
     pv: HybridPVInput
     bess: HybridBESSInput | None = None
     biomass: HybridBiomassInput | None = None
+    diesel: HybridDieselInput | None = None
 
 
 class HybridFinanceInput(HybridStrictModel):
@@ -212,6 +234,8 @@ class HybridFinanceInput(HybridStrictModel):
     bess_capex_per_kwh: float = 3_500_000.0
     biomass_capex: float | None = None
     biomass_capex_per_kw: float = 18_000_000.0
+    diesel_capex: float | None = None
+    diesel_capex_per_kw: float = 4_500_000.0
     bos_and_other_capex: float = 0.0
     capital_grant_amount: float = 0.0
     capital_grant_fraction: float = 0.0
@@ -221,11 +245,13 @@ class HybridFinanceInput(HybridStrictModel):
     bess_fixed_om_per_kwh_year: float = 50_000.0
     bess_om_fraction_of_capex: float | None = None
     biomass_fixed_om_override: float | None = None
+    diesel_fixed_om_override: float | None = None
     inverter_replacement_year: int | None = 13
     inverter_replacement_cost: float = 420_000_000.0
     bess_design_life_years: float | None = 10.0
     inverter_design_life_years: float | None = 12.0
     biomass_overhaul_life_years: float | None = 5.0
+    diesel_overhaul_life_years: float | None = 5.0
     residual_salvage_fraction_of_capex: float = 0.0
     corporate_tax_rate: float = 0.22
     depreciation_years: int | None = None
@@ -240,7 +266,7 @@ class HybridOutputOptions(HybridStrictModel):
 
 
 class HybridSimulateRequest(HybridStrictModel):
-    contract_version: Literal["0.5", "0.6"] = "0.5"
+    contract_version: Literal["0.5", "0.6", "0.7"] = "0.5"
     project: HybridProjectInput
     simulation: HybridSimulationInput = Field(default_factory=HybridSimulationInput)
     load_profile: HybridLoadProfileInput
@@ -253,6 +279,7 @@ class HybridSweepAxisConfig(HybridStrictModel):
     pv_capacity_kwp_values: list[float]
     bess_capacity_kwh_values: list[float]
     biomass_capacity_kw_values: list[float]
+    diesel_capacity_kw_values: list[float] | None = None
     pv_inverter_sizing_mode: Literal["keep_dc_ac_ratio", "fixed"] = "keep_dc_ac_ratio"
     scale_replacement_costs: bool = True
     bess_replacement_cost_per_kwh: float | None = Field(default=None, ge=0.0)
@@ -275,7 +302,7 @@ class HybridSweepRanking(HybridStrictModel):
 
 
 class HybridSweepJobRequest(HybridStrictModel):
-    contract_version: Literal["0.6"] = "0.6"
+    contract_version: Literal["0.6", "0.7"] = "0.6"
     base_request: HybridSimulateRequest
     sweep: HybridSweepAxisConfig
     constraints: HybridSweepConstraints = Field(default_factory=HybridSweepConstraints)
@@ -290,7 +317,7 @@ class HybridSensitivityMatrixInput(HybridStrictModel):
 
 
 class HybridSensitivityRequest(HybridStrictModel):
-    contract_version: Literal["0.6"] = "0.6"
+    contract_version: Literal["0.6", "0.7"] = "0.6"
     base_request: HybridSimulateRequest
     variables: list[str] | None = None
     shifts: list[float] | None = None
@@ -298,7 +325,7 @@ class HybridSensitivityRequest(HybridStrictModel):
 
 
 class HybridExcelExportRequest(HybridStrictModel):
-    contract_version: Literal["0.6"] = "0.6"
+    contract_version: Literal["0.6", "0.7"] = "0.6"
     language: Literal["id", "en"] = "id"
     project_config: dict[str, Any]
     simulation_result: dict[str, Any]

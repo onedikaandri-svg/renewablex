@@ -39,6 +39,12 @@ class DispatchContext:
     biomass_can_start: bool = False
     biomass_can_stop: bool = True
     biomass_fuel_remaining_tons: float | None = None
+    diesel_status: str = "off"
+    diesel_available_kw: float = 0.0
+    diesel_current_power_kw: float = 0.0
+    diesel_min_load_kw: float = 0.0
+    diesel_can_start: bool = False
+    diesel_can_stop: bool = True
 
     @property
     def pv_surplus_kw(self) -> float:
@@ -63,6 +69,7 @@ class DispatchDecision:
     biomass_command_kw: float = 0.0
     biomass_start_request: bool = False
     biomass_stop_request: bool = False
+    diesel_command_kw: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -103,8 +110,23 @@ def _has_biomass(ctx: DispatchContext) -> bool:
     )
 
 
+def _has_diesel(ctx: DispatchContext) -> bool:
+    return (
+        ctx.diesel_status != "off"
+        or ctx.diesel_available_kw > 0.0
+        or ctx.diesel_can_start
+        or ctx.diesel_current_power_kw > 0.0
+    )
+
+
+def _has_dispatchable_gen(ctx: DispatchContext) -> bool:
+    return _has_biomass(ctx) or _has_diesel(ctx)
+
+
 def _plan_biomass_for_deficit(ctx: DispatchContext, needed_kw: float) -> tuple[float, bool, bool]:
     """Menentukan perintah daya, start, dan stop Biomass untuk menutup kekurangan daya."""
+    if not _has_biomass(ctx):
+        return 0.0, False, False
     if needed_kw > 1e-12:
         if ctx.biomass_available_kw > 0.0:
             cmd = min(max(needed_kw, ctx.biomass_min_load_kw), ctx.biomass_available_kw)
@@ -121,6 +143,32 @@ def _plan_biomass_for_deficit(ctx: DispatchContext, needed_kw: float) -> tuple[f
     return 0.0, False, False
 
 
+def _plan_diesel_for_deficit(ctx: DispatchContext, needed_kw: float) -> float:
+    """Menentukan perintah daya Diesel Generator untuk menutup sisa defisit setelah Biomass."""
+    if not _has_diesel(ctx):
+        return 0.0
+    if needed_kw > 1e-12:
+        if ctx.diesel_available_kw > 0.0:
+            return min(max(needed_kw, ctx.diesel_min_load_kw), ctx.diesel_available_kw)
+        return 0.0
+    if ctx.diesel_status == "running":
+        if ctx.diesel_can_stop:
+            return 0.0
+        return min(ctx.diesel_min_load_kw, ctx.diesel_available_kw)
+    return 0.0
+
+
+def _plan_generators_for_deficit(
+    ctx: DispatchContext,
+    needed_kw: float,
+) -> tuple[float, bool, bool, float]:
+    """Merencanakan dispatch berurutan: Biomass lebih dulu, lalu Diesel untuk sisa defisit."""
+    bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, needed_kw)
+    rem_after_bio = max(needed_kw - bio_cmd, 0.0)
+    diesel_cmd = _plan_diesel_for_deficit(ctx, rem_after_bio)
+    return bio_cmd, bio_start, bio_stop, diesel_cmd
+
+
 def _balance_after_bess(
     ctx: DispatchContext,
     bess_cmd_kw: float,
@@ -128,10 +176,11 @@ def _balance_after_bess(
     biomass_cmd_kw: float = 0.0,
     biomass_start: bool = False,
     biomass_stop: bool = False,
+    diesel_cmd_kw: float = 0.0,
 ) -> DispatchDecision:
-    """Menurunkan impor, ekspor, dan curtailment AC bus yang konsisten dengan perintah BESS dan Biomass."""
+    """Menurunkan impor, ekspor, dan curtailment AC bus yang konsisten dengan perintah BESS dan pembangkit."""
     total_demand = ctx.load_kw + ctx.parasitic_load_kw
-    total_gen = ctx.pv_available_kw + max(biomass_cmd_kw, 0.0)
+    total_gen = ctx.pv_available_kw + max(biomass_cmd_kw, 0.0) + max(diesel_cmd_kw, 0.0)
     net_ac = total_gen - total_demand
 
     if bess_cmd_kw > 0.0:
@@ -155,6 +204,7 @@ def _balance_after_bess(
             biomass_command_kw=biomass_cmd_kw,
             biomass_start_request=biomass_start,
             biomass_stop_request=biomass_stop,
+            diesel_command_kw=diesel_cmd_kw,
         )
 
     if bess_cmd_kw < 0.0:
@@ -173,6 +223,7 @@ def _balance_after_bess(
             biomass_command_kw=biomass_cmd_kw,
             biomass_start_request=biomass_start,
             biomass_stop_request=biomass_stop,
+            diesel_command_kw=diesel_cmd_kw,
         )
 
     grid_import = max(-net_ac, 0.0) if ctx.allow_grid_import else 0.0
@@ -188,16 +239,17 @@ def _balance_after_bess(
         biomass_command_kw=biomass_cmd_kw,
         biomass_start_request=biomass_start,
         biomass_stop_request=biomass_stop,
+        diesel_command_kw=diesel_cmd_kw,
     )
 
 
 class SelfConsumptionStrategy(DispatchStrategy):
-    """Memprioritaskan surplus PV untuk mengisi BESS dan discharge atau Biomass untuk defisit beban."""
+    """Memprioritaskan surplus PV untuk mengisi BESS dan discharge atau Biomass/Diesel untuk defisit beban."""
 
     def decide(self, ctx: DispatchContext) -> DispatchDecision:
         total_demand = ctx.load_kw + ctx.parasitic_load_kw
         surplus = ctx.pv_available_kw - total_demand
-        if not _has_biomass(ctx):
+        if not _has_dispatchable_gen(ctx):
             if surplus > 1e-12:
                 chg = min(surplus, ctx.bess_max_charge_kw)
                 reason = "self_consumption: surplus PV mengisi BESS" if chg > 0 else "self_consumption: BESS penuh, surplus dialihkan"
@@ -210,24 +262,28 @@ class SelfConsumptionStrategy(DispatchStrategy):
             return _balance_after_bess(ctx, 0.0, "self_consumption: pasokan PV seimbang dengan beban")
 
         if surplus > 1e-12:
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
-            chg = min(surplus + bio_cmd, ctx.bess_max_charge_kw)
-            reason = "self_consumption: surplus PV mengisi BESS, Biomass dihentikan bila diizinkan"
-            return _balance_after_bess(ctx, chg, reason, bio_cmd, bio_start, bio_stop)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+            chg = min(surplus + bio_cmd + diesel_cmd, ctx.bess_max_charge_kw)
+            reason = "self_consumption: surplus PV mengisi BESS, pembangkit dihentikan bila diizinkan"
+            return _balance_after_bess(ctx, chg, reason, bio_cmd, bio_start, bio_stop, diesel_cmd)
 
         deficit = max(-surplus, 0.0)
         dis = min(deficit, ctx.bess_max_discharge_kw)
         rem_def = max(deficit - dis, 0.0)
-        bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_def)
-        if bio_cmd > 0.0:
+        bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_def)
+        if diesel_cmd > 0.0 and bio_cmd > 0.0:
+            reason = "self_consumption: PV, BESS, Biomass, dan Diesel menutup defisit beban"
+        elif diesel_cmd > 0.0:
+            reason = "self_consumption: Diesel menutup sisa defisit setelah PV/BESS"
+        elif bio_cmd > 0.0:
             reason = "self_consumption: BESS dan Biomass menutup defisit beban"
         elif bio_start:
             reason = "self_consumption: BESS menutup defisit sambil menyalakan Biomass"
         elif dis > 0.0:
             reason = "self_consumption: BESS discharge menutup defisit beban"
         else:
-            reason = "self_consumption: pasokan seimbang atau Biomass menunggu transisi"
-        return _balance_after_bess(ctx, -dis, reason, bio_cmd, bio_start, bio_stop)
+            reason = "self_consumption: pasokan seimbang atau pembangkit menunggu transisi"
+        return _balance_after_bess(ctx, -dis, reason, bio_cmd, bio_start, bio_stop, diesel_cmd)
 
 
 class LoadFollowingStrategy(DispatchStrategy):
@@ -236,7 +292,7 @@ class LoadFollowingStrategy(DispatchStrategy):
     def decide(self, ctx: DispatchContext) -> DispatchDecision:
         total_demand = ctx.load_kw + ctx.parasitic_load_kw
         net = ctx.pv_available_kw - total_demand
-        if not _has_biomass(ctx):
+        if not _has_dispatchable_gen(ctx):
             if net > 1e-12:
                 chg = min(net, ctx.bess_max_charge_kw)
                 return _balance_after_bess(ctx, chg, "load_following: serap surplus PV ke BESS")
@@ -246,8 +302,8 @@ class LoadFollowingStrategy(DispatchStrategy):
             return _balance_after_bess(ctx, 0.0, "load_following: beban seimbang, BESS diam")
 
         if net > 1e-12:
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
-            chg = min(net + bio_cmd, ctx.bess_max_charge_kw)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+            chg = min(net + bio_cmd + diesel_cmd, ctx.bess_max_charge_kw)
             return _balance_after_bess(
                 ctx,
                 chg,
@@ -255,25 +311,28 @@ class LoadFollowingStrategy(DispatchStrategy):
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
 
         deficit = max(-net, 0.0)
         dis = min(deficit, ctx.bess_max_discharge_kw)
         rem_def = max(deficit - dis, 0.0)
-        bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_def)
+        bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_def)
+        total_gen_cmd = bio_cmd + diesel_cmd
         bess_cmd = -dis
-        if bio_cmd > rem_def + 1e-12 and ctx.bess_max_charge_kw > 0.0 and dis == 0.0:
-            bess_cmd = min(bio_cmd - rem_def, ctx.bess_max_charge_kw)
-        reason = (
-            "load_following: Biomass dan BESS mengikuti defisit beban bersih"
-            if (bio_cmd > 0.0 or bio_start)
-            else "load_following: discharge BESS mengikuti defisit beban"
-        )
-        return _balance_after_bess(ctx, bess_cmd, reason, bio_cmd, bio_start, bio_stop)
+        if total_gen_cmd > rem_def + 1e-12 and ctx.bess_max_charge_kw > 0.0 and dis == 0.0:
+            bess_cmd = min(total_gen_cmd - rem_def, ctx.bess_max_charge_kw)
+        if diesel_cmd > 0.0:
+            reason = "load_following: PV, BESS, Biomass, dan Diesel mengikuti defisit beban bersih"
+        elif bio_cmd > 0.0 or bio_start:
+            reason = "load_following: Biomass dan BESS mengikuti defisit beban bersih"
+        else:
+            reason = "load_following: discharge BESS mengikuti defisit beban"
+        return _balance_after_bess(ctx, bess_cmd, reason, bio_cmd, bio_start, bio_stop, diesel_cmd)
 
 
 class CycleChargingStrategy(DispatchStrategy):
-    """Mengisi BESS menuju target SOC saat surplus atau ketika Biomass/grid aktif."""
+    """Mengisi BESS menuju target SOC saat surplus atau ketika Biomass/Diesel/grid aktif."""
 
     def __init__(self, target_soc_fraction: float = 0.80):
         self.target_soc_fraction = target_soc_fraction
@@ -282,7 +341,7 @@ class CycleChargingStrategy(DispatchStrategy):
         total_demand = ctx.load_kw + ctx.parasitic_load_kw
         net = ctx.pv_available_kw - total_demand
 
-        if not _has_biomass(ctx):
+        if not _has_dispatchable_gen(ctx):
             if net > 1e-12:
                 chg = min(net, ctx.bess_max_charge_kw)
                 return _balance_after_bess(ctx, chg, "cycle_charging: surplus PV mengisi BESS")
@@ -301,8 +360,8 @@ class CycleChargingStrategy(DispatchStrategy):
             return _balance_after_bess(ctx, 0.0, "cycle_charging: BESS diam")
 
         if net > 1e-12:
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
-            chg = min(net + bio_cmd, ctx.bess_max_charge_kw)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+            chg = min(net + bio_cmd + diesel_cmd, ctx.bess_max_charge_kw)
             return _balance_after_bess(
                 ctx,
                 chg,
@@ -310,22 +369,26 @@ class CycleChargingStrategy(DispatchStrategy):
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
 
         deficit = max(-net, 0.0)
         needs_charge = ctx.bess_soc < self.target_soc_fraction - 1e-9 and ctx.bess_max_charge_kw > 0.0
         if needs_charge:
-            desired_bio = deficit + ctx.bess_max_charge_kw
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, desired_bio)
-            if bio_cmd > deficit + 1e-12:
-                chg = min(bio_cmd - deficit, ctx.bess_max_charge_kw)
+            desired_total = deficit + ctx.bess_max_charge_kw
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, desired_total)
+            total_gen_cmd = bio_cmd + diesel_cmd
+            if total_gen_cmd > deficit + 1e-12:
+                chg = min(total_gen_cmd - deficit, ctx.bess_max_charge_kw)
+                source_lbl = "Biomass & Diesel" if (bio_cmd > 0.0 and diesel_cmd > 0.0) else ("Diesel" if diesel_cmd > 0.0 else "Biomass")
                 return _balance_after_bess(
                     ctx,
                     chg,
-                    f"cycle_charging: Biomass menyuplai beban dan mengisi BESS menuju target SOC {self.target_soc_fraction:.2f}",
+                    f"cycle_charging: {source_lbl} menyuplai beban dan mengisi BESS menuju target SOC {self.target_soc_fraction:.2f}",
                     bio_cmd,
                     bio_start,
                     bio_stop,
+                    diesel_cmd,
                 )
             if ctx.allow_grid_import:
                 return _balance_after_bess(
@@ -335,27 +398,30 @@ class CycleChargingStrategy(DispatchStrategy):
                     bio_cmd,
                     bio_start,
                     bio_stop,
+                    diesel_cmd,
                 )
-            dis = min(max(deficit - bio_cmd, 0.0), ctx.bess_max_discharge_kw)
+            dis = min(max(deficit - total_gen_cmd, 0.0), ctx.bess_max_discharge_kw)
             return _balance_after_bess(
                 ctx,
                 -dis,
-                "cycle_charging: BESS dan Biomass menutup defisit saat pengisi terbatas",
+                "cycle_charging: BESS dan pembangkit menutup defisit saat pengisi terbatas",
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
 
         dis = min(deficit, ctx.bess_max_discharge_kw)
         rem_def = max(deficit - dis, 0.0)
-        bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_def)
+        bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_def)
         return _balance_after_bess(
             ctx,
             -dis,
-            "cycle_charging: target SOC tercapai, BESS dan Biomass menutup defisit",
+            "cycle_charging: target SOC tercapai, BESS dan pembangkit menutup defisit",
             bio_cmd,
             bio_start,
             bio_stop,
+            diesel_cmd,
         )
 
 
@@ -369,7 +435,7 @@ class PeakShavingStrategy(DispatchStrategy):
         total_demand = ctx.load_kw + ctx.parasitic_load_kw
         net_deficit = total_demand - ctx.pv_available_kw
 
-        if not _has_biomass(ctx):
+        if not _has_dispatchable_gen(ctx):
             if net_deficit > self.peak_limit_kw + 1e-12:
                 shave_needed = net_deficit - self.peak_limit_kw
                 dis = min(shave_needed, ctx.bess_max_discharge_kw)
@@ -396,19 +462,21 @@ class PeakShavingStrategy(DispatchStrategy):
             shave_needed = net_deficit - self.peak_limit_kw
             dis = min(shave_needed, ctx.bess_max_discharge_kw)
             rem_shave = max(shave_needed - dis, 0.0)
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_shave)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_shave)
             return _balance_after_bess(
                 ctx,
                 -dis,
-                f"peak_shaving: BESS dan Biomass memangkas beban di atas {self.peak_limit_kw:.2f} kW",
+                f"peak_shaving: BESS dan pembangkit memangkas beban di atas {self.peak_limit_kw:.2f} kW",
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
 
-        bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
+        bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+        extra_gen = bio_cmd + diesel_cmd
         if net_deficit < -1e-12:
-            surplus = -net_deficit + bio_cmd
+            surplus = -net_deficit + extra_gen
             chg = min(surplus, ctx.bess_max_charge_kw)
             return _balance_after_bess(
                 ctx,
@@ -417,10 +485,11 @@ class PeakShavingStrategy(DispatchStrategy):
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
 
         if ctx.allow_grid_import and ctx.bess_max_charge_kw > 0.0:
-            headroom = max(self.peak_limit_kw - max(net_deficit - bio_cmd, 0.0), 0.0)
+            headroom = max(self.peak_limit_kw - max(net_deficit - extra_gen, 0.0), 0.0)
             if headroom > 1e-12:
                 chg = min(headroom, ctx.bess_max_charge_kw)
                 return _balance_after_bess(
@@ -430,6 +499,7 @@ class PeakShavingStrategy(DispatchStrategy):
                     bio_cmd,
                     bio_start,
                     bio_stop,
+                    diesel_cmd,
                 )
 
         return _balance_after_bess(
@@ -439,6 +509,7 @@ class PeakShavingStrategy(DispatchStrategy):
             bio_cmd,
             bio_start,
             bio_stop,
+            diesel_cmd,
         )
 
 
@@ -461,7 +532,7 @@ class TimeOfUseArbitrageStrategy(DispatchStrategy):
         total_demand = ctx.load_kw + ctx.parasitic_load_kw
         surplus = ctx.pv_available_kw - total_demand
 
-        if not _has_biomass(ctx):
+        if not _has_dispatchable_gen(ctx):
             if ctx.hour_of_day in self.peak_hours:
                 if ctx.bess_soc > self.tou_discharge_soc_floor + 1e-9 and ctx.bess_max_discharge_kw > 0.0:
                     if ctx.allow_grid_export:
@@ -501,18 +572,19 @@ class TimeOfUseArbitrageStrategy(DispatchStrategy):
                     dis = min(max(-surplus, 0.0), ctx.bess_max_discharge_kw)
             if dis > 1e-12:
                 rem_def = max(-surplus - dis, 0.0)
-                bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_def)
+                bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_def)
                 return _balance_after_bess(
                     ctx,
                     -dis,
-                    "tou_arbitrage: jam puncak, BESS dan Biomass menutup beban",
+                    "tou_arbitrage: jam puncak, BESS dan pembangkit menutup beban",
                     bio_cmd,
                     bio_start,
                     bio_stop,
+                    diesel_cmd,
                 )
             if surplus > 1e-12:
-                bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
-                chg = min(surplus + bio_cmd, ctx.bess_max_charge_kw)
+                bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+                chg = min(surplus + bio_cmd + diesel_cmd, ctx.bess_max_charge_kw)
                 return _balance_after_bess(
                     ctx,
                     chg,
@@ -520,22 +592,24 @@ class TimeOfUseArbitrageStrategy(DispatchStrategy):
                     bio_cmd,
                     bio_start,
                     bio_stop,
+                    diesel_cmd,
                 )
             rem_def = max(-surplus, 0.0)
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_def)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_def)
             return _balance_after_bess(
                 ctx,
                 0.0,
-                "tou_arbitrage: jam puncak, BESS pada lantai SOC dan Biomass membantu sisa defisit",
+                "tou_arbitrage: jam puncak, BESS pada lantai SOC dan pembangkit membantu sisa defisit",
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
 
         if ctx.hour_of_day in self.off_peak_hours:
             if ctx.bess_soc < self.tou_charge_soc_target - 1e-9 and ctx.bess_max_charge_kw > 0.0:
                 if ctx.allow_grid_import:
-                    bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
+                    bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
                     return _balance_after_bess(
                         ctx,
                         ctx.bess_max_charge_kw,
@@ -543,10 +617,11 @@ class TimeOfUseArbitrageStrategy(DispatchStrategy):
                         bio_cmd,
                         bio_start,
                         bio_stop,
+                        diesel_cmd,
                     )
                 if surplus > 1e-12:
-                    bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
-                    chg = min(surplus + bio_cmd, ctx.bess_max_charge_kw)
+                    bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+                    chg = min(surplus + bio_cmd + diesel_cmd, ctx.bess_max_charge_kw)
                     return _balance_after_bess(
                         ctx,
                         chg,
@@ -554,39 +629,50 @@ class TimeOfUseArbitrageStrategy(DispatchStrategy):
                         bio_cmd,
                         bio_start,
                         bio_stop,
+                        diesel_cmd,
                     )
             rem_def = max(-surplus, 0.0) if not ctx.allow_grid_import else 0.0
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_def)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_def)
             return _balance_after_bess(
                 ctx,
                 0.0,
-                "tou_arbitrage: jam luar puncak, Biomass menutup sisa defisit tanpa impor grid"
+                "tou_arbitrage: jam luar puncak, pembangkit menutup sisa defisit tanpa impor grid"
                 if rem_def > 1e-12
                 else "tou_arbitrage: jam luar puncak, BESS diam",
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
 
         if surplus > 1e-12:
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
-            chg = min(surplus + bio_cmd, ctx.bess_max_charge_kw)
-            return _balance_after_bess(ctx, chg, "tou_arbitrage: jam menengah, serap surplus PV", bio_cmd, bio_start, bio_stop)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+            chg = min(surplus + bio_cmd + diesel_cmd, ctx.bess_max_charge_kw)
+            return _balance_after_bess(
+                ctx,
+                chg,
+                "tou_arbitrage: jam menengah, serap surplus PV",
+                bio_cmd,
+                bio_start,
+                bio_stop,
+                diesel_cmd,
+            )
         if surplus < -1e-12:
             deficit = -surplus
             dis = min(deficit, ctx.bess_max_discharge_kw)
             rem_def = max(deficit - dis, 0.0)
-            bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, rem_def)
+            bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, rem_def)
             return _balance_after_bess(
                 ctx,
                 -dis,
-                "tou_arbitrage: jam menengah, BESS dan Biomass tutup defisit beban",
+                "tou_arbitrage: jam menengah, BESS dan pembangkit tutup defisit beban",
                 bio_cmd,
                 bio_start,
                 bio_stop,
+                diesel_cmd,
             )
-        bio_cmd, bio_start, bio_stop = _plan_biomass_for_deficit(ctx, 0.0)
-        return _balance_after_bess(ctx, 0.0, "tou_arbitrage: BESS diam", bio_cmd, bio_start, bio_stop)
+        bio_cmd, bio_start, bio_stop, diesel_cmd = _plan_generators_for_deficit(ctx, 0.0)
+        return _balance_after_bess(ctx, 0.0, "tou_arbitrage: BESS diam", bio_cmd, bio_start, bio_stop, diesel_cmd)
 
 
 def create_dispatch_strategy(config: DispatchConfig) -> DispatchStrategy:

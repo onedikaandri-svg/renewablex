@@ -31,6 +31,7 @@ import { usePreferences } from "@/lib/preferences";
 const OPTIONAL_KINDS: Array<{ kind: TopologyNodeKind; addId: string; addEn: string; labelId: string; labelEn: string }> = [
   { kind: "bess", addId: "Tambah BESS", addEn: "Add BESS", labelId: "BESS (Baterai)", labelEn: "BESS (Battery)" },
   { kind: "biomass", addId: "Tambah Biomass", addEn: "Add Biomass", labelId: "Biomass", labelEn: "Biomass" },
+  { kind: "diesel", addId: "Tambah Diesel", addEn: "Add Diesel", labelId: "Diesel Generator", labelEn: "Diesel Generator" },
   { kind: "grid", addId: "Tambah Grid", addEn: "Add Grid", labelId: "Jaringan Grid", labelEn: "Utility Grid" },
 ];
 
@@ -38,6 +39,7 @@ const SERIES_COLOR_BY_KIND: Record<TopologyNodeKind, string> = {
   pv: "var(--series-pv)",
   bess: "var(--series-bess)",
   biomass: "var(--series-biomass)",
+  diesel: "var(--series-diesel)",
   ac_bus: "var(--accent)",
   load: "var(--series-load)",
   grid: "var(--series-grid)",
@@ -51,6 +53,8 @@ function nodeTitle(kind: TopologyNodeKind, lang: "id" | "en"): string {
       return lang === "en" ? "BESS Storage" : "BESS (Baterai)";
     case "biomass":
       return "Biomass";
+    case "diesel":
+      return "Diesel Generator";
     case "ac_bus":
       return "AC BUS";
     case "load":
@@ -61,7 +65,7 @@ function nodeTitle(kind: TopologyNodeKind, lang: "id" | "en"): string {
 }
 
 function nodeMetricText(project: HybridProjectConfig, node: TopologyNode, connected: boolean, lang: "id" | "en"): string {
-  const { pv, bess, biomass } = project.components;
+  const { pv, bess, biomass, diesel } = project.components;
   switch (node.kind) {
     case "pv":
       return connected
@@ -74,6 +78,10 @@ function nodeMetricText(project: HybridProjectConfig, node: TopologyNode, connec
     case "biomass":
       return connected
         ? `${formatNumber(biomass.rated_capacity_kw, lang, 0)} kW | ${biomass.fuel_preset.toUpperCase()}`
+        : (lang === "en" ? "Disconnected (Inactive)" : "Terputus (Nonaktif)");
+    case "diesel":
+      return connected
+        ? `${formatNumber(diesel.rated_capacity_kw, lang, 0)} kW | ${formatNumber(diesel.min_load_fraction * 100, lang, 0)}% min`
         : (lang === "en" ? "Disconnected (Inactive)" : "Terputus (Nonaktif)");
     case "ac_bus":
       return project.simulation.dispatch_strategy;
@@ -170,7 +178,7 @@ export default function SchematicCanvas({
     }
     const rect = svg.getBoundingClientRect();
     const vbWidth = 840;
-    const vbHeight = 400;
+    const vbHeight = 500;
     return {
       svgX: ((clientX - rect.left) / Math.max(rect.width, 1)) * vbWidth,
       svgY: ((clientY - rect.top) / Math.max(rect.height, 1)) * vbHeight,
@@ -471,7 +479,7 @@ export default function SchematicCanvas({
         <svg
           ref={svgRef}
           className="canvas-svg"
-          viewBox="0 0 840 400"
+          viewBox="0 0 840 500"
           role="region"
           aria-label={
             lang === "en"

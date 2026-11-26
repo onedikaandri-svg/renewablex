@@ -96,7 +96,7 @@ export async function previewHybridLoad(
 }
 
 export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<string, unknown> {
-  const { pv, bess, biomass } = cfg.components;
+  const { pv, bess, biomass, diesel } = cfg.components;
   const lp = cfg.load_profile;
 
   const bioPayload: Record<string, unknown> = biomass.enabled
@@ -118,8 +118,31 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
       }
     : { enabled: false };
 
+  const dieselPayload: Record<string, unknown> = diesel?.enabled
+    ? {
+        enabled: true,
+        rated_capacity_kw: diesel.rated_capacity_kw,
+        min_load_fraction: diesel.min_load_fraction,
+        fuel_curve_model: diesel.fuel_curve_model,
+        ...(diesel.no_load_fuel_liters_per_hour !== null
+          ? { no_load_fuel_liters_per_hour: diesel.no_load_fuel_liters_per_hour }
+          : {}),
+        slope_liters_per_kwh: diesel.slope_liters_per_kwh,
+        min_run_time_hours: diesel.min_run_time_hours,
+        min_down_time_hours: diesel.min_down_time_hours,
+        fuel_price_per_liter: diesel.fuel_price_per_liter,
+        fixed_om_per_kw_year: diesel.fixed_om_per_kw_year,
+        variable_om_per_operating_hour: diesel.variable_om_per_operating_hour,
+        startup_cost: diesel.startup_cost,
+        overhaul_interval_operating_hours: diesel.overhaul_interval_operating_hours,
+        overhaul_cost: diesel.overhaul_cost,
+        emission_factor_kg_co2e_per_liter: diesel.emission_factor_kg_co2e_per_liter,
+        is_renewable: false,
+      }
+    : { enabled: false };
+
   return {
-    contract_version: "0.5",
+    contract_version: "0.7",
     project: {
       project_name: cfg.project.project_name,
       latitude: cfg.project.latitude,
@@ -191,6 +214,7 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
           }
         : { enabled: false },
       biomass: bioPayload,
+      diesel: dieselPayload,
     },
     finance: {
       tax_model: cfg.finance.tax_model,
@@ -206,6 +230,7 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
       pv_capex_per_kwp: cfg.finance.pv_capex_per_kwp,
       bess_capex_per_kwh: cfg.finance.bess_capex_per_kwh,
       biomass_capex_per_kw: cfg.finance.biomass_capex_per_kw,
+      diesel_capex_per_kw: cfg.finance.diesel_capex_per_kw ?? 4_500_000.0,
       bos_and_other_capex: cfg.finance.bos_and_other_capex,
       pv_om_fraction_of_capex: cfg.finance.pv_om_fraction_of_capex,
       bess_fixed_om_per_kwh_year: cfg.finance.bess_fixed_om_per_kwh_year,
@@ -217,6 +242,7 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
       bess_design_life_years: cfg.finance.bess_design_life_years,
       inverter_design_life_years: cfg.finance.inverter_design_life_years,
       biomass_overhaul_life_years: cfg.finance.biomass_overhaul_life_years,
+      diesel_overhaul_life_years: cfg.finance.diesel_overhaul_life_years ?? 5.0,
       grid_emission_factor_kg_co2e_per_kwh: cfg.finance.grid_emission_factor_kg_co2e_per_kwh,
     },
     output_options: {
@@ -279,12 +305,15 @@ export async function submitHybridSweepJob(
   return postJson<HybridSweepJobResponse>(
     "/v1/hybrid/sweep/jobs",
     {
-      contract_version: "0.6",
+      contract_version: "0.7",
       base_request: buildCompactBaseRequest(cfg),
       sweep: {
         pv_capacity_kwp_values: sweepInput.pv_capacity_kwp_values,
         bess_capacity_kwh_values: sweepInput.bess_capacity_kwh_values,
         biomass_capacity_kw_values: sweepInput.biomass_capacity_kw_values,
+        ...(sweepInput.diesel_capacity_kw_values
+          ? { diesel_capacity_kw_values: sweepInput.diesel_capacity_kw_values }
+          : {}),
         pv_inverter_sizing_mode: sweepInput.pv_inverter_sizing_mode,
         scale_replacement_costs: sweepInput.scale_replacement_costs,
       },
@@ -340,7 +369,7 @@ export async function runHybridSensitivity(
   return postJson<HybridSensitivityResponse>(
     "/v1/hybrid/sensitivity",
     {
-      contract_version: "0.6",
+      contract_version: "0.7",
       base_request: buildCompactBaseRequest(cfg),
       ...(options.variables ? { variables: options.variables } : {}),
       ...(options.shifts ? { shifts: options.shifts } : {}),
@@ -364,7 +393,7 @@ export async function downloadHybridExcelReport(
     daily?: unknown;
   };
   const body = {
-    contract_version: "0.6",
+    contract_version: "0.7",
     language: params.language,
     project_config: buildCompactBaseRequest(params.cfg),
     simulation_result: compactResult,

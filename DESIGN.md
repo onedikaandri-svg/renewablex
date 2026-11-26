@@ -41,6 +41,7 @@ Untuk membedakan sumber energi dan aliran daya pada grafik sistem hybrid tanpa b
 - **PV (Surya):** `#533AFD` (violet utama, mode gelap `#A78BFA`)
 - **BESS (Baterai):** `#0369A1` (biru laut dalam yang lolos kontras WCAG AA di atas putih, mode gelap `#38BDF8`)
 - **Biomass (Pembangkit):** `#B45309` (amber gelap yang lolos kontras WCAG AA di atas putih, mode gelap `#FBBF24`)
+- **Diesel Generator:** `#475569` (abu-slate netral untuk sumber fosil non-terbarukan, rasio `7,58:1` di atas putih, mode gelap `#94A3B8` rasio `5,96:1`)
 - **Beban (Load):** `#061B31` (navy gelap, mode gelap `#E2E8F0`) dengan gaya garis putus-putus atau pembeda tebal garis
 - **Grid / Ekspor / Positif:** `#15803D` (hijau status lolos WCAG AA di atas putih, mode gelap `#4ADE80`)
 - **Unmet Load / Curtailment / Negatif:** `#B42318` (merah status, mode gelap `#F87171`)

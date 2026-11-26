@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePreferences } from "@/lib/preferences";
 
-const HYBRID_STUDIO_VERSION = "v0.6.1";
+const HYBRID_STUDIO_VERSION = "v0.7.0";
 
 export default function AppHeader() {
   const pathname = usePathname() || "/";

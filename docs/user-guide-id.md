@@ -1,6 +1,6 @@
 # Panduan Pengguna RenewableX
 
-Panduan ini disusun untuk pemilik proyek, insinyur, maupun pengguna non-teknis agar dapat merancang, mensimulasikan, membandingkan, dan mengekspor laporan sistem energi hybrid (**PV, BESS atau baterai, Biomass, dan EMS**) maupun screening kelayakan PV cepat.
+Panduan ini disusun untuk pemilik proyek, insinyur, maupun pengguna non-teknis agar dapat merancang, mensimulasikan, membandingkan, dan mengekspor laporan sistem energi hybrid (**PV, BESS atau baterai, Biomass, Diesel Generator, dan EMS**) maupun screening kelayakan PV cepat.
 
 ---
 
@@ -12,7 +12,7 @@ RenewableX memiliki dua ruang kerja yang dapat dipilih dari menu navigasi atas:
    - Cocok untuk perkiraan awal kelayakan PLTS tanpa baterai dan tanpa profil beban per jam.
    - Menggunakan hasil tahunan, menghitung NPV, IRR, payback sederhana, serta tabel sensitivitas dasar secara cepat.
 2. **Desain Sistem Hybrid (`/hybrid`):**
-   - Simulasi per jam lengkap (**8.760 jam per tahun**, hingga **40 tahun** umur proyek) untuk sistem kombinasi **Solar PV** (model 8 tahap setara SAM atau PVWatts), **BESS (baterai)** beserta degradasi kalender/siklus, **Pembangkit Biomass**, dan **Strategi EMS** (pengatur operasi sistem).
+   - Simulasi per jam lengkap (**8.760 jam per tahun**, hingga **40 tahun** umur proyek) untuk sistem kombinasi **Solar PV** (model 8 tahap setara SAM atau PVWatts), **BESS (baterai)** beserta degradasi kalender/siklus, **Pembangkit Biomass**, **Diesel Generator** (opsional non-terbarukan), dan **Strategi EMS** (pengatur operasi sistem).
    - Data proyek tersimpan secara lokal di browser (`localStorage`). Anda disarankan mengekspor berkas cadangan `.hybrid.json` secara berkala melalui tombol **Ekspor** di Halaman 1 (`/hybrid`) atau Halaman 10.
 
 > **Catatan Jujur Server Gratis Render (*Cold Start*):**
@@ -32,7 +32,7 @@ RenewableX memiliki dua ruang kerja yang dapat dipilih dari menu navigasi atas:
    - Pilih mode **Pembangkit Sintetis** (atur beban dasar, beban puncak, derau, dan seed agar hasil bisa diulang persis) atau mode **Unggah CSV 8.760 Jam**.
    - Klik **"Pratinjau & Validasi Beban"** untuk memeriksa kurva harian 24 jam dan peta panas tahunan 365 x 24.
 4. **Langkah 4: Desain Sistem / Kanvas Skema (`/hybrid/[projectId]/system`)**
-   - Atur komponen di kanvas interaktif: tambah komponen opsional (**BESS**, **Biomass**, **Grid**), geser posisi blok, atau hubungkan/putuskan kabel ke **AC BUS**.
+   - Atur komponen di kanvas interaktif: tambah komponen opsional (**BESS**, **Biomass**, **Diesel Generator**, **Grid**), geser posisi blok, atau hubungkan/putuskan kabel ke **AC BUS**.
    - Klik sebuah komponen untuk mengatur parameternya pada panel inspektor di sebelah kanan (atau di bawah kanvas pada layar ponsel `360px`).
    - Komponen wajib (**AC Bus**, **Solar PV**, dan **Beban Listrik**) terkunci agar tidak terhapus, dan bila kabelnya terputus sistem akan menampilkan galat validasi sebelum simulasi.
 5. **Langkah 5: Strategi Operasi EMS (`/hybrid/[projectId]/ems`)**
@@ -98,7 +98,7 @@ Contoh berkas yang siap langsung diunggah tersedia di `examples/sample-load-8760
 | **NPV** (*Net Present Value*) | Selisih nilai sekarang dari seluruh penghematan/pendapatan listrik dikurangi seluruh biaya proyek. **NPV > 0** berarti proyek memberi nilai tambah finansial di atas tingkat diskonto (WACC). |
 | **IRR** (*Internal Rate of Return*) | Tingkat pengembalian tahunan efektif proyek. Proyek dinilai **Layak** bila `NPV > 0` dan `IRR >= WACC + margin kelayakan` (bawaan margin `2%`). |
 | **Payback Sederhana / Terdiskonto** | Perkiraan tahun kapan modal awal proyek kembali. *Payback terdiskonto* menghitung pengembalian modal setelah memperhitungkan nilai waktu uang (WACC), sehingga waktunya lebih panjang daripada payback sederhana. |
-| **Pangsa Terbarukan** (*Renewable Fraction*) | Persentase beban listrik yang dipasok oleh sumber energi terbarukan (PV dan Biomass terbarukan), tidak termasuk impor grid fosil. |
+| **Pangsa Terbarukan** (*Renewable Fraction*) | Persentase beban listrik yang dipasok oleh sumber energi terbarukan (PV dan Biomass terbarukan), tidak termasuk impor grid fosil dan Diesel Generator (non-terbarukan). |
 | **Unmet Load** | Total energi beban (`kWh` atau `MWh`) yang gagal dipasok sistem karena kapasitas pembangkit dan baterai tidak mencukupi pada jam tertentu. |
 | **Curtailment** | Kelebihan produksi listrik (umumnya PV pada siang hari) yang terpaksa dibuang karena baterai sudah penuh dan ekspor ke grid tidak diizinkan atau dibatasi. |
 | **EFC** (*Equivalent Full Cycles*) | Jumlah siklus penuh baterai setara pengosongan 100% kapasitas efektifnya, dipakai untuk melacak keausan baterai. |
@@ -109,7 +109,7 @@ Contoh berkas yang siap langsung diunggah tersedia di `examples/sample-load-8760
 ## Bab 5: Cara Membaca Sapuan HOMER, Kurva Pareto, Tornado, dan Matriks `5 x 5`
 
 1. **Sapuan Kombinasi HOMER (Tab 1 Halaman 9):**
-   - Anda menentukan beberapa kandidat ukuran **PV (kWp)**, **BESS (kWh)**, dan **Biomass (kW)**. Masukkan `0` pada BESS atau Biomass untuk membandingkan konfigurasi tanpa baterai atau tanpa pembangkit biomassa.
+   - Anda menentukan beberapa kandidat ukuran **PV (kWp)**, **BESS (kWh)**, **Biomass (kW)**, dan opsional **Diesel Generator (kW)**. Masukkan `0` pada BESS, Biomass, atau Diesel untuk membandingkan konfigurasi tanpa komponen tersebut.
    - Mesin mengevaluasi semua kombinasi (maksimal `64` untuk mode `scaled_year_1`, `12` untuk `full_hourly`) dan memberi peringkat otomatis. Kombinasi yang gagal memenuhi batas **Maks. Unmet Load** atau **Min. Terbarukan** tetap ditampilkan di bawah dengan tanda alasan kegagalannya.
    - **Kurva Pareto** memetakan **Pangsa Terbarukan (sumbu X)** terhadap **LCOE (sumbu Y)**. Titik terbaik biasanya berada di kanan bawah (pangsa terbarukan tinggi dengan LCOE terendah).
 2. **Tornado & Matriks `5 x 5` (Tab 3 Halaman 9):**
@@ -125,5 +125,5 @@ Seluruh angka bawaan contoh pada proyek sampel berlabel **`[REAL DATA]`** bersum
 Sebelum memakai hasil untuk keputusan investasi atau penawaran komersial nyata, pastikan Anda mengganti parameter berikut dengan angka datasheet/penawaran resmi:
 1. **Modul PV & Inverter (Halaman 4):** Kapasitas, rasio DC/AC, koefisien suhu, kurva efisiensi inverter, serta rugi kabel/shading aktual lokasi.
 2. **Baterai BESS (Halaman 4):** Kapasitas, batas SOC aman pabrikan, efisiensi round-trip, serta laju degradasi garansi.
-3. **Biomass (Halaman 4):** Kurva konsumsi bahan bakar (*heat rate*) pembangkit, harga beli dan ongkos kirim bahan bakar setempat, serta batas pasokan periodik.
-4. **Ekonomi & Tarif (Halaman 6):** Nilai penawaran CAPEX EPC, biaya O&M kontrak, suku bunga diskonto (WACC), dan struktur tarif PLN/PPA yang berlaku.
+3. **Biomass & Diesel Generator (Halaman 4):** Kurva konsumsi bahan bakar (*heat rate* / liter per kWh), harga beli bahan bakar dan logistik setempat, interval overhaul, serta batas pasokan periodik.
+4. **Ekonomi & Tarif (Halaman 6):** Nilai penawaran CAPEX EPC per komponen (termasuk Diesel bila aktif), biaya O&M kontrak, suku bunga diskonto (WACC), dan struktur tarif PLN/PPA yang berlaku.

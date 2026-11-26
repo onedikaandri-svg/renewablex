@@ -26,6 +26,7 @@ export const NODE_DIMENSIONS: Record<TopologyNodeKind, { width: number; height: 
   pv: { width: 176, height: 76 },
   bess: { width: 176, height: 76 },
   biomass: { width: 176, height: 76 },
+  diesel: { width: 176, height: 76 },
   load: { width: 176, height: 76 },
   grid: { width: 176, height: 76 },
 };
@@ -34,6 +35,7 @@ export const DEFAULT_NODE_POSITIONS: Record<TopologyNodeKind, { x: number; y: nu
   pv: { x: 40, y: 40 },
   bess: { x: 40, y: 160 },
   biomass: { x: 40, y: 280 },
+  diesel: { x: 40, y: 400 },
   ac_bus: { x: 360, y: 160 },
   load: { x: 620, y: 80 },
   grid: { x: 620, y: 220 },
@@ -46,6 +48,7 @@ const NODE_IDS: Record<TopologyNodeKind, string> = {
   pv: "node-pv",
   bess: "node-bess",
   biomass: "node-biomass",
+  diesel: "node-diesel",
   load: "node-load",
   grid: "node-grid",
 };
@@ -82,6 +85,7 @@ const LIGHT_THEME_TOKENS: Record<string, string> = {
   "--series-pv": "#533AFD",
   "--series-bess": "#0369A1",
   "--series-biomass": "#B45309",
+  "--series-diesel": "#475569",
   "--series-load": "#061B31",
   "--series-grid": "#15803D",
   "--series-unmet": "#B42318",
@@ -107,6 +111,7 @@ export function flowTypeForKind(kind: TopologyNodeKind): TopologyEdgeFlowType {
     case "bess":
       return "bidirectional_storage";
     case "biomass":
+    case "diesel":
       return "ac_generation";
     case "load":
       return "ac_load";
@@ -178,6 +183,16 @@ export function deriveDefaultTopology(project: HybridProjectConfig): HybridSyste
     edges.push({
       id: makeEdgeId("biomass"),
       source: NODE_IDS.biomass,
+      target: NODE_IDS.ac_bus,
+      flowType: "ac_generation",
+    });
+  }
+
+  if (project.components.diesel?.enabled) {
+    nodes.push({ id: NODE_IDS.diesel, kind: "diesel", ...DEFAULT_NODE_POSITIONS.diesel });
+    edges.push({
+      id: makeEdgeId("diesel"),
+      source: NODE_IDS.diesel,
       target: NODE_IDS.ac_bus,
       flowType: "ac_generation",
     });
@@ -256,6 +271,7 @@ export function syncProjectFromTopology(
   const pvConnected = isKindConnectedToBus(cleanTopology, "pv");
   const bessConnected = isKindConnectedToBus(cleanTopology, "bess");
   const biomassConnected = isKindConnectedToBus(cleanTopology, "biomass");
+  const dieselConnected = isKindConnectedToBus(cleanTopology, "diesel");
   const gridConnected = isKindConnectedToBus(cleanTopology, "grid");
 
   const prevGridImport = project.simulation.dispatch_params.allow_grid_import;
@@ -263,7 +279,7 @@ export function syncProjectFromTopology(
 
   return {
     ...project,
-    schemaVersion: "0.6",
+    schemaVersion: "0.7",
     topology: cleanTopology,
     components: {
       ...project.components,
@@ -278,6 +294,10 @@ export function syncProjectFromTopology(
       biomass: {
         ...project.components.biomass,
         enabled: biomassConnected,
+      },
+      diesel: {
+        ...project.components.diesel,
+        enabled: dieselConnected,
       },
     },
     simulation: {
@@ -365,7 +385,7 @@ export function moveTopologyNode(
   );
   return {
     ...project,
-    schemaVersion: "0.6",
+    schemaVersion: "0.7",
     topology: topo,
   };
 }
@@ -479,7 +499,7 @@ export function setTopologyViewport(
   };
   return {
     ...project,
-    schemaVersion: "0.6",
+    schemaVersion: "0.7",
     topology: topo,
   };
 }
@@ -493,7 +513,7 @@ export function resetTopologyLayout(project: HybridProjectConfig): HybridProject
   topo.viewport = { ...DEFAULT_VIEWPORT };
   return {
     ...project,
-    schemaVersion: "0.6",
+    schemaVersion: "0.7",
     topology: topo,
   };
 }
@@ -577,7 +597,7 @@ export function validateSystemTopology(project: HybridProjectConfig): TopologyVa
   }
 
   // Validasi parameter fisik komponen aktif
-  const { pv, bess, biomass } = project.components;
+  const { pv, bess, biomass, diesel } = project.components;
   if (pv.enabled) {
     if (!Number.isFinite(pv.capacity_kwp) || pv.capacity_kwp <= 0) {
       errors.push({
@@ -675,12 +695,52 @@ export function validateSystemTopology(project: HybridProjectConfig): TopologyVa
     }
   }
 
+  if (diesel?.enabled) {
+    if (!Number.isFinite(diesel.rated_capacity_kw) || diesel.rated_capacity_kw <= 0) {
+      errors.push({
+        code: "invalid_component_params",
+        severity: "error",
+        nodeId: NODE_IDS.diesel,
+        field: "diesel.rated_capacity_kw",
+        messageId: "Kapasitas terpasang Diesel Generator harus lebih besar dari 0 kW.",
+        messageEn: "Diesel generator rated capacity must be greater than 0 kW.",
+      });
+    }
+    if (!Number.isFinite(diesel.min_load_fraction) || diesel.min_load_fraction < 0 || diesel.min_load_fraction > 1) {
+      errors.push({
+        code: "invalid_component_params",
+        severity: "error",
+        nodeId: NODE_IDS.diesel,
+        field: "diesel.min_load_fraction",
+        messageId: "Beban minimum Diesel harus berada di rentang 0% sampai 100%.",
+        messageEn: "Diesel minimum load fraction must be between 0% and 100%.",
+      });
+    }
+    if (!Number.isFinite(diesel.slope_liters_per_kwh) || diesel.slope_liters_per_kwh <= 0) {
+      errors.push({
+        code: "invalid_component_params",
+        severity: "error",
+        nodeId: NODE_IDS.diesel,
+        field: "diesel.slope_liters_per_kwh",
+        messageId: "Slope konsumsi solar (L/kWh) harus lebih besar dari 0.",
+        messageEn: "Diesel fuel slope (L/kWh) must be greater than 0.",
+      });
+    }
+  }
+
   // Keputusan 2a: node opsional tidak terhubung ke AC Bus memberi peringatan kuning non-blokir.
   for (const node of topo.nodes) {
     if (isRequiredNodeKind(node.kind)) continue;
     const connected = acBus ? topo.edges.some((e) => isEdgeConnecting(e, node.id, acBus.id)) : false;
     if (!connected) {
-      const name = node.kind === "bess" ? "BESS" : node.kind === "biomass" ? "Biomass" : "Grid";
+      const name =
+        node.kind === "bess"
+          ? "BESS"
+          : node.kind === "biomass"
+            ? "Biomass"
+            : node.kind === "diesel"
+              ? "Diesel Generator"
+              : "Grid";
       warnings.push({
         code: "disconnected_optional_node",
         severity: "warning",

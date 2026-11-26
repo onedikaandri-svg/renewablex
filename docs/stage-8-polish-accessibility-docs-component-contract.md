@@ -1,6 +1,6 @@
 # Kontrak Tahap 8: Pemolesan Performa, Audit Aksesibilitas, Dokumentasi Pengguna, dan Komponen Energi Tambahan
 
-**Status dokumen:** Tahap 8A disetujui pemilik proyek pada 2026-11-26 (keputusan 1, 2, 3, dan 5 terkonfirmasi; menunggu konfirmasi keputusan 4 mengenai pilihan komponen pertama Tahap 8B).
+**Status dokumen:** Tahap 8A disetujui dan digabungkan pada 2026-11-26; Tahap 8B (**Diesel Generator**, `contract_version: "0.7"`) disetujui pemilik proyek pada 2026-11-26.
 **Cabang usulan kontrak:** `docs/stage-8-contract` (berbasis `main` setelah penggabungan Tahap 7, commit `ca46fac`).
 **Cakupan:** Hasil pengukuran benchmark performa dasar (backend dan frontend) beserta target optimasi yang terukur, temuan audit aksesibilitas WCAG AA dan perbaikan visual, penambahan 3 grafik katalog `AGENTS.md` 9.2 (tanpa dependensi baru), rancangan dokumentasi pengguna berbahasa Indonesia, serta usulan kontrak komponen energi tambahan pertama melalui antarmuka seragam `EnergyComponent`.
 
@@ -293,6 +293,6 @@ Status konfirmasi keputusan Tahap 8:
 3. **Penambahan 3 Grafik Katalog `AGENTS.md` 9.2 (Nol Dependensi Baru):**
    **Disetujui** (2026-11-26). Menambahkan **Diagram Aliran Energi (Sankey)**, **Kurva Durasi Beban & Pembangkitan**, dan **Grafik Degradasi Kapasitas PV & BESS Umur Proyek** di Halaman 8 pada Tahap 8A.
 4. **Pilihan Komponen Energi Tambahan Pertama (Tahap 8B):**
-   **Menunggu konfirmasi pemilik proyek.** Dari tiga kandidat di `AGENTS.md` bagian 6 (**Diesel Generator**, **Turbin Angin / Wind**, atau **Hidro**), komponen mana yang ingin diprioritaskan pertama di Tahap 8B? *(Direkomendasikan: **Diesel Generator**, baru disusul Turbin Angin pada tahap berikutnya.)*
+   **Disetujui: Diesel Generator** (2026-11-26). Diprioritaskan pertama pada Tahap 8B melalui antarmuka `EnergyComponent` (`contract_version: "0.7"`, `ENGINE_VERSION: "0.7.0"`), dengan opsi ekspansi komponen berikutnya (Wind/Hidro) pada tahap selanjutnya.
 5. **Lokasi dan Akses Dokumentasi Pengguna:**
    **Disetujui ditambahkan di UI** (2026-11-26). Selain berkas `docs/user-guide-id.md` dan contoh CSV `examples/sample-load-8760.csv` di repositori, disediakan halaman ringkas **"Panduan"** di UI web (`/hybrid/guide`).
