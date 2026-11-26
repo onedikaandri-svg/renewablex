@@ -221,6 +221,33 @@ export function IconChevronRight(props: IconProps) {
   );
 }
 
+export function IconSearch(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.35-4.35" />
+    </SvgIcon>
+  );
+}
+
+export function IconMapPin(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 1 1 16 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </SvgIcon>
+  );
+}
+
+export function IconClipboard(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <rect x="8" y="2" width="8" height="4" rx="1" />
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+    </SvgIcon>
+  );
+}
+
 export const COMPONENT_ICON_PATHS: Record<TopologyNodeKind, string[]> = {
   pv: [
     "M3 5h18v11H3z",
