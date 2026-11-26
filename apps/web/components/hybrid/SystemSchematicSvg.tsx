@@ -247,7 +247,7 @@ export default function SystemSchematicSvg({
           </marker>
         </defs>
 
-        {/* Garis penghubung sesuai topologi kanvas */}
+        {/* Garis penghubung sesuai topologi kanvas (dirender lebih dulu agar tidak menutupi pill label) */}
         {topology.edges.map((edge) => {
           const src = nodeMap.get(edge.source);
           const tgt = nodeMap.get(edge.target);
@@ -256,46 +256,57 @@ export default function SystemSchematicSvg({
           const compNode = src.kind === "ac_bus" ? tgt : src;
           const color = SERIES_COLOR_BY_KIND[compNode.kind];
           const bidirectional = compNode.kind === "bess" || compNode.kind === "grid";
-          const flowLabel = edgeFlowBadge(compNode.kind);
-          const pill = flowLabel ? computeEdgePillLayout(geo, flowLabel) : null;
 
           return (
-            <g key={edge.id}>
-              <path
-                d={geo.pathD}
-                fill="none"
+            <path
+              key={`${edge.id}-path`}
+              d={geo.pathD}
+              fill="none"
+              stroke={color}
+              strokeWidth={3}
+              markerStart={bidirectional ? "url(#flow-arrow-start)" : undefined}
+              markerEnd="url(#flow-arrow-end)"
+            />
+          );
+        })}
+
+        {/* Pill label aliran daya dirender di atas seluruh jalur garis */}
+        {topology.edges.map((edge) => {
+          const src = nodeMap.get(edge.source);
+          const tgt = nodeMap.get(edge.target);
+          if (!src || !tgt) return null;
+          const geo = getEdgeGeometry(src, tgt);
+          const compNode = src.kind === "ac_bus" ? tgt : src;
+          const color = SERIES_COLOR_BY_KIND[compNode.kind];
+          const flowLabel = edgeFlowBadge(compNode.kind);
+          const pill = flowLabel ? computeEdgePillLayout(geo, flowLabel) : null;
+          if (!flowLabel || !pill) return null;
+
+          return (
+            <g key={`${edge.id}-pill`}>
+              <rect
+                x={pill.x}
+                y={pill.y}
+                width={pill.width}
+                height={pill.height}
+                rx={10}
+                fill="var(--surface)"
                 stroke={color}
-                strokeWidth={3}
-                markerStart={bidirectional ? "url(#flow-arrow-start)" : undefined}
-                markerEnd="url(#flow-arrow-end)"
+                strokeWidth={1.25}
               />
-              {flowLabel && pill && (
-                <g>
-                  <rect
-                    x={pill.x}
-                    y={pill.y}
-                    width={pill.width}
-                    height={pill.height}
-                    rx={10}
-                    fill="var(--surface)"
-                    stroke={color}
-                    strokeWidth={1.25}
-                  />
-                  <text
-                    x={pill.cx}
-                    y={pill.cy + 3.2}
-                    textAnchor="middle"
-                    style={{
-                      fill: "var(--navytext)",
-                      fontSize: "9.5px",
-                      fontWeight: 600,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {flowLabel}
-                  </text>
-                </g>
-              )}
+              <text
+                x={pill.cx}
+                y={pill.cy + 3.2}
+                textAnchor="middle"
+                style={{
+                  fill: "var(--navytext)",
+                  fontSize: "9.5px",
+                  fontWeight: 600,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {flowLabel}
+              </text>
             </g>
           );
         })}

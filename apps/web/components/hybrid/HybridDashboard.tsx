@@ -79,7 +79,7 @@ export default function HybridDashboard({
         top: 0,
         textStyle: { color: colors.text },
       },
-      grid: { left: 48, right: 20, top: 44, bottom: 28 },
+      grid: { left: 48, right: 20, top: 88, bottom: 28 },
       xAxis: {
         type: "category",
         data: monthLabels,
@@ -89,6 +89,7 @@ export default function HybridDashboard({
       yAxis: {
         type: "value",
         name: "MWh",
+        nameGap: 8,
         nameTextStyle: { color: colors.muted },
         axisLabel: { color: colors.muted },
         splitLine: { lineStyle: { color: colors.border } },
@@ -220,7 +221,7 @@ export default function HybridDashboard({
     return {
       tooltip: { trigger: "axis" },
       legend: { top: 0, textStyle: { color: colors.text } },
-      grid: { left: 50, right: 20, top: 44, bottom: 52 },
+      grid: { left: 50, right: 20, top: 88, bottom: 52 },
       dataZoom: [{ type: "inside" }, { type: "slider", height: 20, bottom: 6 }],
       xAxis: {
         type: "category",
@@ -231,6 +232,7 @@ export default function HybridDashboard({
       yAxis: {
         type: "value",
         name: "kW",
+        nameGap: 8,
         nameTextStyle: { color: colors.muted },
         axisLabel: { color: colors.muted },
         splitLine: { lineStyle: { color: colors.border } },
@@ -449,7 +451,7 @@ export default function HybridDashboard({
     return {
       tooltip: { trigger: "axis" },
       legend: { top: 0, textStyle: { color: colors.text } },
-      grid: { left: 52, right: 20, top: 44, bottom: 38 },
+      grid: { left: 52, right: 20, top: 54, bottom: 38 },
       xAxis: {
         type: "category",
         data: durationData.percentLabels,
@@ -462,6 +464,7 @@ export default function HybridDashboard({
       yAxis: {
         type: "value",
         name: "kW",
+        nameGap: 10,
         nameTextStyle: { color: colors.muted },
         axisLabel: { color: colors.muted },
         splitLine: { lineStyle: { color: colors.border } },
@@ -534,7 +537,7 @@ export default function HybridDashboard({
     return {
       tooltip: { trigger: "axis" },
       legend: { top: 0, textStyle: { color: colors.text } },
-      grid: { left: 52, right: 20, top: 44, bottom: 32 },
+      grid: { left: 52, right: 20, top: 54, bottom: 32 },
       xAxis: {
         type: "category",
         data: degradationData.years,
@@ -547,6 +550,7 @@ export default function HybridDashboard({
         min: yMin,
         max: 102,
         name: "%",
+        nameGap: 10,
         nameTextStyle: { color: colors.muted },
         axisLabel: { color: colors.muted },
         splitLine: { lineStyle: { color: colors.border } },
@@ -598,7 +602,7 @@ export default function HybridDashboard({
     return {
       tooltip: { trigger: "axis" },
       legend: { top: 0, textStyle: { color: colors.text } },
-      grid: { left: 60, right: 20, top: 40, bottom: 32 },
+      grid: { left: 60, right: 20, top: 54, bottom: 32 },
       xAxis: {
         type: "category",
         data: years,
@@ -608,6 +612,7 @@ export default function HybridDashboard({
       yAxis: {
         type: "value",
         name: unitScale,
+        nameGap: 10,
         nameTextStyle: { color: colors.muted },
         axisLabel: { color: colors.muted },
         splitLine: { lineStyle: { color: colors.border } },

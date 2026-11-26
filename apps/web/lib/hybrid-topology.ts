@@ -36,9 +36,9 @@ export const DEFAULT_NODE_POSITIONS: Record<TopologyNodeKind, { x: number; y: nu
   bess: { x: 40, y: 160 },
   biomass: { x: 40, y: 280 },
   diesel: { x: 40, y: 400 },
-  ac_bus: { x: 360, y: 160 },
-  load: { x: 620, y: 80 },
-  grid: { x: 620, y: 220 },
+  ac_bus: { x: 400, y: 200 },
+  load: { x: 680, y: 120 },
+  grid: { x: 680, y: 280 },
 };
 
 export const LOCKED_REQUIRED_KINDS = new Set<TopologyNodeKind>(["ac_bus", "pv", "load"]);
@@ -828,13 +828,22 @@ export function getEdgeGeometry(sourceNode: TopologyNode, targetNode: TopologyNo
     cy2 = y2 - dir * offset;
   }
 
+  // Untuk edge dari komponen ke AC BUS, tempatkan titik jangkar pill sedikit lebih dekat
+  // ke sisi komponen (t = 0.33) agar jalur lengkung komponen lain tidak melintasi pill.
+  const tPill = sourceNode.kind !== "ac_bus" && targetNode.kind === "ac_bus" ? 0.33 : 0.5;
+  const mt = 1 - tPill;
+  const w0 = mt * mt * mt;
+  const w1 = 3 * mt * mt * tPill;
+  const w2 = 3 * mt * tPill * tPill;
+  const w3 = tPill * tPill * tPill;
+
   return {
     x1,
     y1,
     x2,
     y2,
-    mx: (x1 + x2) / 2,
-    my: (y1 + y2) / 2,
+    mx: w0 * x1 + w1 * cx1 + w2 * cx2 + w3 * x2,
+    my: w0 * y1 + w1 * cy1 + w2 * cy2 + w3 * y2,
     pathD: `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`,
   };
 }
