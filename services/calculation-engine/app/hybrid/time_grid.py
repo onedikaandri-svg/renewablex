@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime, timezone as dt_timezone
+from functools import lru_cache
 import re
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -13,6 +14,39 @@ from app.errors import EngineError
 # Selalu 365 hari per tahun sesuai kebijakan mengabaikan tanggal 29 Februari.
 DAYS_PER_MONTH: tuple[int, ...] = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 SUPPORTED_STEP_MINUTES: tuple[int, ...] = (60, 30, 15)
+
+
+@lru_cache(maxsize=16)
+def _cached_day_indices(step_minutes: int, leap_day_policy: str) -> np.ndarray:
+    _ = leap_day_policy
+    steps_per_day = (24 * 60) // step_minutes
+    steps_per_year = sum(DAYS_PER_MONTH) * steps_per_day
+    arr = np.arange(steps_per_year, dtype=np.int64) // steps_per_day
+    arr.flags.writeable = False
+    return arr
+
+
+@lru_cache(maxsize=16)
+def _cached_month_indices(step_minutes: int, leap_day_policy: str) -> np.ndarray:
+    day_to_month = np.repeat(
+        np.arange(1, 13, dtype=np.int64),
+        np.array(DAYS_PER_MONTH, dtype=np.int64),
+    )
+    arr = day_to_month[_cached_day_indices(step_minutes, leap_day_policy)]
+    arr.flags.writeable = False
+    return arr
+
+
+@lru_cache(maxsize=16)
+def _cached_hour_of_day(step_minutes: int, leap_day_policy: str) -> np.ndarray:
+    _ = leap_day_policy
+    steps_per_day = (24 * 60) // step_minutes
+    steps_per_year = sum(DAYS_PER_MONTH) * steps_per_day
+    step_hours = step_minutes / 60.0
+    step_in_day = np.arange(steps_per_year, dtype=np.float64) % steps_per_day
+    arr = (step_in_day + 0.5) * step_hours
+    arr.flags.writeable = False
+    return arr
 
 # Peta zona waktu bawaan agar selalu deterministik dan tidak gagal di Windows tanpa tzdata.
 _FIXED_TIMEZONE_OFFSETS: dict[str, float] = {
@@ -99,20 +133,15 @@ class TimeConfig:
 
     def day_indices(self) -> np.ndarray:
         """Indeks hari 0..364 untuk setiap langkah waktu dalam setahun."""
-        return np.arange(self.steps_per_year, dtype=np.int64) // self.steps_per_day
+        return _cached_day_indices(self.step_minutes, self.leap_day_policy)
 
     def month_indices(self) -> np.ndarray:
         """Indeks bulan 1..12 untuk setiap langkah waktu dalam setahun."""
-        day_to_month = np.repeat(
-            np.arange(1, 13, dtype=np.int64),
-            np.array(DAYS_PER_MONTH, dtype=np.int64),
-        )
-        return day_to_month[self.day_indices()]
+        return _cached_month_indices(self.step_minutes, self.leap_day_policy)
 
     def hour_of_day(self) -> np.ndarray:
         """Titik tengah jam lokal [0, 24) untuk setiap langkah waktu."""
-        step_in_day = np.arange(self.steps_per_year, dtype=np.float64) % self.steps_per_day
-        return (step_in_day + 0.5) * self.step_hours
+        return _cached_hour_of_day(self.step_minutes, self.leap_day_policy)
 
     def timestamp_labels(self) -> list[str]:
         """Label waktu lokal awal tiap langkah dalam format MM-DD HH:MM."""

@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { downloadFile, formatNumber } from "@/lib/format";
 import {
+  computeEdgePillLayout,
   computeSchematicBounds,
   getEdgeGeometry,
   getNodeRect,
@@ -241,6 +242,7 @@ export default function SystemSchematicSvg({
           const color = SERIES_COLOR_BY_KIND[compNode.kind];
           const bidirectional = compNode.kind === "bess" || compNode.kind === "grid";
           const flowLabel = edgeFlowBadge(compNode.kind);
+          const pill = flowLabel ? computeEdgePillLayout(geo, flowLabel) : null;
 
           return (
             <g key={edge.id}>
@@ -252,25 +254,25 @@ export default function SystemSchematicSvg({
                 markerStart={bidirectional ? "url(#flow-arrow-start)" : undefined}
                 markerEnd="url(#flow-arrow-end)"
               />
-              {flowLabel && (
+              {flowLabel && pill && (
                 <g>
                   <rect
-                    x={geo.mx - 54}
-                    y={geo.my - 11}
-                    width={108}
-                    height={20}
+                    x={pill.x}
+                    y={pill.y}
+                    width={pill.width}
+                    height={pill.height}
                     rx={10}
                     fill="var(--surface)"
                     stroke={color}
                     strokeWidth={1.25}
                   />
                   <text
-                    x={geo.mx}
-                    y={geo.my + 3}
+                    x={pill.cx}
+                    y={pill.cy + 3.2}
                     textAnchor="middle"
                     style={{
                       fill: "var(--navytext)",
-                      fontSize: "10px",
+                      fontSize: "9.5px",
                       fontWeight: 600,
                       fontVariantNumeric: "tabular-nums",
                     }}

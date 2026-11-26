@@ -24,7 +24,7 @@ Mengikuti arahan pemilik proyek, palet aksen violet dari `kiyo.html` dipertahank
 | `brand` (`--accent`, `--btn`) | `#533AFD` | Aksen utama, tombol aksi utama, indikator tab aktif, slider |
 | `brand-hover` (`--btnhover`) | `#4229E8` | Keadaan hover tombol aksi utama |
 | `brand-soft` (`--accent-soft`, `--secondary`) | `#8E5CFF` / `#B9B9F9` | Batas tombol sekunder dan sorotan halus |
-| `positive` (`--success` / `--successbg`) | `#16A34A` / `#F0FDF4` | Status layak dan indikator nilai positif |
+| `positive` (`--success` / `--successbg`) | `#15803D` / `#F0FDF4` | Status layak dan indikator nilai positif (lolos WCAG AA `>= 4,5:1` di atas putih dan `--successbg`) |
 | `negative` (`--errtext` / `--errbg`) | `#B42318` / `#FEF2F2` | Status tidak layak, pesan galat, indikator nilai negatif |
 | `warning` (`--warntext` / `--warnbg`) | `#92400E` / `#FFFBEB` | Status marjinal dan banner peringatan |
 
@@ -39,10 +39,10 @@ Mode gelap mengikuti preferensi sistem (`prefers-color-scheme: dark`) dan toggle
 ### 2.3 Palet Seri Grafik Hybrid
 Untuk membedakan sumber energi dan aliran daya pada grafik sistem hybrid tanpa bergantung pada warna saja (selalu disertai label, legenda, atau pola garis):
 - **PV (Surya):** `#533AFD` (violet utama, mode gelap `#A78BFA`)
-- **BESS (Baterai):** `#0EA5E9` (biru langit, mode gelap `#38BDF8`)
-- **Biomass (Pembangkit):** `#D97706` (amber hangat, mode gelap `#FBBF24`)
+- **BESS (Baterai):** `#0369A1` (biru laut dalam yang lolos kontras WCAG AA di atas putih, mode gelap `#38BDF8`)
+- **Biomass (Pembangkit):** `#B45309` (amber gelap yang lolos kontras WCAG AA di atas putih, mode gelap `#FBBF24`)
 - **Beban (Load):** `#061B31` (navy gelap, mode gelap `#E2E8F0`) dengan gaya garis putus-putus atau pembeda tebal garis
-- **Grid / Ekspor / Positif:** `#16A34A` (hijau status, mode gelap `#4ADE80`)
+- **Grid / Ekspor / Positif:** `#15803D` (hijau status lolos WCAG AA di atas putih, mode gelap `#4ADE80`)
 - **Unmet Load / Curtailment / Negatif:** `#B42318` (merah status, mode gelap `#F87171`)
 
 ## 3. Tipografi

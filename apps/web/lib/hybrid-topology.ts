@@ -34,9 +34,9 @@ export const DEFAULT_NODE_POSITIONS: Record<TopologyNodeKind, { x: number; y: nu
   pv: { x: 40, y: 40 },
   bess: { x: 40, y: 160 },
   biomass: { x: 40, y: 280 },
-  ac_bus: { x: 300, y: 160 },
-  load: { x: 500, y: 80 },
-  grid: { x: 500, y: 220 },
+  ac_bus: { x: 360, y: 160 },
+  load: { x: 620, y: 80 },
+  grid: { x: 620, y: 220 },
 };
 
 export const LOCKED_REQUIRED_KINDS = new Set<TopologyNodeKind>(["ac_bus", "pv", "load"]);
@@ -70,8 +70,8 @@ const LIGHT_THEME_TOKENS: Record<string, string> = {
   "--border": "#E5EDF5",
   "--field": "#6B7A90",
   "--field-border": "#6B7A90",
-  "--success": "#16A34A",
-  "--positive": "#16A34A",
+  "--success": "#15803D",
+  "--positive": "#15803D",
   "--successbg": "#F0FDF4",
   "--errbg": "#FEF2F2",
   "--errtext": "#B42318",
@@ -80,10 +80,10 @@ const LIGHT_THEME_TOKENS: Record<string, string> = {
   "--warntext": "#92400E",
   "--warning": "#92400E",
   "--series-pv": "#533AFD",
-  "--series-bess": "#0EA5E9",
-  "--series-biomass": "#D97706",
+  "--series-bess": "#0369A1",
+  "--series-biomass": "#B45309",
   "--series-load": "#061B31",
-  "--series-grid": "#16A34A",
+  "--series-grid": "#15803D",
   "--series-unmet": "#B42318",
 };
 
@@ -776,6 +776,44 @@ export function getEdgeGeometry(sourceNode: TopologyNode, targetNode: TopologyNo
     mx: (x1 + x2) / 2,
     my: (y1 + y2) / 2,
     pathD: `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`,
+  };
+}
+
+export interface EdgePillLayout {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  cx: number;
+  cy: number;
+}
+
+/**
+ * Menghitung posisi dan lebar adaptif pill label aliran energi agar selalu
+ * berada di ruang kosong antara node sumber dan target tanpa menyentuh tepi kotak.
+ */
+export function computeEdgePillLayout(geo: EdgeGeometry, label: string): EdgePillLayout {
+  const width = Math.max(82, Math.min(124, Math.ceil(label.length * 6.0) + 18));
+  const height = 20;
+  const minXBound = Math.min(geo.x1, geo.x2);
+  const maxXBound = Math.max(geo.x1, geo.x2);
+  const gapX = maxXBound - minXBound;
+  const margin = 8;
+
+  let cx = geo.mx;
+  if (gapX >= width + margin * 2) {
+    const lo = minXBound + width / 2 + margin;
+    const hi = maxXBound - width / 2 - margin;
+    cx = Math.min(Math.max(geo.mx, lo), hi);
+  }
+  const cy = geo.my;
+  return {
+    x: Math.round((cx - width / 2) * 10) / 10,
+    y: Math.round((cy - height / 2) * 10) / 10,
+    width,
+    height,
+    cx: Math.round(cx * 10) / 10,
+    cy: Math.round(cy * 10) / 10,
   };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 export interface ToastItem {
   id: string;
@@ -16,6 +16,17 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setItems((prev) => prev.slice(0, -1));
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [items.length]);
 
   const pushToast = useCallback((message: string, tone: "info" | "success" | "error" = "info") => {
     const id = `${Date.now()}-${Math.random().toString(16).slice(2, 6)}`;
@@ -39,7 +50,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <button
               type="button"
               className="seg-btn"
-              style={{ color: "inherit", minWidth: "auto", minHeight: "1.75rem" }}
+              style={{ color: "inherit", minWidth: "2.75rem", minHeight: "2.75rem" }}
               onClick={() => setItems((prev) => prev.filter((x) => x.id !== item.id))}
               aria-label="Tutup notifikasi"
             >

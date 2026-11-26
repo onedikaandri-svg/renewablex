@@ -291,6 +291,123 @@ def _extract_yearly_row(
     return row, new_efc_total
 
 
+def run_scaled_lifetime_from_year_1(
+    config: SimulationConfig,
+    year_1_result: SimulationResult,
+    lifetime_config: LifetimeConfig,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> LifetimeSimulationResult:
+    """Membangun hasil multi-tahun mode scaled_year_1 langsung dari SimulationResult Tahun 1."""
+    validate_lifetime_config(lifetime_config)
+    pv_deg = _resolve_pv_degradation(config, lifetime_config)
+    yearly_rows: list[YearlyTechnicalResult] = []
+    all_events: list[LifecycleEvent] = []
+
+    row1, _ = _extract_yearly_row(year_1_result, 1, 1.0, 0.0, _inverter_event_for_year(lifetime_config, 1))
+    yearly_rows.append(row1)
+    all_events.extend(row1.lifecycle_events)
+    if progress_callback is not None:
+        progress_callback(1, lifetime_config.project_lifetime_years)
+
+    y1_pv_to_load = max(row1.served_load_kwh - row1.grid_import_kwh - row1.biomass_generation_kwh, 0.0)
+    for year in range(2, lifetime_config.project_lifetime_years + 1):
+        deg_factor = (1.0 - pv_deg) ** (year - 1)
+        pv_kwh = row1.pv_generation_kwh * deg_factor
+        pv_served = y1_pv_to_load * deg_factor
+        pv_drop = y1_pv_to_load - pv_served
+
+        extra_events = _inverter_event_for_year(lifetime_config, year)
+        bess_repl = 0
+        if (
+            config.bess is not None
+            and lifetime_config.scaled_bess_replacement_interval_years is not None
+            and year % lifetime_config.scaled_bess_replacement_interval_years == 0
+        ):
+            bess_repl = 1
+            extra_events.append(
+                LifecycleEvent(
+                    year=year,
+                    event_type="bess_replacement",
+                    description=f"Penggantian BESS terjadwal (scaled_year_1) pada tahun ke-{year}.",
+                    cost_amount=float(config.bess.replacement_cost),
+                )
+            )
+
+        bio_oh = 0
+        if (
+            config.biomass is not None
+            and lifetime_config.scaled_biomass_overhaul_interval_years is not None
+            and year % lifetime_config.scaled_biomass_overhaul_interval_years == 0
+        ):
+            bio_oh = 1
+            extra_events.append(
+                LifecycleEvent(
+                    year=year,
+                    event_type="biomass_overhaul",
+                    description=f"Overhaul Biomass terjadwal (scaled_year_1) pada tahun ke-{year}.",
+                    cost_amount=float(config.biomass.overhaul_cost),
+                )
+            )
+
+        if row1.grid_import_kwh > 0.0:
+            grid_imp = row1.grid_import_kwh + pv_drop
+            served = row1.served_load_kwh
+            unmet = row1.unmet_load_kwh
+        else:
+            grid_imp = 0.0
+            served = min(pv_served + row1.biomass_generation_kwh, row1.total_load_kwh)
+            unmet = max(row1.total_load_kwh - served, 0.0)
+
+        curtail = row1.curtailment_kwh * deg_factor
+        grid_exp = row1.grid_export_kwh * deg_factor
+        non_ren_bio = (
+            row1.biomass_generation_kwh
+            if (config.biomass is not None and not config.biomass.effective_is_renewable)
+            else 0.0
+        )
+        ren_frac = (
+            min(max((served - grid_imp - non_ren_bio) / row1.total_load_kwh, 0.0), 1.0)
+            if row1.total_load_kwh > 0.0
+            else 0.0
+        )
+
+        row_y = replace(
+            row1,
+            year=year,
+            pv_degradation_factor=deg_factor,
+            pv_generation_kwh=pv_kwh,
+            served_load_kwh=served,
+            unmet_load_kwh=unmet,
+            curtailment_kwh=curtail,
+            grid_import_kwh=grid_imp,
+            grid_export_kwh=grid_exp,
+            renewable_fraction=ren_frac,
+            bess_replacement_count=bess_repl,
+            biomass_overhaul_count=bio_oh,
+            lifecycle_events=tuple(extra_events),
+        )
+        yearly_rows.append(row_y)
+        all_events.extend(extra_events)
+
+    return LifetimeSimulationResult(
+        lifetime_config=lifetime_config,
+        year_1_result=year_1_result,
+        yearly=tuple(yearly_rows),
+        all_lifecycle_events=tuple(all_events),
+        total_load_kwh=sum(r.total_load_kwh for r in yearly_rows),
+        total_pv_generation_kwh=sum(r.pv_generation_kwh for r in yearly_rows),
+        total_biomass_generation_kwh=sum(r.biomass_generation_kwh for r in yearly_rows),
+        total_served_load_kwh=sum(r.served_load_kwh for r in yearly_rows),
+        total_unmet_load_kwh=sum(r.unmet_load_kwh for r in yearly_rows),
+        total_curtailment_kwh=sum(r.curtailment_kwh for r in yearly_rows),
+        total_grid_import_kwh=sum(r.grid_import_kwh for r in yearly_rows),
+        total_grid_export_kwh=sum(r.grid_export_kwh for r in yearly_rows),
+        total_bess_replacements=sum(r.bess_replacement_count for r in yearly_rows),
+        total_biomass_overhauls=sum(r.biomass_overhaul_count for r in yearly_rows),
+        max_balance_error_kw=max(r.max_balance_error_kw for r in yearly_rows),
+    )
+
+
 def run_lifetime_simulation(
     config: SimulationConfig,
     weather: WeatherDataset,
@@ -304,127 +421,47 @@ def run_lifetime_simulation(
     validate_lifetime_config(lc)
     pv_deg = _resolve_pv_degradation(config, lc)
 
+    if lc.multi_year_mode != "full_hourly":
+        yr1_cfg = _make_year_sim_config(config, 1, pv_deg)
+        res1 = run_simulation(yr1_cfg, weather, load_profile, simulation_year=1, pv_output_cache=pv_output_cache)
+        return run_scaled_lifetime_from_year_1(
+            config,
+            res1,
+            lc,
+            progress_callback=progress_callback,
+        )
+
     yearly_rows: list[YearlyTechnicalResult] = []
     all_events: list[LifecycleEvent] = []
     year_1_res: SimulationResult | None = None
 
-    if lc.multi_year_mode == "full_hourly":
-        bess_state: dict[str, Any] | None = None
-        biomass_state: dict[str, Any] | None = None
-        prev_efc = 0.0
+    bess_state: dict[str, Any] | None = None
+    biomass_state: dict[str, Any] | None = None
+    prev_efc = 0.0
 
-        for year in range(1, lc.project_lifetime_years + 1):
-            yr_cfg = _make_year_sim_config(config, year, pv_deg)
-            res = run_simulation(
-                yr_cfg,
-                weather,
-                load_profile,
-                initial_bess_state=bess_state,
-                initial_biomass_state=biomass_state,
-                simulation_year=year,
-                pv_output_cache=pv_output_cache,
-            )
-            if year == 1:
-                year_1_res = res
+    for year in range(1, lc.project_lifetime_years + 1):
+        yr_cfg = _make_year_sim_config(config, year, pv_deg)
+        res = run_simulation(
+            yr_cfg,
+            weather,
+            load_profile,
+            initial_bess_state=bess_state,
+            initial_biomass_state=biomass_state,
+            simulation_year=year,
+            pv_output_cache=pv_output_cache,
+        )
+        if year == 1:
+            year_1_res = res
 
-            bess_state = res.final_bess_state
-            biomass_state = res.final_biomass_state
-            deg_factor = (1.0 - pv_deg) ** (year - 1)
-            inv_events = _inverter_event_for_year(lc, year)
-            row, prev_efc = _extract_yearly_row(res, year, deg_factor, prev_efc, inv_events)
-            yearly_rows.append(row)
-            all_events.extend(row.lifecycle_events)
-            if progress_callback is not None:
-                progress_callback(year, lc.project_lifetime_years)
-    else:
-        yr1_cfg = _make_year_sim_config(config, 1, pv_deg)
-        res1 = run_simulation(yr1_cfg, weather, load_profile, simulation_year=1, pv_output_cache=pv_output_cache)
-        year_1_res = res1
-        row1, prev_efc = _extract_yearly_row(res1, 1, 1.0, 0.0, _inverter_event_for_year(lc, 1))
-        yearly_rows.append(row1)
-        all_events.extend(row1.lifecycle_events)
+        bess_state = res.final_bess_state
+        biomass_state = res.final_biomass_state
+        deg_factor = (1.0 - pv_deg) ** (year - 1)
+        inv_events = _inverter_event_for_year(lc, year)
+        row, prev_efc = _extract_yearly_row(res, year, deg_factor, prev_efc, inv_events)
+        yearly_rows.append(row)
+        all_events.extend(row.lifecycle_events)
         if progress_callback is not None:
-            progress_callback(1, lc.project_lifetime_years)
-
-        y1_pv_to_load = max(row1.served_load_kwh - row1.grid_import_kwh - row1.biomass_generation_kwh, 0.0)
-        for year in range(2, lc.project_lifetime_years + 1):
-            deg_factor = (1.0 - pv_deg) ** (year - 1)
-            pv_kwh = row1.pv_generation_kwh * deg_factor
-            pv_served = y1_pv_to_load * deg_factor
-            pv_drop = y1_pv_to_load - pv_served
-
-            extra_events = _inverter_event_for_year(lc, year)
-            bess_repl = 0
-            if (
-                config.bess is not None
-                and lc.scaled_bess_replacement_interval_years is not None
-                and year % lc.scaled_bess_replacement_interval_years == 0
-            ):
-                bess_repl = 1
-                extra_events.append(
-                    LifecycleEvent(
-                        year=year,
-                        event_type="bess_replacement",
-                        description=f"Penggantian BESS terjadwal (scaled_year_1) pada tahun ke-{year}.",
-                        cost_amount=float(config.bess.replacement_cost),
-                    )
-                )
-
-            bio_oh = 0
-            if (
-                config.biomass is not None
-                and lc.scaled_biomass_overhaul_interval_years is not None
-                and year % lc.scaled_biomass_overhaul_interval_years == 0
-            ):
-                bio_oh = 1
-                extra_events.append(
-                    LifecycleEvent(
-                        year=year,
-                        event_type="biomass_overhaul",
-                        description=f"Overhaul Biomass terjadwal (scaled_year_1) pada tahun ke-{year}.",
-                        cost_amount=float(config.biomass.overhaul_cost),
-                    )
-                )
-
-            if row1.grid_import_kwh > 0.0:
-                grid_imp = row1.grid_import_kwh + pv_drop
-                served = row1.served_load_kwh
-                unmet = row1.unmet_load_kwh
-            else:
-                grid_imp = 0.0
-                served = min(pv_served + row1.biomass_generation_kwh, row1.total_load_kwh)
-                unmet = max(row1.total_load_kwh - served, 0.0)
-
-            curtail = row1.curtailment_kwh * deg_factor
-            grid_exp = row1.grid_export_kwh * deg_factor
-            non_ren_bio = (
-                row1.biomass_generation_kwh
-                if (config.biomass is not None and not config.biomass.effective_is_renewable)
-                else 0.0
-            )
-            ren_frac = (
-                min(max((served - grid_imp - non_ren_bio) / row1.total_load_kwh, 0.0), 1.0)
-                if row1.total_load_kwh > 0.0
-                else 0.0
-            )
-
-            row_y = replace(
-                row1,
-                year=year,
-                pv_degradation_factor=deg_factor,
-                pv_generation_kwh=pv_kwh,
-                served_load_kwh=served,
-                unmet_load_kwh=unmet,
-                curtailment_kwh=curtail,
-                grid_import_kwh=grid_imp,
-                grid_export_kwh=grid_exp,
-                renewable_fraction=ren_frac,
-                bess_replacement_count=bess_repl,
-                biomass_overhaul_count=bio_oh,
-                lifecycle_events=tuple(extra_events),
-            )
-            yearly_rows.append(row_y)
-            all_events.extend(extra_events)
+            progress_callback(year, lc.project_lifetime_years)
 
     assert year_1_res is not None
     return LifetimeSimulationResult(

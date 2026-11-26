@@ -4,9 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePreferences } from "@/lib/preferences";
 
+const HYBRID_STUDIO_VERSION = "v0.6.1";
+
 export default function AppHeader() {
   const pathname = usePathname() || "/";
   const { theme, setTheme, lang, setLang, currency, setCurrency } = usePreferences();
+  const isGuide = pathname.startsWith("/hybrid/guide");
   const isHybrid = pathname.startsWith("/hybrid");
 
   return (
@@ -20,7 +23,7 @@ export default function AppHeader() {
             </svg>
           </div>
           <p className="brand">RenewableX</p>
-          <span className="chip">{isHybrid ? "Hybrid Studio v0.5" : "PV Screening v0.2"}</span>
+          <span className="chip">{isHybrid ? `Hybrid Studio ${HYBRID_STUDIO_VERSION}` : "PV Screening v0.2"}</span>
         </Link>
 
         <div className="header-controls">
@@ -28,8 +31,11 @@ export default function AppHeader() {
             <Link href="/" className="mode-link" aria-current={!isHybrid ? "page" : undefined}>
               {lang === "en" ? "Quick PV" : "Mode Cepat PV"}
             </Link>
-            <Link href="/hybrid" className="mode-link" aria-current={isHybrid ? "page" : undefined}>
+            <Link href="/hybrid" className="mode-link" aria-current={isHybrid && !isGuide ? "page" : undefined}>
               {lang === "en" ? "Hybrid Design" : "Desain Hybrid"}
+            </Link>
+            <Link href="/hybrid/guide" className="mode-link" aria-current={isGuide ? "page" : undefined}>
+              {lang === "en" ? "Guide" : "Panduan"}
             </Link>
           </nav>
 

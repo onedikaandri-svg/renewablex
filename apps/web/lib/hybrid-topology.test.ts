@@ -3,6 +3,7 @@ import { buildHybridSimulatePayload } from "./hybrid-api";
 import { buildBlankProject, buildSampleProject } from "./hybrid-storage";
 import {
   addTopologyNode,
+  computeEdgePillLayout,
   computeSchematicBounds,
   connectTopologyNodes,
   deriveDefaultTopology,
@@ -183,6 +184,21 @@ describe("hybrid-topology: geometri SVG dan serialisasi tema terang untuk PDF Ta
     expect(getNodeRect(pvNode).width).toBe(176);
     const geo = getEdgeGeometry(pvNode, busNode);
     expect(geo.pathD.startsWith("M ")).toBe(true);
+
+    // Pastikan seluruh pill aliran energi pada topologi default tidak menyentuh tepi kotak node maupun AC BUS
+    const nodeMap = new Map(topo.nodes.map((n) => [n.id, n]));
+    for (const edge of topo.edges) {
+      const src = nodeMap.get(edge.source)!;
+      const tgt = nodeMap.get(edge.target)!;
+      const eGeo = getEdgeGeometry(src, tgt);
+      const pill = computeEdgePillLayout(eGeo, "650,2 MWh/thn");
+      const srcRect = getNodeRect(src);
+      const tgtRect = getNodeRect(tgt);
+      const leftRect = srcRect.cx < tgtRect.cx ? srcRect : tgtRect;
+      const rightRect = srcRect.cx < tgtRect.cx ? tgtRect : srcRect;
+      expect(pill.x).toBeGreaterThanOrEqual(leftRect.x + leftRect.width + 6);
+      expect(pill.x + pill.width).toBeLessThanOrEqual(rightRect.x - 6);
+    }
 
     const fakeAttrMap = new Map<string, string>([
       ["viewBox", "0 0 680 340"],

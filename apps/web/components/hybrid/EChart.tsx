@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as echarts from "echarts/core";
-import { BarChart, HeatmapChart, LineChart, ScatterChart } from "echarts/charts";
+import { BarChart, HeatmapChart, LineChart, SankeyChart, ScatterChart } from "echarts/charts";
 import {
   DataZoomComponent,
   GridComponent,
@@ -19,6 +19,7 @@ echarts.use([
   BarChart,
   LineChart,
   HeatmapChart,
+  SankeyChart,
   ScatterChart,
   GridComponent,
   TooltipComponent,
@@ -68,10 +69,10 @@ export function getChartThemeColors(theme: "light" | "dark"): ChartThemeColors {
     border: "#E5EDF5",
     surface: "#FFFFFF",
     pv: "#533AFD",
-    bess: "#0EA5E9",
-    biomass: "#D97706",
+    bess: "#0369A1",
+    biomass: "#B45309",
     load: "#061B31",
-    grid: "#16A34A",
+    grid: "#15803D",
     unmet: "#B42318",
     accent: "#533AFD",
   };
