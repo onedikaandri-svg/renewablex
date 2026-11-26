@@ -185,6 +185,8 @@ class SimulationResult:
     biomass_status: tuple[str, ...] = ()
     biomass_fuel_tons: np.ndarray | None = None
     biomass_summary: BiomassSummary | None = None
+    final_bess_state: dict[str, Any] | None = None
+    final_biomass_state: dict[str, Any] | None = None
 
     def to_summary_dict(self) -> dict[str, Any]:
         """Mengembalikan ringkasan terstruktur siap serialisasi JSON."""
@@ -295,6 +297,9 @@ def run_simulation(
     config: SimulationConfig,
     weather: WeatherDataset,
     load_profile: LoadProfile,
+    initial_bess_state: dict[str, Any] | None = None,
+    initial_biomass_state: dict[str, Any] | None = None,
+    simulation_year: int | None = None,
 ) -> SimulationResult:
     """Menjalankan simulasi hybrid per langkah waktu dan memverifikasi neraca energi."""
     if weather.time_config != config.time_config:
@@ -317,20 +322,43 @@ def run_simulation(
         pv_cap_kwp = config.pv.capacity_kwp
     pv_output = pv_component.prepare(weather)
 
-    sim_year = config.pv.simulation_year if isinstance(config.pv, PVDetailedConfig) else 1
+    if simulation_year is not None:
+        sim_year = int(simulation_year)
+    elif isinstance(config.pv, PVDetailedConfig):
+        sim_year = config.pv.simulation_year
+    else:
+        sim_year = 1
 
     bess_component: BESSComponent | None = None
     bess_state: dict[str, Any] = {}
     if config.bess is not None:
         bess_component = BESSComponent(config.bess)
-        bess_state = bess_component.initial_state(year=sim_year)
+        if initial_bess_state is not None:
+            bess_component.validate()
+            bess_state = dict(initial_bess_state)
+            bess_state["current_year"] = sim_year
+            bess_state["events"] = []
+        else:
+            bess_state = bess_component.initial_state(year=sim_year)
 
     biomass_component: BiomassComponent | None = None
     biomass_state: dict[str, Any] = {}
     if config.biomass is not None:
         biomass_component = BiomassComponent(config.biomass)
         biomass_component.prepare_outage_masks(config.time_config)
-        biomass_state = biomass_component.initial_state(year=sim_year)
+        if initial_biomass_state is not None:
+            biomass_component.validate()
+            biomass_state = dict(initial_biomass_state)
+            biomass_state["total_operating_hours"] = 0.0
+            biomass_state["startup_count"] = 0
+            biomass_state["overhaul_count"] = 0
+            biomass_state["fuel_consumed_total_tons"] = 0.0
+            biomass_state["co2e_emitted_kg"] = 0.0
+            biomass_state["current_period_key"] = None
+            biomass_state["current_year"] = sim_year
+            biomass_state["events"] = []
+        else:
+            biomass_state = biomass_component.initial_state(year=sim_year)
 
     is_stage_1_loop = (
         bess_component is None
@@ -597,6 +625,8 @@ def run_simulation(
     if bess_component is not None:
         assert bess_conv_losses_kw is not None
         assert bess_aux_served_kw is not None
+        bess_events = list(bess_state.get("events", []))
+        bess_repl_count = len(bess_events) if initial_bess_state is not None else int(bess_state["replacement_count"])
         bess_summary = BESSSummary(
             total_charge_kwh=float(np.sum(charge_kw) * h),
             total_discharge_kwh=float(np.sum(discharge_kw) * h),
@@ -605,9 +635,9 @@ def run_simulation(
             equivalent_full_cycles=float(bess_state["equivalent_full_cycles"]),
             final_soc_fraction=float(bess_state["soc_fraction"]),
             final_effective_capacity_kwh=float(bess_state["effective_capacity_kwh"]),
-            replacement_count=int(bess_state["replacement_count"]),
+            replacement_count=bess_repl_count,
         )
-        events.extend(bess_state.get("events", []))
+        events.extend(bess_events)
 
     biomass_summary: BiomassSummary | None = None
     if biomass_component is not None:
@@ -654,4 +684,6 @@ def run_simulation(
         biomass_status=tuple(bio_status_list),
         biomass_fuel_tons=bio_fuel_series,
         biomass_summary=biomass_summary,
+        final_bess_state=dict(bess_state) if bess_component is not None else None,
+        final_biomass_state=dict(biomass_state) if biomass_component is not None else None,
     )
