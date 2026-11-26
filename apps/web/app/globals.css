@@ -1130,6 +1130,97 @@ table.sens-main {
   background: var(--surface-subtle);
 }
 
+/* Kanvas skema sistem interaktif Tahap 6A */
+.grid-canvas {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 64rem) {
+  .grid-canvas {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  }
+}
+
+.canvas-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.875rem;
+}
+
+.canvas-stage {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  overflow: hidden;
+  touch-action: none;
+}
+
+.canvas-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 15rem;
+  user-select: none;
+}
+
+.canvas-node:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.canvas-mobile-list {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.canvas-mobile-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 48rem) {
+  .canvas-mobile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.canvas-mobile-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+  padding: 0.875rem;
+}
+
+.canvas-mobile-card.is-selected {
+  border: 2px solid var(--accent);
+  background: var(--surface);
+}
+
+.canvas-toolbar .btn-sm,
+.canvas-mobile-card .btn-sm {
+  min-height: 2.75rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 40rem) {
   .wrap {
     padding: 0 0.875rem;
