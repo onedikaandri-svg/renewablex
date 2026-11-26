@@ -1,0 +1,123 @@
+{
+  "contract_version": "0.1",
+  "config_hash": "sha256:b880affb3e26bbdc8ffa8c4dcf63c464edee3bc6791af261b9d9077e0b582d7a",
+  "summary": {
+    "steps_count": 8760,
+    "step_minutes": 60,
+    "total_load_kwh": 2090852.9770953418,
+    "pv_generation_kwh": 736214.1911448805,
+    "served_load_kwh": 736198.6233442366,
+    "unmet_load_kwh": 1354654.3537511053,
+    "curtailment_kwh": 15.567800643942007,
+    "renewable_fraction": 0.3521044432148356,
+    "pv_capacity_factor": 0.16808543176823756,
+    "pv_specific_yield_kwh_per_kwp": 1472.428382289761,
+    "max_balance_error_kw": 0.0
+  },
+  "pv_loss_breakdown_kwh": {
+    "dc_nominal_kwh": 977829.632775747,
+    "temperature_loss_kwh": 86097.32760995164,
+    "system_loss_kwh": 124842.52272321135,
+    "inverter_loss_kwh": 30675.59129770338,
+    "clipping_loss_kwh": 0.0,
+    "ac_net_kwh": 736214.1911448805
+  },
+  "monthly": [
+    {
+      "month": 1,
+      "load_kwh": 177355.66392890472,
+      "pv_generation_kwh": 68416.84180917656,
+      "served_load_kwh": 68416.84180917656,
+      "unmet_load_kwh": 108938.82211972815,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 2,
+      "load_kwh": 160346.68217636802,
+      "pv_generation_kwh": 57811.69661044545,
+      "served_load_kwh": 57811.69661044545,
+      "unmet_load_kwh": 102534.98556592257,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 3,
+      "load_kwh": 176665.60126606317,
+      "pv_generation_kwh": 58956.67404874974,
+      "served_load_kwh": 58956.67404874974,
+      "unmet_load_kwh": 117708.92721731342,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 4,
+      "load_kwh": 172160.16023879772,
+      "pv_generation_kwh": 51196.373171117404,
+      "served_load_kwh": 51196.373171117404,
+      "unmet_load_kwh": 120963.78706768033,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 5,
+      "load_kwh": 178069.06973899045,
+      "pv_generation_kwh": 49827.62473230052,
+      "served_load_kwh": 49827.62473230052,
+      "unmet_load_kwh": 128241.4450066899,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 6,
+      "load_kwh": 171713.45657047583,
+      "pv_generation_kwh": 47945.41782112159,
+      "served_load_kwh": 47945.41782112159,
+      "unmet_load_kwh": 123768.03874935427,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 7,
+      "load_kwh": 177124.1474839547,
+      "pv_generation_kwh": 53364.36527917741,
+      "served_load_kwh": 53364.36527917741,
+      "unmet_load_kwh": 123759.7822047773,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 8,
+      "load_kwh": 178163.6358886043,
+      "pv_generation_kwh": 62372.259579494086,
+      "served_load_kwh": 62372.259579494086,
+      "unmet_load_kwh": 115791.37630911023,
+      "curtailment_kwh": 0.0
+    },
+    {
+      "month": 9,
+      "load_kwh": 172533.43798930076,
+      "pv_generation_kwh": 67790.82381872044,
+      "served_load_kwh": 67785.29849098253,
+      "unmet_load_kwh": 104748.13949831823,
+      "curtailment_kwh": 5.525327737897101
+    },
+    {
+      "month": 10,
+      "load_kwh": 177803.49538226216,
+      "pv_generation_kwh": 74262.24450902434,
+      "served_load_kwh": 74259.66258682452,
+      "unmet_load_kwh": 103543.83279543764,
+      "curtailment_kwh": 2.581922199822941
+    },
+    {
+      "month": 11,
+      "load_kwh": 170999.96083873598,
+      "pv_generation_kwh": 71924.05484254245,
+      "served_load_kwh": 71916.59429183623,
+      "unmet_load_kwh": 99083.36654689972,
+      "curtailment_kwh": 7.460550706221966
+    },
+    {
+      "month": 12,
+      "load_kwh": 177917.66559288395,
+      "pv_generation_kwh": 72345.81492301052,
+      "served_load_kwh": 72345.81492301052,
+      "unmet_load_kwh": 105571.85066987343,
+      "curtailment_kwh": 0.0
+    }
+  ]
+}
