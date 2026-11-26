@@ -66,10 +66,17 @@ Seluruh nilai di bawah ini bersifat **asumsi sementara untuk keperluan pengemban
 - **Degradasi kalender dan siklus (aditif):** `calendar_fade_per_year = 0,015` (1,5%/tahun) dan `cycle_fade_per_efc = 0,00005` (0,005% per siklus penuh, setara ~4.000 siklus menuju batas EOL bersama fade kalender) `[REAL DATA]`. Definisi Equivalent Full Cycle (EFC): akumulasi `energy_out_internal_kwh / effective_capacity_kwh`.
 - **Batas akhir umur baterai (End of Life):** `0,80` (80% dari kapasitas nominal awal) `[REAL DATA]`.
 
-### 2.3 Komponen Biomass (`[REAL DATA]`, Persiapan Tahap 3)
-- **Kebijakan kurva bahan bakar:** Mesin **tidak menanam kurva konsumsi bahan bakar tebakan**. Seluruh titik kurva beban parsial (`piecewise_heat_rate`, `piecewise_efficiency`, atau parameter `willans_linear`), nilai kalor bawah (LHV beserta basis `as_received` atau `dry`), kadar air, ramp rate, waktu start/stop, min up/down time, jadwal overhaul, dan faktor emisi wajib dipasok eksplisit melalui konfigurasi dari datasheet nyata pemilik proyek (`[REAL DATA]`).
+### 2.3 Komponen Biomass (`[REAL DATA]`, Persiapan Tahap 3A)
+- **Kebijakan parameter pembangkit:** Mesin mendukung input bebas sesuai datasheet proyek, dan untuk contoh serta pengujian awal Tahap 3A disediakan 2 profil sampel ilustratif berlabel `[REAL DATA]` (tidak ada kurva tersembunyi tanpa sumber):
+  - **Sampel A (`250 kW`, gasifikasi / gas engine `[REAL DATA]`):** beban minimum `40%`, ramp rate `125 kW/jam`, start/stop `1 jam`, min up/down `4/2 jam`, titik heat rate `[(0.40, 16500), (0.75, 14200), (1.00, 13500)] kJ/kWh`, forced outage rate `3%` (MTTR `6 jam`), interval overhaul `8.000 jam`.
+  - **Sampel B (`1.000 kW`, boiler + turbin uap `[REAL DATA]`):** beban minimum `45%`, ramp rate `200/250 kW/jam`, start/stop `3/2 jam`, min up/down `8/4 jam`, titik heat rate `[(0.45, 17800), (0.75, 15200), (1.00, 14400)] kJ/kWh`, forced outage rate `4%` (MTTR `12 jam`), interval overhaul `16.000 jam`.
+- **Katalog preset sampel jenis bahan bakar (`fuel_preset`, `[REAL DATA]`):** Nilai di bawah adalah sampel ilustratif sifat umum bahan bakar untuk memudahkan simulasi awal dan dapat ditimpa per field di konfigurasi (bukan data kontrak pasokan spesifik):
+  - `efb` (Empty Fruit Bunch / Tandan Kosong Sawit): kadar air `45%`, LHV terima `8,5 MJ/kg`, harga `Rp 350.000/ton`, logistik `Rp 150.000/ton`, emisi rantai pasok `35 kg CO2e/ton` `[REAL DATA]`.
+  - `wood_pellet` (Pelet Kayu): kadar air `8%`, LHV terima `17,5 MJ/kg`, harga `Rp 2.200.000/ton`, logistik `Rp 200.000/ton`, emisi rantai pasok `65 kg CO2e/ton` `[REAL DATA]`.
+  - `pks` (Palm Kernel Shell / Cangkang Sawit): kadar air `12%`, LHV terima `16,5 MJ/kg`, harga `Rp 1.100.000/ton`, logistik `Rp 150.000/ton`, emisi rantai pasok `45 kg CO2e/ton` `[REAL DATA]`.
+  - `woodchip` (Serpihan Kayu): kadar air `30%`, LHV terima `12,2 MJ/kg`, harga `Rp 650.000/ton`, logistik `Rp 150.000/ton`, emisi rantai pasok `40 kg CO2e/ton` `[REAL DATA]`.
+  - `rice_husk` (Sekam Padi): kadar air `12%`, LHV terima `13,5 MJ/kg`, harga `Rp 400.000/ton`, logistik `Rp 120.000/ton`, emisi rantai pasok `30 kg CO2e/ton` `[REAL DATA]`.
 - **Konstanta konversi LHV basis kering ke kondisi terima (`as_received`):** Jika pengguna memasukkan LHV dalam basis kering (`lhv_basis = "dry"`), koreksi kadar air menggunakan konstanta termodinamika standar kalor laten penguapan air pada suhu acuan 25 C sebesar `2,443 MJ/kg` (rujukan standar analisis bahan bakar padat ISO 18125 / ASTM): `lhv_effective = lhv_dry * (1 - moisture_fraction) - 2.443 * moisture_fraction`.
-- **Angka contoh di dokumen kontrak Tahap 3:** Nilai seperti kapasitas `250 kW`, beban minimum `40%`, heat rate `13.500 sampai 16.500 kJ/kWh`, LHV cangkang sawit `16,5 MJ/kg`, kadar air `12%`, harga `Rp 950.000/ton`, biaya logistik `Rp 150.000/ton`, dan emisi rantai pasok `45 kg CO2e/ton` hanya bersifat ilustratif struktur JSON dan ditandai `[REAL DATA]` sampai datasheet resmi diterima.
 
 ---
 
