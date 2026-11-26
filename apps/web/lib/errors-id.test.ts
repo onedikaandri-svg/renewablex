@@ -155,3 +155,14 @@ describe("detail berupa teks", () => {
     expect(translateDetailText("Not Found")).toBe("Not Found");
   });
 });
+
+describe("kode galat sistem hybrid Tahap 5", () => {
+  const byCode = (code: string) => translateIssue(issue("value_error", "raw", undefined, code));
+
+  it("menerjemahkan kode beban, komponen, dan job asinkron", () => {
+    expect(byCode("invalid_load_length")).toContain("8.760");
+    expect(byCode("negative_load_value")).toContain("negatif");
+    expect(byCode("invalid_bess_config")).toContain("BESS");
+    expect(byCode("job_not_found")).toContain("Job simulasi");
+  });
+});

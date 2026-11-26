@@ -8,8 +8,10 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.version import ENGINE_VERSION
 
-# A full request is about 1 KB; 64 KB leaves room for long notes and sensitivity lists.
+# A full PV screening request is about 1 KB; 64 KB leaves room for notes and sensitivity lists.
+# Hybrid endpoints allow up to 2 MB so users can upload 8760-hour CSV load profiles.
 MAX_BODY_BYTES = 64 * 1024
+HYBRID_MAX_BODY_BYTES = 2 * 1024 * 1024
 
 request_log = logging.getLogger("renewablex.request")
 if not request_log.handlers:
@@ -40,9 +42,11 @@ class BodyLimit:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        path = str(scope.get("path", ""))
+        limit = HYBRID_MAX_BODY_BYTES if path.startswith("/v1/hybrid/") else self.max_bytes
         declared = dict(scope["headers"]).get(b"content-length", b"")
-        if declared.isdigit() and int(declared) > self.max_bytes:
-            response = JSONResponse(status_code=413, content={"detail": too_large_detail(self.max_bytes)})
+        if declared.isdigit() and int(declared) > limit:
+            response = JSONResponse(status_code=413, content={"detail": too_large_detail(limit)})
             await response(scope, receive, send)
             return
         seen = 0
@@ -52,9 +56,9 @@ class BodyLimit:
             message = await receive()
             if message["type"] == "http.request":
                 seen += len(message.get("body", b""))
-                if seen > self.max_bytes:
+                if seen > limit:
                     # FastAPI re-raises HTTPException from body parsing; any other error becomes a 400.
-                    raise HTTPException(413, detail=too_large_detail(self.max_bytes))
+                    raise HTTPException(413, detail=too_large_detail(limit))
             return message
 
         await self.app(scope, limited, send)
