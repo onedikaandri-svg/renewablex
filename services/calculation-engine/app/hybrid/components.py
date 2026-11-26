@@ -94,6 +94,10 @@ class PVHourlyOutput:
     ac_before_clip_kw: np.ndarray
     ac_net_kw: np.ndarray
     loss_breakdown_kwh: dict[str, float]
+    night_tare_kw: np.ndarray | None = None
+    poa_beam_w_m2: np.ndarray | None = None
+    poa_sky_w_m2: np.ndarray | None = None
+    poa_ground_w_m2: np.ndarray | None = None
 
 
 def _solar_geometry_cos_aoi(
@@ -258,6 +262,11 @@ class PVWattsComponent(EnergyComponent):
     ) -> float:
         output = self.prepare(weather)
         return float(output.ac_net_kw[step_idx])
+
+    def night_tare_power_kw(self, step_idx: int, weather: WeatherDataset) -> float:
+        """Mengembalikan konsumsi malam inverter (0.0 kW pada model PVWatts Tahap 1)."""
+        _ = step_idx, weather
+        return 0.0
 
     def step(
         self,

@@ -8,8 +8,11 @@ import sys
 from typing import Any
 
 from app.errors import EngineError
+from app.hybrid.bess import BESSConfig
 from app.hybrid.components import PVWattsConfig
+from app.hybrid.dispatch import DispatchConfig
 from app.hybrid.load import generate_synthetic_load, load_profile_from_csv
+from app.hybrid.pv_detailed import PVDetailedConfig
 from app.hybrid.simulator import SimulationConfig, SimulationResult, run_simulation
 from app.hybrid.time_grid import TimeConfig
 from app.hybrid.weather import PVGISTMYWeatherProvider, load_weather_from_json
@@ -64,6 +67,117 @@ def _load_profile_from_config(cfg: dict[str, Any], base_dir: Path, time_config: 
     raise EngineError("unsupported_load_mode", f"Mode profil beban tidak dikenal: {mode}.")
 
 
+def _parse_pv_config(pv_raw: dict[str, Any]) -> PVWattsConfig | PVDetailedConfig:
+    model = str(pv_raw.get("model", "pvwatts_v1"))
+    cap_kwp = float(pv_raw["capacity_kwp"])
+    inv_ac_kw = float(pv_raw.get("inverter_ac_kw", cap_kwp))
+
+    if model == "pvwatts_v1":
+        return PVWattsConfig(
+            capacity_kwp=cap_kwp,
+            inverter_ac_kw=inv_ac_kw,
+            tilt_degrees=float(pv_raw.get("tilt_degrees", 10.0)),
+            azimuth_degrees=float(pv_raw.get("azimuth_degrees", 0.0)),
+            system_loss_fraction=float(pv_raw.get("system_loss_fraction", 0.14)),
+            temp_coeff_per_c=float(pv_raw.get("temp_coeff_per_c", -0.004)),
+            noct_c=float(pv_raw.get("noct_c", 45.0)),
+            inverter_efficiency=float(pv_raw.get("inverter_efficiency", 0.96)),
+            albedo=float(pv_raw.get("albedo", 0.2)),
+        )
+
+    if model == "detailed_v1":
+        soiling = tuple(float(v) for v in pv_raw["soiling_monthly"]) if "soiling_monthly" in pv_raw else (0.02,) * 12
+        snow = tuple(float(v) for v in pv_raw["snow_loss_monthly"]) if "snow_loss_monthly" in pv_raw else (0.0,) * 12
+        curve_raw = pv_raw.get("efficiency_curve_points")
+        curve_pts = tuple((float(pt[0]), float(pt[1])) for pt in curve_raw) if curve_raw is not None else None
+        return PVDetailedConfig(
+            capacity_kwp=cap_kwp,
+            inverter_ac_kw=inv_ac_kw,
+            decompose_ghi_if_missing=bool(pv_raw.get("decompose_ghi_if_missing", True)),
+            transposition_model=pv_raw.get("transposition_model", "perez"),
+            albedo=float(pv_raw.get("albedo", 0.2)),
+            tracking_mode=pv_raw.get("tracking_mode", "fixed"),
+            tilt_degrees=float(pv_raw.get("tilt_degrees", 10.0)),
+            azimuth_degrees=float(pv_raw.get("azimuth_degrees", 0.0)),
+            max_angle_deg=float(pv_raw.get("max_angle_deg", 60.0)),
+            backtracking=bool(pv_raw.get("backtracking", True)),
+            gcr=float(pv_raw.get("gcr", 0.35)),
+            iam_b0=float(pv_raw.get("iam_b0", 0.05)),
+            soiling_monthly=soiling,
+            snow_loss_monthly=snow,
+            cell_temp_model=pv_raw.get("cell_temp_model", "faiman"),
+            noct_c=float(pv_raw.get("noct_c", 45.0)),
+            faiman_u0=float(pv_raw.get("faiman_u0", 25.0)),
+            faiman_u1=float(pv_raw.get("faiman_u1", 6.84)),
+            dc_model=pv_raw.get("dc_model", "pvwatts"),
+            temp_coeff_per_c=float(pv_raw.get("temp_coeff_per_c", -0.004)),
+            i_sc=float(pv_raw.get("i_sc", 13.8)),
+            v_oc=float(pv_raw.get("v_oc", 49.5)),
+            i_mp=float(pv_raw.get("i_mp", 13.0)),
+            v_mp=float(pv_raw.get("v_mp", 41.5)),
+            alpha_sc=float(pv_raw.get("alpha_sc", 0.0069)),
+            beta_voc=float(pv_raw.get("beta_voc", -0.1386)),
+            cells_in_series=int(pv_raw.get("cells_in_series", 72)),
+            n_modules_series=None if pv_raw.get("n_modules_series") is None else int(pv_raw["n_modules_series"]),
+            n_strings_parallel=None if pv_raw.get("n_strings_parallel") is None else int(pv_raw["n_strings_parallel"]),
+            mismatch_fraction=float(pv_raw.get("mismatch_fraction", 0.02)),
+            dc_wiring_fraction=float(pv_raw.get("dc_wiring_fraction", 0.02)),
+            shading_fraction=float(pv_raw.get("shading_fraction", 0.0)),
+            availability_fraction=float(pv_raw.get("availability_fraction", 0.01)),
+            lid_fraction=float(pv_raw.get("lid_fraction", 0.015)),
+            annual_degradation_fraction=float(pv_raw.get("annual_degradation_fraction", 0.005)),
+            simulation_year=int(pv_raw.get("simulation_year", 1)),
+            inverter_model=pv_raw.get("inverter_model", "constant"),
+            inverter_efficiency=float(pv_raw.get("inverter_efficiency", 0.96)),
+            efficiency_curve_points=curve_pts,
+            night_tare_kw=float(pv_raw.get("night_tare_kw", 0.0)),
+        )
+
+    raise EngineError("invalid_pv_config", f"Model PV tidak dikenal: {model}.")
+
+
+def _parse_bess_config(bess_raw: dict[str, Any] | None) -> BESSConfig | None:
+    if not bess_raw or bess_raw.get("enabled") is False:
+        return None
+    return BESSConfig(
+        nominal_capacity_kwh=float(bess_raw["nominal_capacity_kwh"]),
+        max_charge_kw=None if bess_raw.get("max_charge_kw") is None else float(bess_raw["max_charge_kw"]),
+        max_discharge_kw=None if bess_raw.get("max_discharge_kw") is None else float(bess_raw["max_discharge_kw"]),
+        c_rate_charge=None if bess_raw.get("c_rate_charge") is None else float(bess_raw["c_rate_charge"]),
+        c_rate_discharge=None if bess_raw.get("c_rate_discharge") is None else float(bess_raw["c_rate_discharge"]),
+        soc_min_fraction=float(bess_raw.get("soc_min_fraction", 0.20)),
+        soc_max_fraction=float(bess_raw.get("soc_max_fraction", 0.95)),
+        initial_soc_fraction=float(bess_raw.get("initial_soc_fraction", 0.50)),
+        charge_efficiency=float(bess_raw.get("charge_efficiency", 0.94)),
+        discharge_efficiency=float(bess_raw.get("discharge_efficiency", 0.94)),
+        pcs_loss_fraction=float(bess_raw.get("pcs_loss_fraction", 0.02)),
+        aux_load_kw=float(bess_raw.get("aux_load_kw", 0.0)),
+        calendar_fade_per_year=float(bess_raw.get("calendar_fade_per_year", 0.015)),
+        cycle_fade_per_efc=float(bess_raw.get("cycle_fade_per_efc", 0.00005)),
+        eol_capacity_fraction=float(bess_raw.get("eol_capacity_fraction", 0.80)),
+        replacement_cost=float(bess_raw.get("replacement_cost", 0.0)),
+    )
+
+
+def _parse_dispatch_config(sim_raw: dict[str, Any]) -> DispatchConfig | None:
+    if "dispatch_strategy" not in sim_raw and "dispatch_params" not in sim_raw:
+        return None
+    params = sim_raw.get("dispatch_params") or {}
+    peak_hours_raw = params.get("peak_hours", (17, 18, 19, 20, 21))
+    off_peak_raw = params.get("off_peak_hours", (0, 1, 2, 3, 4, 5))
+    return DispatchConfig(
+        strategy=sim_raw.get("dispatch_strategy", "self_consumption"),
+        allow_grid_import=bool(params.get("allow_grid_import", False)),
+        allow_grid_export=bool(params.get("allow_grid_export", False)),
+        target_soc_fraction=float(params.get("target_soc_fraction", 0.80)),
+        peak_limit_kw=None if params.get("peak_limit_kw") is None else float(params["peak_limit_kw"]),
+        peak_hours=tuple(int(h) for h in peak_hours_raw),
+        off_peak_hours=tuple(int(h) for h in off_peak_raw),
+        tou_charge_soc_target=float(params.get("tou_charge_soc_target", 0.90)),
+        tou_discharge_soc_floor=float(params.get("tou_discharge_soc_floor", 0.25)),
+    )
+
+
 def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResult:
     """Membaca berkas JSON konfigurasi, menjalankan simulasi, dan menulis hasil ke folder keluaran."""
     cfg = json.loads(config_path.read_text(encoding="utf-8"))
@@ -71,7 +185,8 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
 
     project_raw = cfg.get("project") or {}
     sim_raw = cfg.get("simulation") or {}
-    pv_raw = (cfg.get("components") or {}).get("pv") or {}
+    components_raw = cfg.get("components") or {}
+    pv_raw = components_raw.get("pv") or {}
 
     time_config = TimeConfig(
         step_minutes=int(sim_raw.get("step_minutes", 60)),
@@ -79,23 +194,17 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
         leap_day_policy=str(sim_raw.get("leap_day_policy", "ignore_feb_29")),  # type: ignore[arg-type]
     )
 
-    pv_config = PVWattsConfig(
-        capacity_kwp=float(pv_raw["capacity_kwp"]),
-        inverter_ac_kw=float(pv_raw.get("inverter_ac_kw", pv_raw["capacity_kwp"])),
-        tilt_degrees=float(pv_raw.get("tilt_degrees", 10.0)),
-        azimuth_degrees=float(pv_raw.get("azimuth_degrees", 0.0)),
-        system_loss_fraction=float(pv_raw.get("system_loss_fraction", 0.14)),
-        temp_coeff_per_c=float(pv_raw.get("temp_coeff_per_c", -0.004)),
-        noct_c=float(pv_raw.get("noct_c", 45.0)),
-        inverter_efficiency=float(pv_raw.get("inverter_efficiency", 0.96)),
-        albedo=float(pv_raw.get("albedo", 0.2)),
-    )
+    pv_config = _parse_pv_config(pv_raw)
+    bess_config = _parse_bess_config(components_raw.get("bess"))
+    dispatch_config = _parse_dispatch_config(sim_raw)
 
     sim_config = SimulationConfig(
         project_name=str(project_raw.get("project_name", "Proyek Hybrid")),
         time_config=time_config,
         pv=pv_config,
         contract_version=str(cfg.get("contract_version", "0.1")),
+        bess=bess_config,
+        dispatch=dispatch_config,
     )
 
     weather = _load_weather_from_config(cfg, base_dir, time_config)
@@ -110,9 +219,11 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
     csv_path = output_dir / "hourly_balance.csv"
     labels = time_config.timestamp_labels()
     b = result.balance
+    include_stage2_cols = result.bess_soc is not None or result.dispatch_strategy is not None
+
     with csv_path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow([
+        header = [
             "step",
             "local_time",
             "load_kw",
@@ -122,9 +233,13 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
             "unmet_load_kw",
             "curtailment_kw",
             "losses_kw",
-        ])
+        ]
+        if include_stage2_cols:
+            header.extend(["charge_kw", "discharge_kw", "grid_import_kw", "grid_export_kw", "bess_soc", "trace_reason"])
+        writer.writerow(header)
+
         for i in range(time_config.steps_per_year):
-            writer.writerow([
+            row: list[Any] = [
                 i,
                 labels[i],
                 round(float(b.load_kw[i]), 6),
@@ -134,7 +249,19 @@ def run_from_config_file(config_path: Path, output_dir: Path) -> SimulationResul
                 round(float(b.unmet_load_kw[i]), 6),
                 round(float(b.curtailment_kw[i]), 6),
                 round(float(b.losses_kw[i]), 6),
-            ])
+            ]
+            if include_stage2_cols:
+                soc_val = round(float(result.bess_soc[i]), 6) if result.bess_soc is not None else ""
+                reason = result.trace_reasons[i] if i < len(result.trace_reasons) else ""
+                row.extend([
+                    round(float(b.charge_kw[i]), 6),
+                    round(float(b.discharge_kw[i]), 6),
+                    round(float(b.grid_import_kw[i]), 6),
+                    round(float(b.grid_export_kw[i]), 6),
+                    soc_val,
+                    reason,
+                ])
+            writer.writerow(row)
 
     return result
 

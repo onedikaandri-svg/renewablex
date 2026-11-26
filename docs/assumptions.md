@@ -57,12 +57,13 @@ Seluruh nilai di bawah ini bersifat **asumsi sementara untuk keperluan pengemban
 - **Parameter modul satu-dioda ilustratif (untuk uji model sampai datasheet modul nyata dipilih pemilik):** `i_sc = 13,8` A, `v_oc = 49,5` V, `i_mp = 13,0` A, `v_mp = 41,5` V, `alpha_sc = 0,0005 * i_sc` A/K, `beta_voc = -0,0028 * v_oc` V/K, `cells_in_series = 72` `[REAL DATA]`.
 - **Degradasi tahunan modul (`degradation_fraction_per_year`):** `0,005` per tahun (0,5%/tahun) `[REAL DATA]`.
 - **Rasio DC/AC inverter tipikal:** `1,15` sampai `1,20` `[REAL DATA]`.
+- **Kurva efisiensi inverter beban parsial ilustratif (untuk mode `efficiency_curve` bila tidak diisi dari datasheet):** titik `(0.05, 0.90), (0.10, 0.94), (0.20, 0.965), (0.50, 0.975), (0.75, 0.972), (1.00, 0.965)` `[REAL DATA]`.
 
 ### 2.2 Komponen BESS (`[REAL DATA]`, Tahap 2)
 - **Efisiensi satu arah (`charge_efficiency`, `discharge_efficiency`):** `0,94` per arah (atau sekitar 0,88 round-trip sebelum rugi PCS) `[REAL DATA]`.
 - **Rugi PCS (`pcs_loss_fraction`) dan beban tambahan (`aux_load_kw`):** `0,02` (2%) dan `0,0` kW bawaan `[REAL DATA]`.
 - **Batas SOC minimum dan maksimum:** `0,20` (20%) dan `0,95` (95%), dengan `initial_soc_fraction = 0,50` `[REAL DATA]`.
-- **Degradasi kalender dan siklus (aditif):** `calendar_fade_per_year = 0,015` (1,5%/tahun) dan `cycle_fade_per_efc = 0,00005` (0,005% per siklus penuh, setara ~4.000 siklus menuju batas EOL bersama fade kalender) `[REAL DATA]`.
+- **Degradasi kalender dan siklus (aditif):** `calendar_fade_per_year = 0,015` (1,5%/tahun) dan `cycle_fade_per_efc = 0,00005` (0,005% per siklus penuh, setara ~4.000 siklus menuju batas EOL bersama fade kalender) `[REAL DATA]`. Definisi Equivalent Full Cycle (EFC): akumulasi `energy_out_internal_kwh / effective_capacity_kwh`.
 - **Batas akhir umur baterai (End of Life):** `0,80` (80% dari kapasitas nominal awal) `[REAL DATA]`.
 
 ### 2.3 Komponen Biomass (`[REAL DATA]`, Persiapan Tahap 3)
