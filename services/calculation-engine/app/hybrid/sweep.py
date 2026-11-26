@@ -9,6 +9,7 @@ from app.errors import EngineError
 from app.hybrid.bess import BESSComponent, BESSConfig
 from app.hybrid.biomass import BiomassComponent, BiomassConfig, build_sample_biomass_config
 from app.hybrid.components import PVHourlyOutput, PVWattsConfig
+from app.hybrid.diesel import DieselComponent, DieselConfig
 from app.hybrid.finance import (
     FinanceConfig,
     FinanceResult,
@@ -71,9 +72,11 @@ def validate_sweep_limits(
     bess_values: list[float],
     biomass_values: list[float],
     multi_year_mode: str,
+    diesel_values: list[float] | None = None,
 ) -> int:
     """Memeriksa batas aman jumlah kombinasi terhadap mode multi-tahun."""
-    total = len(pv_values) * len(bess_values) * len(biomass_values)
+    diesel_len = len(diesel_values) if diesel_values is not None else 1
+    total = len(pv_values) * len(bess_values) * len(biomass_values) * diesel_len
     if multi_year_mode == "full_hourly" and total > MAX_SWEEP_COMBINATIONS_FULL_HOURLY:
         raise EngineError(
             "sweep_full_hourly_limit_exceeded",
@@ -204,6 +207,37 @@ def _scale_biomass_config(
     return cand
 
 
+def _scale_diesel_config(
+    base_diesel: DieselConfig | None,
+    target_kw: float,
+    scale_replacement_costs: bool,
+) -> DieselConfig | None:
+    if target_kw <= 0.0:
+        return None
+
+    ref = base_diesel
+    if ref is None:
+        cand = DieselConfig(
+            rated_capacity_kw=target_kw,
+            overhaul_cost=(120_000_000.0 * (target_kw / 250.0)) if scale_replacement_costs else 0.0,
+        )
+    else:
+        base_kw = ref.rated_capacity_kw if ref.rated_capacity_kw > 0.0 else 250.0
+        scale = target_kw / base_kw
+        cand = replace(
+            ref,
+            rated_capacity_kw=target_kw,
+            no_load_fuel_liters_per_hour=(
+                ref.no_load_fuel_liters_per_hour * scale
+                if ref.no_load_fuel_liters_per_hour is not None
+                else None
+            ),
+            overhaul_cost=(ref.overhaul_cost * scale) if scale_replacement_costs else ref.overhaul_cost,
+        )
+    DieselComponent(cand).validate()
+    return cand
+
+
 def _sort_key_for_combo(combo: dict[str, Any], sort_by: SortByMode, feasible_first: bool) -> tuple[Any, ...]:
     fin = combo["finance"]
     tech = combo["technical"]
@@ -234,6 +268,7 @@ def run_hybrid_sweep(
     pv_values: list[float],
     bess_values: list[float],
     biomass_values: list[float],
+    diesel_values: list[float] | None = None,
     inverter_sizing_mode: InverterSizingMode = "keep_dc_ac_ratio",
     scale_replacement_costs: bool = True,
     bess_replacement_cost_per_kwh: float | None = None,
@@ -245,16 +280,23 @@ def run_hybrid_sweep(
     progress_callback: Any = None,
     cancel_event: threading.Event | None = None,
 ) -> dict[str, Any]:
-    """Menjalankan sapuan kombinasi ukuran PV, BESS, dan Biomass lalu mengurutkan hasilnya."""
+    """Menjalankan sapuan kombinasi ukuran PV, BESS, Biomass, dan Diesel lalu mengurutkan hasilnya."""
     pv_clean = validate_sweep_axis(pv_values, "pv_capacity_kwp_values", allow_zero=False)
     bess_clean = validate_sweep_axis(bess_values, "bess_capacity_kwh_values", allow_zero=True)
     bio_clean = validate_sweep_axis(biomass_values, "biomass_capacity_kw_values", allow_zero=True)
+    include_diesel_in_id = diesel_values is not None
+    diesel_clean = (
+        validate_sweep_axis(diesel_values, "diesel_capacity_kw_values", allow_zero=True)
+        if diesel_values is not None
+        else [0.0]
+    )
 
     total = validate_sweep_limits(
         pv_clean,
         bess_clean,
         bio_clean,
         base_lifetime_config.multi_year_mode,
+        diesel_values=diesel_clean,
     )
 
     if max_unmet_load_fraction is not None and not (0.0 <= max_unmet_load_fraction <= 1.0):
@@ -288,103 +330,123 @@ def run_hybrid_sweep(
             )
 
             for bio_kw in bio_clean:
-                if cancel_event is not None and cancel_event.is_set():
-                    raise EngineError("sweep_job_cancelled", "Job sapuan kombinasi dibatalkan oleh pengguna.")
-
                 cand_bio = _scale_biomass_config(
                     base_sim_config.biomass,
                     bio_kw,
                     scale_replacement_costs,
                 )
 
-                cand_sim = replace(
-                    base_sim_config,
-                    pv=scaled_pv,
-                    bess=cand_bess,
-                    biomass=cand_bio,
-                )
+                for diesel_kw in diesel_clean:
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise EngineError("sweep_job_cancelled", "Job sapuan kombinasi dibatalkan oleh pengguna.")
 
-                lifetime_res = run_lifetime_simulation(
-                    cand_sim,
-                    weather,
-                    load_profile,
-                    cand_lifetime,
-                    pv_output_cache=pv_cache,
-                )
-                fin_res: FinanceResult = run_financial_analysis(lifetime_res, base_finance_config)
+                    cand_diesel = _scale_diesel_config(
+                        base_sim_config.diesel,
+                        diesel_kw,
+                        scale_replacement_costs,
+                    )
 
-                y1 = lifetime_res.year_1_result
-                y1_summary = y1.summary
-                unmet_frac = (
-                    y1_summary.unmet_load_kwh / y1_summary.total_load_kwh
-                    if y1_summary.total_load_kwh > 0.0
-                    else 0.0
-                )
+                    cand_sim = replace(
+                        base_sim_config,
+                        pv=scaled_pv,
+                        bess=cand_bess,
+                        biomass=cand_bio,
+                        diesel=cand_diesel,
+                    )
 
-                infeasible_reasons: list[str] = []
-                if max_unmet_load_fraction is not None and unmet_frac > max_unmet_load_fraction + 1e-9:
-                    infeasible_reasons.append("unmet_load_exceeded")
-                if min_renewable_fraction is not None and y1_summary.renewable_fraction + 1e-9 < min_renewable_fraction:
-                    infeasible_reasons.append("renewable_fraction_below_min")
+                    lifetime_res = run_lifetime_simulation(
+                        cand_sim,
+                        weather,
+                        load_profile,
+                        cand_lifetime,
+                        pv_output_cache=pv_cache,
+                    )
+                    fin_res: FinanceResult = run_financial_analysis(lifetime_res, base_finance_config)
 
-                combo_id = f"pv{pv_kwp:g}-bess{bess_kwh:g}-bio{bio_kw:g}"
-                fs = fin_res.summary
-                em = fin_res.emissions
+                    y1 = lifetime_res.year_1_result
+                    y1_summary = y1.summary
+                    unmet_frac = (
+                        y1_summary.unmet_load_kwh / y1_summary.total_load_kwh
+                        if y1_summary.total_load_kwh > 0.0
+                        else 0.0
+                    )
 
-                combinations.append({
-                    "rank": 0,
-                    "combination_id": combo_id,
-                    "feasible": len(infeasible_reasons) == 0,
-                    "infeasible_reasons": infeasible_reasons,
-                    "sizing": {
-                        "pv_capacity_kwp": round(pv_kwp, 3),
-                        "pv_inverter_ac_kw": round(cand_inv_kw, 3),
-                        "bess_enabled": cand_bess is not None,
-                        "bess_nominal_capacity_kwh": round(bess_kwh, 3),
-                        "bess_max_charge_kw": round(cand_bess.rated_max_charge_kw, 3) if cand_bess is not None else 0.0,
-                        "bess_max_discharge_kw": round(cand_bess.rated_max_discharge_kw, 3) if cand_bess is not None else 0.0,
-                        "biomass_enabled": cand_bio is not None,
-                        "biomass_rated_capacity_kw": round(bio_kw, 3),
-                    },
-                    "technical": {
-                        "pv_generation_kwh": round(y1_summary.pv_generation_kwh, 3),
-                        "biomass_generation_kwh": round(
-                            y1.biomass_summary.total_generation_kwh if y1.biomass_summary is not None else 0.0,
-                            3,
-                        ),
-                        "served_load_kwh": round(y1_summary.served_load_kwh, 3),
-                        "unmet_load_kwh": round(y1_summary.unmet_load_kwh, 3),
-                        "unmet_load_fraction": round(unmet_frac, 6),
-                        "curtailment_kwh": round(y1_summary.curtailment_kwh, 3),
-                        "renewable_fraction": round(y1_summary.renewable_fraction, 6),
-                        "bess_equivalent_full_cycles": round(
-                            y1.bess_summary.equivalent_full_cycles if y1.bess_summary is not None else 0.0,
-                            3,
-                        ),
-                        "biomass_fuel_tons": round(
-                            y1.biomass_summary.total_fuel_tons if y1.biomass_summary is not None else 0.0,
-                            3,
-                        ),
-                        "avoided_emissions_tons_co2e": round(em.avoided_emissions_tons_co2e, 3),
-                    },
-                    "finance": {
-                        "currency_code": fs.currency_code,
-                        "gross_capex": round(fs.gross_capex, 2),
-                        "net_capex": round(fs.net_capex, 2),
-                        "total_npc": round(fs.total_npc, 2),
-                        "lcoe": round(fs.lcoe, 4),
-                        "npv": round(fs.npv, 2),
-                        "irr": None if fs.irr is None else round(fs.irr, 6),
-                        "irr_status": fs.irr_status,
-                        "simple_payback_years": None if fs.simple_payback_years is None else round(fs.simple_payback_years, 3),
-                        "discounted_payback_years": None if fs.discounted_payback_years is None else round(fs.discounted_payback_years, 3),
-                        "viability_status": fs.viability_status,
-                    },
-                })
+                    infeasible_reasons: list[str] = []
+                    if max_unmet_load_fraction is not None and unmet_frac > max_unmet_load_fraction + 1e-9:
+                        infeasible_reasons.append("unmet_load_exceeded")
+                    if min_renewable_fraction is not None and y1_summary.renewable_fraction + 1e-9 < min_renewable_fraction:
+                        infeasible_reasons.append("renewable_fraction_below_min")
 
-                done_count += 1
-                if progress_callback is not None:
-                    progress_callback(done_count, total, combo_id)
+                    combo_id = f"pv{pv_kwp:g}-bess{bess_kwh:g}-bio{bio_kw:g}"
+                    if include_diesel_in_id:
+                        combo_id = f"{combo_id}-dsl{diesel_kw:g}"
+                    fs = fin_res.summary
+                    em = fin_res.emissions
+
+                    combinations.append({
+                        "rank": 0,
+                        "combination_id": combo_id,
+                        "feasible": len(infeasible_reasons) == 0,
+                        "infeasible_reasons": infeasible_reasons,
+                        "sizing": {
+                            "pv_capacity_kwp": round(pv_kwp, 3),
+                            "pv_inverter_ac_kw": round(cand_inv_kw, 3),
+                            "bess_enabled": cand_bess is not None,
+                            "bess_nominal_capacity_kwh": round(bess_kwh, 3),
+                            "bess_max_charge_kw": round(cand_bess.rated_max_charge_kw, 3) if cand_bess is not None else 0.0,
+                            "bess_max_discharge_kw": round(cand_bess.rated_max_discharge_kw, 3) if cand_bess is not None else 0.0,
+                            "biomass_enabled": cand_bio is not None,
+                            "biomass_rated_capacity_kw": round(bio_kw, 3),
+                            "diesel_enabled": cand_diesel is not None,
+                            "diesel_rated_capacity_kw": round(diesel_kw, 3),
+                        },
+                        "technical": {
+                            "pv_generation_kwh": round(y1_summary.pv_generation_kwh, 3),
+                            "biomass_generation_kwh": round(
+                                y1.biomass_summary.total_generation_kwh if y1.biomass_summary is not None else 0.0,
+                                3,
+                            ),
+                            "diesel_generation_kwh": round(
+                                y1.diesel_summary.total_generation_kwh if y1.diesel_summary is not None else 0.0,
+                                3,
+                            ),
+                            "served_load_kwh": round(y1_summary.served_load_kwh, 3),
+                            "unmet_load_kwh": round(y1_summary.unmet_load_kwh, 3),
+                            "unmet_load_fraction": round(unmet_frac, 6),
+                            "curtailment_kwh": round(y1_summary.curtailment_kwh, 3),
+                            "renewable_fraction": round(y1_summary.renewable_fraction, 6),
+                            "bess_equivalent_full_cycles": round(
+                                y1.bess_summary.equivalent_full_cycles if y1.bess_summary is not None else 0.0,
+                                3,
+                            ),
+                            "biomass_fuel_tons": round(
+                                y1.biomass_summary.total_fuel_tons if y1.biomass_summary is not None else 0.0,
+                                3,
+                            ),
+                            "diesel_fuel_liters": round(
+                                y1.diesel_summary.total_fuel_liters if y1.diesel_summary is not None else 0.0,
+                                3,
+                            ),
+                            "avoided_emissions_tons_co2e": round(em.avoided_emissions_tons_co2e, 3),
+                        },
+                        "finance": {
+                            "currency_code": fs.currency_code,
+                            "gross_capex": round(fs.gross_capex, 2),
+                            "net_capex": round(fs.net_capex, 2),
+                            "total_npc": round(fs.total_npc, 2),
+                            "lcoe": round(fs.lcoe, 4),
+                            "npv": round(fs.npv, 2),
+                            "irr": None if fs.irr is None else round(fs.irr, 6),
+                            "irr_status": fs.irr_status,
+                            "simple_payback_years": None if fs.simple_payback_years is None else round(fs.simple_payback_years, 3),
+                            "discounted_payback_years": None if fs.discounted_payback_years is None else round(fs.discounted_payback_years, 3),
+                            "viability_status": fs.viability_status,
+                        },
+                    })
+
+                    done_count += 1
+                    if progress_callback is not None:
+                        progress_callback(done_count, total, combo_id)
 
     combinations.sort(key=lambda item: _sort_key_for_combo(item, sort_by, feasible_first))
     for idx, item in enumerate(combinations, start=1):

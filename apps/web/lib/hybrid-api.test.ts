@@ -21,13 +21,14 @@ afterEach(() => {
 });
 
 describe("hybrid-api", () => {
-  it("membangun payload simulasi sesuai kontrak v0.5 tanpa field UI cache", () => {
+  it("membangun payload simulasi sesuai kontrak v0.7 tanpa field UI cache", () => {
     const cfg = buildSampleProject("test-id");
     const payload = buildHybridSimulatePayload(cfg);
-    expect(payload.contract_version).toBe("0.5");
+    expect(payload.contract_version).toBe("0.7");
     expect((payload as Record<string, unknown>).weatherPreview).toBeUndefined();
     expect((payload as Record<string, unknown>).loadPreview).toBeUndefined();
     expect((payload.components as Record<string, unknown>).pv).toBeDefined();
+    expect((payload.components as Record<string, unknown>).diesel).toEqual({ enabled: false });
   });
 
   it("memetakan respons sukses dan galat 422 dengan code stabil", async () => {
@@ -60,13 +61,13 @@ describe("hybrid-api", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn()
-        .mockResolvedValueOnce(new Response(JSON.stringify({ contract_version: "0.5" }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ contract_version: "0.7" }), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "j1", status: "queued" }), { status: 202 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "j1", status: "completed" }), { status: 200 })),
     );
 
     const sim = await runHybridSimulate(cfg);
-    expect(sim.contract_version).toBe("0.5");
+    expect(sim.contract_version).toBe("0.7");
 
     const job = await submitHybridJob(cfg);
     expect(job.job_id).toBe("j1");
@@ -86,7 +87,7 @@ describe("hybrid-api", () => {
         .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "sw1", total_combinations: 4, status: "queued" }), { status: 202 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "sw1", status: "completed" }), { status: 200 }))
         .mockResolvedValueOnce(new Response(JSON.stringify({ job_id: "sw1", status: "cancelled" }), { status: 200 }))
-        .mockResolvedValueOnce(new Response(JSON.stringify({ contract_version: "0.6", variables: [] }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ contract_version: "0.7", variables: [] }), { status: 200 }))
         .mockResolvedValueOnce(
           new Response(new Uint8Array([80, 75, 3, 4]), {
             status: 200,
@@ -102,6 +103,7 @@ describe("hybrid-api", () => {
       pv_capacity_kwp_values: [300, 500],
       bess_capacity_kwh_values: [0, 400],
       biomass_capacity_kw_values: [0],
+      diesel_capacity_kw_values: [0, 200],
       pv_inverter_sizing_mode: "keep_dc_ac_ratio",
       scale_replacement_costs: true,
       max_unmet_load_fraction: 0.05,
@@ -118,7 +120,7 @@ describe("hybrid-api", () => {
     expect(swCancel.status).toBe("cancelled");
 
     const sens = await runHybridSensitivity(cfg, { variables: ["capex_total"], shifts: [-0.1, 0.1] });
-    expect(sens.contract_version).toBe("0.6");
+    expect(sens.contract_version).toBe("0.7");
 
     const fakeResult = {
       project_name: "Cikarang",

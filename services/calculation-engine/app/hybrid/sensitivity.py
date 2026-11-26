@@ -32,6 +32,7 @@ SensitivityVariableId = Literal[
     "electricity_tariff",
     "discount_rate",
     "biomass_fuel_price",
+    "diesel_fuel_price",
     "om_total",
     "pv_degradation_rate",
     "load_scale",
@@ -53,6 +54,7 @@ FINANCE_ONLY_VARIABLES: frozenset[str] = frozenset({
     "electricity_tariff",
     "discount_rate",
     "biomass_fuel_price",
+    "diesel_fuel_price",
     "om_total",
 })
 
@@ -119,6 +121,10 @@ def _base_value_and_unit(
         if sim_cfg.biomass is None:
             return 0.0, f"{curr}/ton", True
         return float(sim_cfg.biomass.effective_fuel_params.fuel_price_per_ton), f"{curr}/ton", False
+    if var == "diesel_fuel_price":
+        if sim_cfg.diesel is None:
+            return 0.0, f"{curr}/L", True
+        return float(sim_cfg.diesel.fuel_price_per_liter), f"{curr}/L", False
     if var == "om_total":
         yr1_om = float(base_finance.schedule[1].om_cost) if len(base_finance.schedule) > 1 else 0.0
         return yr1_om, f"{curr}/thn", False
@@ -160,6 +166,8 @@ def _apply_finance_shift(
             bess_capex_per_kwh=fin_cfg.bess_capex_per_kwh * factor,
             biomass_capex=(fin_cfg.biomass_capex * factor) if fin_cfg.biomass_capex is not None else None,
             biomass_capex_per_kw=fin_cfg.biomass_capex_per_kw * factor,
+            diesel_capex=(fin_cfg.diesel_capex * factor) if fin_cfg.diesel_capex is not None else None,
+            diesel_capex_per_kw=fin_cfg.diesel_capex_per_kw * factor,
             bos_and_other_capex=fin_cfg.bos_and_other_capex * factor,
         )
     elif var == "electricity_tariff":
@@ -186,6 +194,11 @@ def _apply_finance_shift(
             replace(row, biomass_fuel_cost=row.biomass_fuel_cost * factor)
             for row in yearly
         )
+    elif var == "diesel_fuel_price":
+        next_yearly = tuple(
+            replace(row, diesel_fuel_cost=row.diesel_fuel_cost * factor)
+            for row in yearly
+        )
     elif var == "om_total":
         next_fin = replace(
             fin_cfg,
@@ -206,6 +219,11 @@ def _apply_finance_shift(
                 if fin_cfg.biomass_fixed_om_override is not None
                 else None
             ),
+            diesel_fixed_om_override=(
+                fin_cfg.diesel_fixed_om_override * factor
+                if fin_cfg.diesel_fixed_om_override is not None
+                else None
+            ),
         )
         next_yearly = tuple(
             replace(
@@ -213,6 +231,9 @@ def _apply_finance_shift(
                 biomass_fixed_om_cost=row.biomass_fixed_om_cost * factor,
                 biomass_variable_om_cost=row.biomass_variable_om_cost * factor,
                 biomass_startup_cost=row.biomass_startup_cost * factor,
+                diesel_fixed_om_cost=row.diesel_fixed_om_cost * factor,
+                diesel_variable_om_cost=row.diesel_variable_om_cost * factor,
+                diesel_startup_cost=row.diesel_startup_cost * factor,
             )
             for row in yearly
         )
@@ -348,6 +369,7 @@ def _evaluate_pair_shifts(
     )
     bess_kwh = sim_cfg.bess.nominal_capacity_kwh if sim_cfg.bess is not None else 0.0
     bio_kw = sim_cfg.biomass.rated_capacity_kw if sim_cfg.biomass is not None else 0.0
+    diesel_kw = sim_cfg.diesel.rated_capacity_kw if sim_cfg.diesel is not None else 0.0
 
     return run_financial_analysis_from_yearly(
         yearly=yearly,
@@ -355,6 +377,7 @@ def _evaluate_pair_shifts(
         pv_capacity_kwp=pv_kwp,
         bess_capacity_kwh=bess_kwh,
         biomass_capacity_kw=bio_kw,
+        diesel_capacity_kw=diesel_kw,
     )
 
 
@@ -441,19 +464,33 @@ def run_hybrid_sensitivity(
                 elif var == "biomass_fuel_price" and sim_cfg.biomass is not None:
                     base_fp = sim_cfg.biomass.effective_fuel_params.fuel_price_per_ton
                     sim_cfg = replace(sim_cfg, biomass=replace(sim_cfg.biomass, fuel_price_per_ton=base_fp * (1.0 + sh)))
-                elif var == "om_total" and sim_cfg.biomass is not None:
-                    sim_cfg = replace(
-                        sim_cfg,
-                        biomass=replace(
-                            sim_cfg.biomass,
-                            fixed_om_per_kw_year=sim_cfg.biomass.fixed_om_per_kw_year * (1.0 + sh),
-                            variable_om_per_kwh=sim_cfg.biomass.variable_om_per_kwh * (1.0 + sh),
-                            startup_cost=sim_cfg.biomass.startup_cost * (1.0 + sh),
-                        ),
-                    )
+                elif var == "diesel_fuel_price" and sim_cfg.diesel is not None:
+                    base_dp = sim_cfg.diesel.fuel_price_per_liter
+                    sim_cfg = replace(sim_cfg, diesel=replace(sim_cfg.diesel, fuel_price_per_liter=base_dp * (1.0 + sh)))
+                elif var == "om_total":
+                    if sim_cfg.biomass is not None:
+                        sim_cfg = replace(
+                            sim_cfg,
+                            biomass=replace(
+                                sim_cfg.biomass,
+                                fixed_om_per_kw_year=sim_cfg.biomass.fixed_om_per_kw_year * (1.0 + sh),
+                                variable_om_per_kwh=sim_cfg.biomass.variable_om_per_kwh * (1.0 + sh),
+                                startup_cost=sim_cfg.biomass.startup_cost * (1.0 + sh),
+                            ),
+                        )
+                    if sim_cfg.diesel is not None:
+                        sim_cfg = replace(
+                            sim_cfg,
+                            diesel=replace(
+                                sim_cfg.diesel,
+                                fixed_om_per_kw_year=sim_cfg.diesel.fixed_om_per_kw_year * (1.0 + sh),
+                                variable_om_per_operating_hour=sim_cfg.diesel.variable_om_per_operating_hour * (1.0 + sh),
+                                startup_cost=sim_cfg.diesel.startup_cost * (1.0 + sh),
+                            ),
+                        )
                 lt = run_lifetime_simulation(sim_cfg, weather, lp, lc_cfg, pv_output_cache=pv_cache)
                 fin_shift, _ = _apply_finance_shift(
-                    var if var != "biomass_fuel_price" and var != "om_total" else ("om_total" if var == "om_total" else "noop"),
+                    var if var not in ("biomass_fuel_price", "diesel_fuel_price", "om_total") else ("om_total" if var == "om_total" else "noop"),
                     sh,
                     sim_cfg,
                     base_finance_config,
@@ -520,6 +557,11 @@ def run_hybrid_sensitivity(
             raise EngineError(
                 "invalid_matrix_axes",
                 "Variabel biomass_fuel_price tidak dapat dipakai pada matriks saat Biomass nonaktif.",
+            )
+        if (x_var == "diesel_fuel_price" or y_var == "diesel_fuel_price") and base_sim_config.diesel is None:
+            raise EngineError(
+                "invalid_matrix_axes",
+                "Variabel diesel_fuel_price tidak dapat dipakai pada matriks saat Diesel Generator nonaktif.",
             )
 
         cells: list[dict[str, Any]] = []

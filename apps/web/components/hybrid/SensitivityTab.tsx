@@ -21,6 +21,7 @@ const VARIABLE_LABELS: Record<HybridSensitivityVariableId, string> = {
   electricity_tariff: "Tarif Listrik",
   discount_rate: "Tingkat Diskonto (WACC)",
   biomass_fuel_price: "Harga Bahan Bakar Biomass",
+  diesel_fuel_price: "Harga Solar Diesel",
   om_total: "Biaya O&M Tahunan",
   pv_degradation_rate: "Degradasi Tahunan PV",
   load_scale: "Skala Beban Listrik",

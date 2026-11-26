@@ -1,4 +1,4 @@
-"""Pembuat buku kerja Excel (.xlsx) multi-sheet untuk laporan sistem hybrid Tahap 7."""
+"""Pembuat buku kerja Excel (.xlsx) multi-sheet untuk laporan sistem hybrid Tahap 7 dan 8B."""
 
 from io import BytesIO
 from typing import Any
@@ -123,6 +123,7 @@ def build_hybrid_excel_bytes(
     ws_meta = simulation_result.get("weather_source") or {}
     bess_sum = simulation_result.get("bess_summary") or {}
     bio_sum = simulation_result.get("biomass_summary") or {}
+    diesel_sum = simulation_result.get("diesel_summary") or {}
     lcoe_bd = simulation_result.get("lcoe_breakdown") or {}
     curr = str(fin.get("currency_code") or (project_config.get("project") or {}).get("currency_code") or "IDR")
 
@@ -172,6 +173,7 @@ def build_hybrid_excel_bytes(
         ("Total Beban" if not is_en else "Total Load", summary.get("total_load_kwh", 0.0), "kWh/thn", "#,##0.0"),
         ("Produksi PV" if not is_en else "PV Generation", summary.get("pv_generation_kwh", 0.0), "kWh/thn", "#,##0.0"),
         ("Produksi Biomass" if not is_en else "Biomass Generation", summary.get("biomass_generation_kwh", 0.0), "kWh/thn", "#,##0.0"),
+        ("Produksi Diesel" if not is_en else "Diesel Generation", summary.get("diesel_generation_kwh", 0.0), "kWh/thn", "#,##0.0"),
         ("Beban Terpenuhi" if not is_en else "Served Load", summary.get("served_load_kwh", 0.0), "kWh/thn", "#,##0.0"),
         ("Beban Tidak Terpenuhi" if not is_en else "Unmet Load", summary.get("unmet_load_kwh", 0.0), "kWh/thn", "#,##0.0"),
         ("Curtailment", summary.get("curtailment_kwh", 0.0), "kWh/thn", "#,##0.0"),
@@ -180,6 +182,9 @@ def build_hybrid_excel_bytes(
         ("BESS Discharge", bess_sum.get("total_discharge_kwh", 0.0), "kWh/thn", "#,##0.0"),
         ("Siklus BESS (EFC)" if not is_en else "BESS Cycles (EFC)", bess_sum.get("equivalent_full_cycles", 0.0), "siklus", "#,##0.0"),
         ("Konsumsi Bahan Bakar Biomass" if not is_en else "Biomass Fuel Consumed", bio_sum.get("total_fuel_tons", 0.0), "ton/thn", "#,##0.0"),
+        ("Konsumsi Solar Diesel" if not is_en else "Diesel Fuel Consumed", diesel_sum.get("total_fuel_liters", 0.0), "liter/thn", "#,##0.0"),
+        ("Jam Operasi Diesel" if not is_en else "Diesel Operating Hours", diesel_sum.get("total_operating_hours", 0.0), "jam/thn", "#,##0.0"),
+        ("Emisi CO2e Diesel" if not is_en else "Diesel CO2e Emissions", diesel_sum.get("total_co2e_kg", 0.0), "kg CO2e/thn", "#,##0.0"),
         ("Galat Neraca Maks" if not is_en else "Max Balance Error", summary.get("max_balance_error_kw", 0.0), "kW", "0.00E+00"),
     ]
     for label, val, unit, fmt in tech_rows:
@@ -201,12 +206,13 @@ def build_hybrid_excel_bytes(
 
     # 2. Sheet Energi_Bulanan
     ws_mon = wb.create_sheet("Energi_Bulanan")
-    _style_banner(ws_mon, 1, "Ringkasan Energi Bulanan (Tahun 1, kWh)" if not is_en else "Monthly Energy Summary (Year 1, kWh)", 11)
+    _style_banner(ws_mon, 1, "Ringkasan Energi Bulanan (Tahun 1, kWh)" if not is_en else "Monthly Energy Summary (Year 1, kWh)", 12)
     mon_headers = [
         "Bulan" if not is_en else "Month",
         "Beban (kWh)",
         "PV (kWh)",
         "Biomass (kWh)",
+        "Diesel (kWh)",
         "BESS Charge (kWh)",
         "BESS Discharge (kWh)",
         "Grid Impor (kWh)",
@@ -217,8 +223,8 @@ def build_hybrid_excel_bytes(
     ]
     _style_table_header(ws_mon, 3, mon_headers)
     m_names = _MONTH_NAMES_EN if is_en else _MONTH_NAMES_ID
-    mon_fmt = {c: "#,##0.0" for c in range(2, 12)}
-    totals = [0.0] * 10
+    mon_fmt = {c: "#,##0.0" for c in range(2, 13)}
+    totals = [0.0] * 11
     row_i = 4
     for m_row in monthly:
         m_num = int(m_row.get("month", 1))
@@ -227,6 +233,7 @@ def build_hybrid_excel_bytes(
             float(m_row.get("load_kwh", 0.0)),
             float(m_row.get("pv_generation_kwh", 0.0)),
             float(m_row.get("biomass_generation_kwh", 0.0)),
+            float(m_row.get("diesel_generation_kwh", 0.0)),
             float(m_row.get("bess_charge_kwh", 0.0)),
             float(m_row.get("bess_discharge_kwh", 0.0)),
             float(m_row.get("grid_import_kwh", 0.0)),
@@ -306,7 +313,12 @@ def build_hybrid_excel_bytes(
         elif isinstance(obj, list):
             out.append((prefix, ", ".join(str(x) for x in obj), "[REAL DATA] / input proyek"))
         else:
-            note = "Lihat docs/assumptions.md [REAL DATA]" if prefix.startswith(("components", "finance")) else "Konfigurasi proyek"
+            if prefix == "components.diesel.emission_factor_kg_co2e_per_liter":
+                note = "Rujukan IPCC 2006 / DEFRA (2,68 kg CO2e/liter); lihat docs/assumptions.md"
+            elif prefix.startswith(("components", "finance")):
+                note = "Lihat docs/assumptions.md [REAL DATA]"
+            else:
+                note = "Konfigurasi proyek"
             out.append((prefix, obj if obj is not None else "Kosong", note))
 
     cfg_rows: list[tuple[str, Any, str]] = []
@@ -321,7 +333,7 @@ def build_hybrid_excel_bytes(
     # 5. Sheet Hasil_Sapuan (opsional)
     if sweep_result and isinstance(sweep_result.get("combinations"), list):
         ws_sw = wb.create_sheet("Hasil_Sapuan")
-        _style_banner(ws_sw, 1, "Hasil Sapuan Kombinasi Gaya HOMER", 11)
+        _style_banner(ws_sw, 1, "Hasil Sapuan Kombinasi Gaya HOMER", 12)
         sw_headers = [
             "Peringkat",
             "ID Kombinasi",
@@ -329,6 +341,7 @@ def build_hybrid_excel_bytes(
             "PV (kWp)",
             "BESS (kWh)",
             "Biomass (kW)",
+            "Diesel (kW)",
             f"LCOE ({curr}/kWh)",
             f"Total NPC ({curr})",
             f"NPV ({curr})",
@@ -336,7 +349,7 @@ def build_hybrid_excel_bytes(
             "Pangsa Terbarukan",
         ]
         _style_table_header(ws_sw, 3, sw_headers)
-        sw_fmt = {1: "0", 4: "#,##0.0", 5: "#,##0.0", 6: "#,##0.0", 7: "#,##0.00", 8: "#,##0", 9: "#,##0", 10: "0.00%", 11: "0.0%"}
+        sw_fmt = {1: "0", 4: "#,##0.0", 5: "#,##0.0", 6: "#,##0.0", 7: "#,##0.0", 8: "#,##0.00", 9: "#,##0", 10: "#,##0", 11: "0.00%", 12: "0.0%"}
         row_i = 4
         for c in sweep_result["combinations"]:
             sz = c.get("sizing") or {}
@@ -352,6 +365,7 @@ def build_hybrid_excel_bytes(
                     sz.get("pv_capacity_kwp", 0.0),
                     sz.get("bess_nominal_capacity_kwh", 0.0),
                     sz.get("biomass_rated_capacity_kw", 0.0),
+                    sz.get("diesel_rated_capacity_kw", 0.0),
                     fn.get("lcoe", 0.0),
                     fn.get("total_npc", 0.0),
                     fn.get("npv", 0.0),

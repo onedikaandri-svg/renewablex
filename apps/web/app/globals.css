@@ -37,6 +37,7 @@
   --series-pv: #533AFD;
   --series-bess: #0369A1;
   --series-biomass: #B45309;
+  --series-diesel: #475569;
   --series-load: #061B31;
   --series-grid: #15803D;
   --series-unmet: #B42318;
@@ -89,6 +90,7 @@
     --series-pv: #A78BFA;
     --series-bess: #38BDF8;
     --series-biomass: #FBBF24;
+    --series-diesel: #94A3B8;
     --series-load: #E2E8F0;
     --series-grid: #4ADE80;
     --series-unmet: #F87171;
@@ -131,6 +133,7 @@
   --series-pv: #533AFD;
   --series-bess: #0369A1;
   --series-biomass: #B45309;
+  --series-diesel: #475569;
   --series-load: #061B31;
   --series-grid: #15803D;
   --series-unmet: #B42318;
@@ -173,6 +176,7 @@
   --series-pv: #A78BFA;
   --series-bess: #38BDF8;
   --series-biomass: #FBBF24;
+  --series-diesel: #94A3B8;
   --series-load: #E2E8F0;
   --series-grid: #4ADE80;
   --series-unmet: #F87171;

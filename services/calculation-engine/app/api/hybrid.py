@@ -1,4 +1,4 @@
-"""Endpoint HTTP FastAPI untuk sistem energi hybrid RenewableX (Tahap 5 dan Tahap 7)."""
+"""Endpoint HTTP FastAPI untuk sistem energi hybrid RenewableX (Tahap 5, 7, dan 8B)."""
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
@@ -28,8 +28,18 @@ from app.hybrid.biomass import BIOMASS_FUEL_PRESETS, BIOMASS_PLANT_SAMPLES, Biom
 from app.hybrid.cli import (
     _parse_bess_config,
     _parse_biomass_config,
+    _parse_diesel_config,
     _parse_dispatch_config,
     _parse_pv_config,
+)
+from app.hybrid.diesel import (
+    DEFAULT_DIESEL_EMISSION_FACTOR_KG_PER_LITER,
+    DEFAULT_DIESEL_FIXED_OM_IDR,
+    DEFAULT_DIESEL_FUEL_PRICE_IDR,
+    DEFAULT_DIESEL_MIN_LOAD_FRACTION,
+    DEFAULT_DIESEL_OVERHAUL_HOURS,
+    DEFAULT_DIESEL_SLOPE_L_PER_KWH,
+    DieselComponent,
 )
 from app.hybrid.excel_export import build_hybrid_excel_bytes
 from app.hybrid.finance import (
@@ -52,6 +62,7 @@ router = APIRouter(prefix="/v1/hybrid", tags=["hybrid"])
 
 CONTRACT_VERSION = "0.5"
 STAGE7_CONTRACT_VERSION = "0.6"
+STAGE8B_CONTRACT_VERSION = "0.7"
 MAX_JOBS = 50
 JOB_TTL_SECONDS = 1800.0
 MAX_SWEEP_JOBS = 15
@@ -80,32 +91,32 @@ DISPATCH_STRATEGIES: list[dict[str, Any]] = [
         "id": "self_consumption",
         "name_id": "Konsumsi Sendiri (Self-Consumption)",
         "name_en": "Self-Consumption",
-        "description_id": "Surplus PV mengisi baterai terlebih dahulu; kekurangan beban ditutup baterai lalu biomass bila aktif.",
-        "description_en": "PV surplus charges BESS first; load deficit is covered by BESS discharge and then biomass if enabled.",
+        "description_id": "Surplus PV mengisi baterai terlebih dahulu; kekurangan beban ditutup baterai, biomass, lalu diesel bila aktif.",
+        "description_en": "PV surplus charges BESS first; load deficit is covered by BESS discharge, biomass, and then diesel if enabled.",
         "default_params": {"allow_grid_import": False, "allow_grid_export": False},
     },
     {
         "id": "load_following",
         "name_id": "Mengikuti Beban (Load Following)",
         "name_en": "Load Following",
-        "description_id": "Baterai dan biomass menyesuaikan keluaran hanya untuk menutup sisa beban bersih setelah PV.",
-        "description_en": "BESS and biomass adjust output solely to cover residual net load after PV.",
+        "description_id": "Baterai, biomass, dan diesel menyesuaikan keluaran hanya untuk menutup sisa beban bersih setelah PV.",
+        "description_en": "BESS, biomass, and diesel adjust output solely to cover residual net load after PV.",
         "default_params": {"allow_grid_import": False, "allow_grid_export": False},
     },
     {
         "id": "cycle_charging",
         "name_id": "Pengisian Siklus (Cycle Charging)",
         "name_en": "Cycle Charging",
-        "description_id": "Saat pembangkit biomass atau sumber pengisi aktif, baterai ikut diisi sampai target SOC.",
-        "description_en": "When biomass or charging supply runs, it operates higher to charge BESS toward target SOC.",
+        "description_id": "Saat pembangkit biomass, diesel, atau sumber pengisi aktif, baterai ikut diisi sampai target SOC.",
+        "description_en": "When biomass, diesel, or charging supply runs, it operates higher to charge BESS toward target SOC.",
         "default_params": {"allow_grid_import": False, "allow_grid_export": False, "target_soc_fraction": 0.80},
     },
     {
         "id": "peak_shaving",
         "name_id": "Pemangkasan Beban Puncak (Peak Shaving)",
         "name_en": "Peak Shaving",
-        "description_id": "Baterai dan biomass memangkas beban di atas batas puncak agar daya sumber lain tetap terkendali.",
-        "description_en": "BESS and biomass shave peak load above the configured peak limit.",
+        "description_id": "Baterai, biomass, dan diesel memangkas beban di atas batas puncak agar daya sumber lain tetap terkendali.",
+        "description_en": "BESS, biomass, and diesel shave peak load above the configured peak limit.",
         "default_params": {"allow_grid_import": True, "allow_grid_export": False, "peak_limit_kw": 250.0},
     },
     {
@@ -185,8 +196,6 @@ def _resolve_load(lp: HybridLoadProfileInput, time_config: TimeConfig) -> LoadPr
             raise EngineError("invalid_csv_format", "Teks CSV beban harus berisi deret nilai per baris.")
         return load_profile_from_csv(lp.csv_text, time_config)
     if lp.mode == "synthetic":
-        if lp.base_load_kw is None or lp.peak_load_kw is None:
-            raise EngineError("invalid_load_parameters", "base_load_kw dan peak_load_kw wajib diisi untuk mode synthetic.")
         return generate_synthetic_load(
             base_load_kw=lp.base_load_kw,
             peak_load_kw=lp.peak_load_kw,
@@ -231,6 +240,7 @@ def _build_simulation_response(
     b = result.balance
     pv_gen = b.effective_pv_generation_kw
     bio_gen = b.effective_biomass_generation_kw
+    diesel_gen = b.effective_diesel_generation_kw
 
     monthly_rows: list[dict[str, Any]] = []
     for m in range(1, 13):
@@ -240,6 +250,7 @@ def _build_simulation_response(
             "load_kwh": round(float(np.sum(b.load_kw[mask]) * h), 3),
             "pv_generation_kwh": round(float(np.sum(pv_gen[mask]) * h), 3),
             "biomass_generation_kwh": round(float(np.sum(bio_gen[mask]) * h), 3),
+            "diesel_generation_kwh": round(float(np.sum(diesel_gen[mask]) * h), 3),
             "bess_charge_kwh": round(float(np.sum(b.charge_kw[mask]) * h), 3),
             "bess_discharge_kwh": round(float(np.sum(b.discharge_kw[mask]) * h), 3),
             "grid_import_kwh": round(float(np.sum(b.grid_import_kw[mask]) * h), 3),
@@ -253,6 +264,9 @@ def _build_simulation_response(
     summary_dict["biomass_generation_kwh"] = (
         round(result.biomass_summary.total_generation_kwh, 3) if result.biomass_summary is not None else 0.0
     )
+    summary_dict["diesel_generation_kwh"] = (
+        round(result.diesel_summary.total_generation_kwh, 3) if result.diesel_summary is not None else 0.0
+    )
 
     warnings: list[str] = []
     warning_codes: list[str] = []
@@ -265,7 +279,7 @@ def _build_simulation_response(
 
     out: dict[str, Any] = {
         "engine_version": ENGINE_VERSION,
-        "contract_version": CONTRACT_VERSION,
+        "contract_version": req.contract_version,
         "config_hash": result.config_hash,
         "calculated_at": result.calculated_at,
         "project_name": result.config.project_name,
@@ -276,6 +290,7 @@ def _build_simulation_response(
         "monthly": monthly_rows,
         "bess_summary": asdict(result.bess_summary) if result.bess_summary is not None else None,
         "biomass_summary": asdict(result.biomass_summary) if result.biomass_summary is not None else None,
+        "diesel_summary": asdict(result.diesel_summary) if result.diesel_summary is not None else None,
         "lifetime_summary": lifetime_result.to_summary_dict(),
         "finance_summary": asdict(finance_result.summary) if finance_result is not None else None,
         "lcoe_breakdown": asdict(finance_result.lcoe_breakdown) if finance_result is not None else None,
@@ -296,6 +311,12 @@ def _build_simulation_response(
             "load_kw": _round_list(b.load_kw, 3),
             "pv_generation_kw": _round_list(pv_gen, 3),
             "biomass_generation_kw": _round_list(bio_gen, 3),
+            "diesel_generation_kw": _round_list(diesel_gen, 3),
+            "diesel_fuel_liters": (
+                _round_list(result.diesel_fuel_liters, 4)
+                if result.diesel_fuel_liters is not None
+                else [0.0] * tc.steps_per_year
+            ),
             "bess_charge_kw": _round_list(b.charge_kw, 3),
             "bess_discharge_kw": _round_list(b.discharge_kw, 3),
             "grid_import_kw": _round_list(b.grid_import_kw, 3),
@@ -306,6 +327,7 @@ def _build_simulation_response(
             "losses_kw": _round_list(b.losses_kw, 3),
             "bess_soc_fraction": _round_list(result.bess_soc, 4) if result.bess_soc is not None else None,
             "biomass_status": list(result.biomass_status) if result.biomass_status else None,
+            "diesel_status": list(result.diesel_status) if result.diesel_status else None,
             "trace_reason": (
                 list(result.trace_reasons)
                 if (req.output_options.include_trace_reasons and result.trace_reasons)
@@ -340,6 +362,11 @@ def _build_core_inputs(req: HybridSimulateRequest) -> tuple[SimulationConfig, An
     if biomass_config is not None:
         BiomassComponent(biomass_config).validate()
 
+    diesel_raw = req.components.diesel.model_dump(exclude_none=True) if req.components.diesel is not None else None
+    diesel_config = _parse_diesel_config(diesel_raw)
+    if diesel_config is not None:
+        DieselComponent(diesel_config).validate()
+
     sim_raw = req.simulation.model_dump(exclude_none=True)
     dispatch_config = _parse_dispatch_config(sim_raw)
 
@@ -351,6 +378,7 @@ def _build_core_inputs(req: HybridSimulateRequest) -> tuple[SimulationConfig, An
         bess=bess_config,
         dispatch=dispatch_config,
         biomass=biomass_config,
+        diesel=diesel_config,
     )
 
     fin_raw = req.finance.model_dump(exclude_none=True) if req.finance is not None else None
@@ -489,11 +517,30 @@ def get_presets() -> dict[str, Any]:
             "grid_emission_factor_kg_co2e_per_kwh": 0.78,
         },
     }
+    diesel_defaults = {
+        "rated_capacity_kw": 250.0,
+        "min_load_fraction": DEFAULT_DIESEL_MIN_LOAD_FRACTION,
+        "fuel_curve_model": "willans_linear",
+        "slope_liters_per_kwh": DEFAULT_DIESEL_SLOPE_L_PER_KWH,
+        "min_run_time_hours": 1.0,
+        "min_down_time_hours": 1.0,
+        "fuel_price_per_liter": DEFAULT_DIESEL_FUEL_PRICE_IDR,
+        "fixed_om_per_kw_year": DEFAULT_DIESEL_FIXED_OM_IDR,
+        "variable_om_per_operating_hour": 0.0,
+        "startup_cost": 0.0,
+        "overhaul_interval_operating_hours": DEFAULT_DIESEL_OVERHAUL_HOURS,
+        "overhaul_cost": 120_000_000.0,
+        "emission_factor_kg_co2e_per_liter": DEFAULT_DIESEL_EMISSION_FACTOR_KG_PER_LITER,
+        "is_renewable": False,
+        "diesel_capex_per_kw": 4_500_000.0,
+        "diesel_overhaul_life_years": 5.0,
+    }
     return {
         "engine_version": ENGINE_VERSION,
         "contract_version": CONTRACT_VERSION,
         "fuel_presets": BIOMASS_FUEL_PRESETS,
         "plant_samples": BIOMASS_PLANT_SAMPLES,
+        "diesel_defaults": diesel_defaults,
         "dispatch_strategies": DISPATCH_STRATEGIES,
         "location_presets": LOCATION_PRESETS,
         "sample_config": sample_config,
@@ -753,7 +800,7 @@ def get_hybrid_job(job_id: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Endpoint Tahap 7: Sapuan Kombinasi, Sensitivitas Hybrid, dan Ekspor Excel
+# Endpoint Tahap 7 & 8B: Sapuan Kombinasi, Sensitivitas Hybrid, dan Ekspor Excel
 # ---------------------------------------------------------------------------
 
 
@@ -810,6 +857,7 @@ def _run_sweep_job(job_id: str, req: HybridSweepJobRequest, cancel_event: thread
             pv_values=req.sweep.pv_capacity_kwp_values,
             bess_values=req.sweep.bess_capacity_kwh_values,
             biomass_values=req.sweep.biomass_capacity_kw_values,
+            diesel_values=req.sweep.diesel_capacity_kw_values,
             inverter_sizing_mode=req.sweep.pv_inverter_sizing_mode,
             scale_replacement_costs=req.sweep.scale_replacement_costs,
             bess_replacement_cost_per_kwh=req.sweep.bess_replacement_cost_per_kwh,
@@ -871,11 +919,17 @@ def create_hybrid_sweep_job(req: HybridSweepJobRequest) -> JSONResponse:
         pv_vals = validate_sweep_axis(req.sweep.pv_capacity_kwp_values, "pv_capacity_kwp_values", allow_zero=False)
         bess_vals = validate_sweep_axis(req.sweep.bess_capacity_kwh_values, "bess_capacity_kwh_values", allow_zero=True)
         bio_vals = validate_sweep_axis(req.sweep.biomass_capacity_kw_values, "biomass_capacity_kw_values", allow_zero=True)
+        diesel_vals = (
+            validate_sweep_axis(req.sweep.diesel_capacity_kw_values, "diesel_capacity_kw_values", allow_zero=True)
+            if req.sweep.diesel_capacity_kw_values is not None
+            else None
+        )
         total_combos = validate_sweep_limits(
             pv_vals,
             bess_vals,
             bio_vals,
             req.base_request.simulation.multi_year_mode,
+            diesel_values=diesel_vals,
         )
     except EngineError as exc:
         _raise_engine_error(exc)
@@ -898,7 +952,7 @@ def create_hybrid_sweep_job(req: HybridSweepJobRequest) -> JSONResponse:
         _sweep_jobs_store[job_id] = {
             "job_id": job_id,
             "engine_version": ENGINE_VERSION,
-            "contract_version": STAGE7_CONTRACT_VERSION,
+            "contract_version": req.contract_version,
             "status": "queued",
             "progress_percent": 0,
             "completed_combinations": 0,
@@ -917,7 +971,7 @@ def create_hybrid_sweep_job(req: HybridSweepJobRequest) -> JSONResponse:
         content={
             "job_id": job_id,
             "engine_version": ENGINE_VERSION,
-            "contract_version": STAGE7_CONTRACT_VERSION,
+            "contract_version": req.contract_version,
             "status": "queued",
             "progress_percent": 0,
             "completed_combinations": 0,
@@ -1010,7 +1064,7 @@ def sensitivity_hybrid(req: HybridSensitivityRequest) -> dict[str, Any]:
 
     return {
         "engine_version": ENGINE_VERSION,
-        "contract_version": STAGE7_CONTRACT_VERSION,
+        "contract_version": req.contract_version,
         "calculated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         **res,
     }

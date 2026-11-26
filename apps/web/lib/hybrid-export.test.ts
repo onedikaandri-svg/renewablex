@@ -76,6 +76,7 @@ describe("hybrid-export", () => {
     const cfCsv = buildCashflowCsv(sim);
     expect(cfCsv.split("\n")).toHaveLength(2);
     expect(cfCsv).toContain("capex_outflow");
+    expect(cfCsv).toContain("diesel_generation_kwh");
 
     const sweep = {
       sort_by: "lcoe_asc",

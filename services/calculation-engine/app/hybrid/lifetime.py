@@ -29,6 +29,7 @@ class LifetimeConfig:
     inverter_replacement_cost: float = 0.0
     scaled_bess_replacement_interval_years: int | None = None
     scaled_biomass_overhaul_interval_years: int | None = None
+    scaled_diesel_overhaul_interval_years: int | None = None
 
 
 def validate_lifetime_config(config: LifetimeConfig) -> None:
@@ -61,6 +62,7 @@ def validate_lifetime_config(config: LifetimeConfig) -> None:
     for name, iv in (
         ("scaled_bess_replacement_interval_years", config.scaled_bess_replacement_interval_years),
         ("scaled_biomass_overhaul_interval_years", config.scaled_biomass_overhaul_interval_years),
+        ("scaled_diesel_overhaul_interval_years", config.scaled_diesel_overhaul_interval_years),
     ):
         if iv is not None and (isinstance(iv, bool) or not isinstance(iv, int) or iv <= 0):
             raise EngineError("invalid_lifetime_config", f"{name} harus berupa bilangan bulat positif.")
@@ -98,6 +100,15 @@ class YearlyTechnicalResult:
     biomass_overhaul_count: int = 0
     biomass_thermal_output_kwh_th: float = 0.0
     lifecycle_events: tuple[LifecycleEvent, ...] = ()
+    diesel_generation_kwh: float = 0.0
+    diesel_operating_hours: float = 0.0
+    diesel_fuel_liters: float = 0.0
+    diesel_fuel_cost: float = 0.0
+    diesel_variable_om_cost: float = 0.0
+    diesel_fixed_om_cost: float = 0.0
+    diesel_startup_cost: float = 0.0
+    diesel_co2e_kg: float = 0.0
+    diesel_overhaul_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -119,6 +130,8 @@ class LifetimeSimulationResult:
     total_bess_replacements: int
     total_biomass_overhauls: int
     max_balance_error_kw: float
+    total_diesel_generation_kwh: float = 0.0
+    total_diesel_overhauls: int = 0
 
     def to_summary_dict(self) -> dict[str, Any]:
         """Mengembalikan ringkasan umur proyek siap serialisasi JSON."""
@@ -128,6 +141,7 @@ class LifetimeSimulationResult:
             "total_load_kwh": self.total_load_kwh,
             "total_pv_generation_kwh": self.total_pv_generation_kwh,
             "total_biomass_generation_kwh": self.total_biomass_generation_kwh,
+            "total_diesel_generation_kwh": self.total_diesel_generation_kwh,
             "total_served_load_kwh": self.total_served_load_kwh,
             "total_unmet_load_kwh": self.total_unmet_load_kwh,
             "total_curtailment_kwh": self.total_curtailment_kwh,
@@ -135,6 +149,7 @@ class LifetimeSimulationResult:
             "total_grid_export_kwh": self.total_grid_export_kwh,
             "total_bess_replacements": self.total_bess_replacements,
             "total_biomass_overhauls": self.total_biomass_overhauls,
+            "total_diesel_overhauls": self.total_diesel_overhauls,
             "max_balance_error_kw": self.max_balance_error_kw,
             "lifecycle_events": [asdict(ev) for ev in self.all_lifecycle_events],
             "yearly": [
@@ -144,6 +159,7 @@ class LifetimeSimulationResult:
                     "total_load_kwh": r.total_load_kwh,
                     "pv_generation_kwh": r.pv_generation_kwh,
                     "biomass_generation_kwh": r.biomass_generation_kwh,
+                    "diesel_generation_kwh": r.diesel_generation_kwh,
                     "served_load_kwh": r.served_load_kwh,
                     "unmet_load_kwh": r.unmet_load_kwh,
                     "curtailment_kwh": r.curtailment_kwh,
@@ -155,6 +171,8 @@ class LifetimeSimulationResult:
                     "bess_replacement_count": r.bess_replacement_count,
                     "biomass_fuel_tons": r.biomass_fuel_tons,
                     "biomass_overhaul_count": r.biomass_overhaul_count,
+                    "diesel_fuel_liters": r.diesel_fuel_liters,
+                    "diesel_overhaul_count": r.diesel_overhaul_count,
                 }
                 for r in self.yearly
             ],
@@ -257,6 +275,27 @@ def _extract_yearly_row(
         bio_oh = bs.overhaul_count
         bio_th = bs.total_thermal_output_kwh_th
 
+    diesel_gen = 0.0
+    diesel_hrs = 0.0
+    diesel_liters = 0.0
+    diesel_fuel_cost = 0.0
+    diesel_var_om = 0.0
+    diesel_fix_om = 0.0
+    diesel_start_cost = 0.0
+    diesel_co2 = 0.0
+    diesel_oh = 0
+    if sim_res.diesel_summary is not None:
+        ds = sim_res.diesel_summary
+        diesel_gen = ds.total_generation_kwh
+        diesel_hrs = ds.total_operating_hours
+        diesel_liters = ds.total_fuel_liters
+        diesel_fuel_cost = ds.total_fuel_cost
+        diesel_var_om = ds.total_variable_om_cost
+        diesel_fix_om = ds.total_fixed_om_cost
+        diesel_start_cost = ds.total_startup_cost
+        diesel_co2 = ds.total_co2e_kg
+        diesel_oh = ds.overhaul_count
+
     events = tuple(list(sim_res.lifecycle_events) + extra_events)
     row = YearlyTechnicalResult(
         year=year,
@@ -287,6 +326,15 @@ def _extract_yearly_row(
         biomass_overhaul_count=bio_oh,
         biomass_thermal_output_kwh_th=bio_th,
         lifecycle_events=events,
+        diesel_generation_kwh=diesel_gen,
+        diesel_operating_hours=diesel_hrs,
+        diesel_fuel_liters=diesel_liters,
+        diesel_fuel_cost=diesel_fuel_cost,
+        diesel_variable_om_cost=diesel_var_om,
+        diesel_fixed_om_cost=diesel_fix_om,
+        diesel_startup_cost=diesel_start_cost,
+        diesel_co2e_kg=diesel_co2,
+        diesel_overhaul_count=diesel_oh,
     )
     return row, new_efc_total
 
@@ -309,7 +357,10 @@ def run_scaled_lifetime_from_year_1(
     if progress_callback is not None:
         progress_callback(1, lifetime_config.project_lifetime_years)
 
-    y1_pv_to_load = max(row1.served_load_kwh - row1.grid_import_kwh - row1.biomass_generation_kwh, 0.0)
+    y1_pv_to_load = max(
+        row1.served_load_kwh - row1.grid_import_kwh - row1.biomass_generation_kwh - row1.diesel_generation_kwh,
+        0.0,
+    )
     for year in range(2, lifetime_config.project_lifetime_years + 1):
         deg_factor = (1.0 - pv_deg) ** (year - 1)
         pv_kwh = row1.pv_generation_kwh * deg_factor
@@ -349,13 +400,32 @@ def run_scaled_lifetime_from_year_1(
                 )
             )
 
+        diesel_oh = 0
+        if (
+            config.diesel is not None
+            and lifetime_config.scaled_diesel_overhaul_interval_years is not None
+            and year % lifetime_config.scaled_diesel_overhaul_interval_years == 0
+        ):
+            diesel_oh = 1
+            extra_events.append(
+                LifecycleEvent(
+                    year=year,
+                    event_type="diesel_overhaul",
+                    description=f"Overhaul Diesel Generator terjadwal (scaled_year_1) pada tahun ke-{year}.",
+                    cost_amount=float(config.diesel.overhaul_cost),
+                )
+            )
+
         if row1.grid_import_kwh > 0.0:
             grid_imp = row1.grid_import_kwh + pv_drop
             served = row1.served_load_kwh
             unmet = row1.unmet_load_kwh
         else:
             grid_imp = 0.0
-            served = min(pv_served + row1.biomass_generation_kwh, row1.total_load_kwh)
+            served = min(
+                pv_served + row1.biomass_generation_kwh + row1.diesel_generation_kwh,
+                row1.total_load_kwh,
+            )
             unmet = max(row1.total_load_kwh - served, 0.0)
 
         curtail = row1.curtailment_kwh * deg_factor
@@ -365,8 +435,13 @@ def run_scaled_lifetime_from_year_1(
             if (config.biomass is not None and not config.biomass.effective_is_renewable)
             else 0.0
         )
+        non_ren_diesel = (
+            row1.diesel_generation_kwh
+            if (config.diesel is not None and not config.diesel.is_renewable)
+            else 0.0
+        )
         ren_frac = (
-            min(max((served - grid_imp - non_ren_bio) / row1.total_load_kwh, 0.0), 1.0)
+            min(max((served - grid_imp - non_ren_bio - non_ren_diesel) / row1.total_load_kwh, 0.0), 1.0)
             if row1.total_load_kwh > 0.0
             else 0.0
         )
@@ -384,6 +459,7 @@ def run_scaled_lifetime_from_year_1(
             renewable_fraction=ren_frac,
             bess_replacement_count=bess_repl,
             biomass_overhaul_count=bio_oh,
+            diesel_overhaul_count=diesel_oh,
             lifecycle_events=tuple(extra_events),
         )
         yearly_rows.append(row_y)
@@ -405,6 +481,8 @@ def run_scaled_lifetime_from_year_1(
         total_bess_replacements=sum(r.bess_replacement_count for r in yearly_rows),
         total_biomass_overhauls=sum(r.biomass_overhaul_count for r in yearly_rows),
         max_balance_error_kw=max(r.max_balance_error_kw for r in yearly_rows),
+        total_diesel_generation_kwh=sum(r.diesel_generation_kwh for r in yearly_rows),
+        total_diesel_overhauls=sum(r.diesel_overhaul_count for r in yearly_rows),
     )
 
 
@@ -437,6 +515,7 @@ def run_lifetime_simulation(
 
     bess_state: dict[str, Any] | None = None
     biomass_state: dict[str, Any] | None = None
+    diesel_state: dict[str, Any] | None = None
     prev_efc = 0.0
 
     for year in range(1, lc.project_lifetime_years + 1):
@@ -449,12 +528,14 @@ def run_lifetime_simulation(
             initial_biomass_state=biomass_state,
             simulation_year=year,
             pv_output_cache=pv_output_cache,
+            initial_diesel_state=diesel_state,
         )
         if year == 1:
             year_1_res = res
 
         bess_state = res.final_bess_state
         biomass_state = res.final_biomass_state
+        diesel_state = res.final_diesel_state
         deg_factor = (1.0 - pv_deg) ** (year - 1)
         inv_events = _inverter_event_for_year(lc, year)
         row, prev_efc = _extract_yearly_row(res, year, deg_factor, prev_efc, inv_events)
@@ -480,4 +561,6 @@ def run_lifetime_simulation(
         total_bess_replacements=sum(r.bess_replacement_count for r in yearly_rows),
         total_biomass_overhauls=sum(r.biomass_overhaul_count for r in yearly_rows),
         max_balance_error_kw=max(r.max_balance_error_kw for r in yearly_rows),
+        total_diesel_generation_kwh=sum(r.diesel_generation_kwh for r in yearly_rows),
+        total_diesel_overhauls=sum(r.diesel_overhaul_count for r in yearly_rows),
     )

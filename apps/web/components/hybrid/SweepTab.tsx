@@ -58,6 +58,7 @@ export default function SweepTab({
   const [pvText, setPvText] = useState("300, 500, 700");
   const [bessText, setBessText] = useState("0, 400, 800");
   const [bioText, setBioText] = useState("0, 250");
+  const [dieselText, setDieselText] = useState("0");
   const [invMode, setInvMode] = useState<"keep_dc_ac_ratio" | "fixed">("keep_dc_ac_ratio");
   const [maxUnmetPct, setMaxUnmetPct] = useState("5");
   const [minRenPct, setMinRenPct] = useState("80");
@@ -98,8 +99,9 @@ export default function SweepTab({
   const pvVals = useMemo(() => parseAxisNumbers(pvText), [pvText]);
   const bessVals = useMemo(() => parseAxisNumbers(bessText), [bessText]);
   const bioVals = useMemo(() => parseAxisNumbers(bioText), [bioText]);
+  const dieselVals = useMemo(() => parseAxisNumbers(dieselText), [dieselText]);
   const maxCombos = project.simulation.multi_year_mode === "full_hourly" ? 12 : 64;
-  const totalCombos = pvVals.length * bessVals.length * bioVals.length;
+  const totalCombos = pvVals.length * bessVals.length * bioVals.length * dieselVals.length;
   const axisError =
     pvVals.length === 0 || pvVals.some((v) => v <= 0)
       ? "Daftar PV (kWp) wajib berisi angka > 0."
@@ -107,9 +109,11 @@ export default function SweepTab({
         ? "Daftar BESS (kWh) wajib berisi angka >= 0."
         : bioVals.length === 0 || bioVals.some((v) => v < 0)
           ? "Daftar Biomass (kW) wajib berisi angka >= 0."
-          : totalCombos > maxCombos
-            ? `Total ${totalCombos} kombinasi melebihi batas aman ${maxCombos} kombinasi.`
-            : null;
+          : dieselVals.length === 0 || dieselVals.some((v) => v < 0)
+            ? "Daftar Diesel (kW) wajib berisi angka >= 0."
+            : totalCombos > maxCombos
+              ? `Total ${totalCombos} kombinasi melebihi batas aman ${maxCombos} kombinasi.`
+              : null;
 
   async function handleRunSweep() {
     if (axisError) {
@@ -129,6 +133,7 @@ export default function SweepTab({
         pv_capacity_kwp_values: pvVals,
         bess_capacity_kwh_values: bessVals,
         biomass_capacity_kw_values: bioVals,
+        diesel_capacity_kw_values: dieselVals,
         pv_inverter_sizing_mode: invMode,
         scale_replacement_costs: true,
         max_unmet_load_fraction: parsedUnmet !== null && Number.isFinite(parsedUnmet) ? parsedUnmet : null,
@@ -311,6 +316,7 @@ export default function SweepTab({
               setPvText("300, 500, 700");
               setBessText("0, 400, 800");
               setBioText("0, 250");
+              setDieselText("0");
             }}
           >
             Muat Contoh [REAL DATA]
@@ -318,7 +324,7 @@ export default function SweepTab({
         </div>
 
         <p className="note">
-          Masukkan daftar ukuran dipisah koma. Isi <code>0</code> pada BESS atau Biomass untuk menguji kombinasi tanpa komponen tersebut.
+          Masukkan daftar ukuran dipisah koma. Isi <code>0</code> pada BESS, Biomass, atau Diesel untuk menguji kombinasi tanpa komponen tersebut.
         </p>
 
         <div className="fld">
@@ -343,6 +349,14 @@ export default function SweepTab({
             <span className="unit tabular-nums">{bioVals.length} nilai</span>
           </div>
           <input id="sw-bio" type="text" value={bioText} onChange={(e) => setBioText(e.target.value)} placeholder="0, 250" />
+        </div>
+
+        <div className="fld">
+          <div className="label-row">
+            <label htmlFor="sw-diesel">Kapasitas Diesel Generator (kW)</label>
+            <span className="unit tabular-nums">{dieselVals.length} nilai</span>
+          </div>
+          <input id="sw-diesel" type="text" value={dieselText} onChange={(e) => setDieselText(e.target.value)} placeholder="0" />
         </div>
 
         <div className="fld">
@@ -468,7 +482,7 @@ export default function SweepTab({
                   <div className="kpi">
                     <span>Ukuran Sistem</span>
                     <b style={{ fontSize: "1.05rem" }}>
-                      {formatNumber(winner.sizing.pv_capacity_kwp, lang, 0)} kWp | {formatNumber(winner.sizing.bess_nominal_capacity_kwh, lang, 0)} kWh | {formatNumber(winner.sizing.biomass_rated_capacity_kw, lang, 0)} kW
+                      {formatNumber(winner.sizing.pv_capacity_kwp, lang, 0)} kWp | {formatNumber(winner.sizing.bess_nominal_capacity_kwh, lang, 0)} kWh | {formatNumber(winner.sizing.biomass_rated_capacity_kw, lang, 0)} kW Bio | {formatNumber(winner.sizing.diesel_rated_capacity_kw ?? 0, lang, 0)} kW Diesel
                     </b>
                   </div>
                   <div className="kpi">
@@ -529,7 +543,7 @@ export default function SweepTab({
 
               <div className="tw" tabIndex={0} role="region" aria-label="Tabel hasil sapuan kombinasi, bisa digulir">
                 <table>
-                  <caption>Hasil simulasi seluruh kombinasi ukuran PV, BESS, dan Biomass.</caption>
+                  <caption>Hasil simulasi seluruh kombinasi ukuran PV, BESS, Biomass, dan Diesel Generator.</caption>
                   <thead>
                     <tr>
                       <th scope="col">#</th>

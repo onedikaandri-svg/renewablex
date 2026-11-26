@@ -78,6 +78,13 @@ Seluruh nilai di bawah ini bersifat **asumsi sementara untuk keperluan pengemban
   - `rice_husk` (Sekam Padi): kadar air `12%`, LHV terima `13,5 MJ/kg`, harga `Rp 400.000/ton`, logistik `Rp 120.000/ton`, emisi rantai pasok `30 kg CO2e/ton` `[REAL DATA]`.
 - **Konstanta konversi LHV basis kering ke kondisi terima (`as_received`):** Jika pengguna memasukkan LHV dalam basis kering (`lhv_basis = "dry"`), koreksi kadar air menggunakan konstanta termodinamika standar kalor laten penguapan air pada suhu acuan 25 C sebesar `2,443 MJ/kg` (rujukan standar analisis bahan bakar padat ISO 18125 / ASTM): `lhv_effective = lhv_dry * (1 - moisture_fraction) - 2.443 * moisture_fraction`.
 
+### 2.4 Komponen Diesel Generator (`[REAL DATA]`, Tahap 8B)
+- **Status sumber energi:** `is_renewable = false` (non-terbarukan). Produksi energi diesel dikecualikan dari pembilang *renewable fraction* (`renewable_fraction`).
+- **Kapasitas nominal dan beban minimum:** Contoh referensi `250` kW, `min_load_fraction = 0,30` (30% beban minimum standar genset industri untuk menghindari *wet stacking*), `min_run_time_hours = 1`, `min_down_time_hours = 1` `[REAL DATA]`.
+- **Model konsumsi bahan bakar (`fuel_curve_model`):** Mendukung kurva linear Willans (`willans_linear`: `fuel_lph = no_load_fuel_liters_per_hour + slope_liters_per_kwh * p_gen_kw`) maupun kurva SFC bertahap (`piecewise_sfc`). Nilai bawaan acuan: `no_load_fuel_liters_per_hour = 0,0` (atau mis. `0,08` x `rated_capacity_kw` L/jam bila kurva Willans dua suku dipakai) dan `slope_liters_per_kwh = 0,25` L/kWh `[REAL DATA]`.
+- **Biaya bahan bakar dan operasi:** `fuel_price_per_liter = Rp 18.500/liter` (solar non-subsidi industri acuan `[REAL DATA]`), `fixed_om_per_kw_year = Rp 150.000/kW/tahun` `[REAL DATA]`, `variable_om_per_operating_hour = Rp 0/jam` bawaan, `startup_cost = Rp 0/start` bawaan, serta interval overhaul `15.000` jam operasi dengan biaya contoh `Rp 120.000.000` `[REAL DATA]`.
+- **Faktor emisi CO2e pembakaran solar:** `2,68 kg CO2e/liter` (rujukan *IPCC 2006 Guidelines for National Greenhouse Gas Inventories* dan *UK DEFRA Conversion Factors* untuk *gas oil / diesel*).
+
 ---
 
 ## 3. Asumsi Ekonomi Default, Sampel Keuangan Tahap 4, dan Kasus Pembanding `kiyo.html`
@@ -94,6 +101,7 @@ Seluruh angka di bawah ini bersifat **sampel ilustratif sementara** untuk contoh
 - **CAPEX dan O&M PV sampel:** `Rp 11.500.000/kWp`, O&M tahunan `1,5%` dari CAPEX PV, penggantian inverter tahun ke-13 sebesar `Rp 420.000.000` (untuk acuan ~420 kW AC, umur desain inverter `12` tahun) `[REAL DATA]`.
 - **CAPEX, penggantian, dan O&M BESS sampel:** `Rp 3.500.000/kWh`, biaya penggantian EOL `Rp 3.000.000/kWh` (mis. `Rp 1.800.000.000` untuk 600 kWh), O&M tetap `Rp 50.000/kWh/tahun`, umur desain acuan nilai sisa `10` tahun `[REAL DATA]`.
 - **CAPEX dan overhaul Biomass sampel:** `Rp 18.000.000/kW`, biaya overhaul `Rp 150.000.000` (untuk sampel 250 kW), umur overhaul acuan nilai sisa `5` tahun `[REAL DATA]`.
+- **CAPEX dan overhaul Diesel Generator sampel:** `Rp 4.500.000/kW`, biaya overhaul `Rp 120.000.000` (interval `15.000` jam operasi), umur overhaul acuan nilai sisa `5` tahun `[REAL DATA]`.
 - **Tarif listrik acuan sampel:** `Rp 1.445/kWh` `[REAL DATA]`.
 - **Pajak opsional (`after_tax`):** Tarif pajak penghasilan badan Indonesia acuan umum `0,22` (22%) dengan depresiasi garis lurus `10` tahun (hanya aktif bila pengguna memilih `tax_model = "after_tax"`, default tetap `"pre_tax"`) `[REAL DATA]`.
 - **Metode nilai sisa (Salvage Value):** Depresiasi linear sisa umur pakai ala HOMER pada akhir umur proyek untuk aset yang mengalami penggantian atau overhaul di tengah umur proyek.

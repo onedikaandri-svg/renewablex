@@ -28,6 +28,7 @@ export function buildCashflowCsv(result: HybridSimulateResponse): string {
     "served_load_kwh",
     "pv_generation_kwh",
     "biomass_generation_kwh",
+    "diesel_generation_kwh",
     "grid_import_kwh",
     "capex_outflow",
     "gross_revenue_or_savings",
@@ -48,6 +49,7 @@ export function buildCashflowCsv(result: HybridSimulateResponse): string {
     r.served_load_kwh,
     r.pv_generation_kwh,
     r.biomass_generation_kwh,
+    r.diesel_generation_kwh ?? 0,
     r.grid_import_kwh,
     r.capex_outflow,
     r.gross_revenue_or_savings,
@@ -74,6 +76,8 @@ export function buildHourlyCsv(result: HybridSimulateResponse): string | null {
     "load_kw",
     "pv_generation_kw",
     "biomass_generation_kw",
+    "diesel_generation_kw",
+    "diesel_fuel_liters",
     "bess_charge_kw",
     "bess_discharge_kw",
     "grid_import_kw",
@@ -84,6 +88,7 @@ export function buildHourlyCsv(result: HybridSimulateResponse): string | null {
     "losses_kw",
     "bess_soc_fraction",
     "biomass_status",
+    "diesel_status",
   ];
   const rows: unknown[][] = [];
   for (let i = 0; i < hourly.steps_count; i++) {
@@ -92,6 +97,8 @@ export function buildHourlyCsv(result: HybridSimulateResponse): string | null {
       hourly.load_kw[i],
       hourly.pv_generation_kw[i],
       hourly.biomass_generation_kw[i],
+      hourly.diesel_generation_kw ? hourly.diesel_generation_kw[i] : 0,
+      hourly.diesel_fuel_liters ? hourly.diesel_fuel_liters[i] : 0,
       hourly.bess_charge_kw[i],
       hourly.bess_discharge_kw[i],
       hourly.grid_import_kw[i],
@@ -102,6 +109,7 @@ export function buildHourlyCsv(result: HybridSimulateResponse): string | null {
       hourly.losses_kw[i],
       hourly.bess_soc_fraction ? hourly.bess_soc_fraction[i] : "",
       hourly.biomass_status ? hourly.biomass_status[i] : "",
+      hourly.diesel_status ? hourly.diesel_status[i] : "",
     ]);
   }
   return buildCsvDocument(headers, rows, true);
@@ -116,6 +124,7 @@ export function buildSweepCsv(sweep: HybridSweepResult): string {
     "pv_inverter_ac_kw",
     "bess_nominal_capacity_kwh",
     "biomass_rated_capacity_kw",
+    "diesel_rated_capacity_kw",
     "lcoe",
     "total_npc",
     "npv",
@@ -135,6 +144,7 @@ export function buildSweepCsv(sweep: HybridSweepResult): string {
     c.sizing.pv_inverter_ac_kw,
     c.sizing.bess_nominal_capacity_kwh,
     c.sizing.biomass_rated_capacity_kw,
+    c.sizing.diesel_rated_capacity_kw ?? 0,
     c.finance.lcoe,
     c.finance.total_npc,
     c.finance.npv,

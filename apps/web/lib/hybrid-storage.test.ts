@@ -60,16 +60,20 @@ describe("hybrid-storage", () => {
     const jsonText = exportProjectJson(sample);
     const imported = importProjectJson(jsonText);
     expect(imported.id).not.toBe(sample.id);
-    expect(imported.schemaVersion).toBe("0.6");
+    expect(imported.schemaVersion).toBe("0.7");
+    expect(imported.components.diesel.enabled).toBe(false);
     expect(imported.topology?.nodes.length).toBeGreaterThanOrEqual(3);
     expect(listProjects()).toHaveLength(4);
 
-    // Kompatibilitas mundur: impor JSON proyek Tahap 5 (v0.5 tanpa topology)
+    // Kompatibilitas mundur: impor JSON proyek Tahap 5/6 (tanpa topology / tanpa diesel)
     const legacyObj = JSON.parse(jsonText) as Record<string, unknown>;
     delete legacyObj.topology;
+    delete (legacyObj.components as Record<string, unknown>).diesel;
     legacyObj.schemaVersion = "0.5";
     const importedLegacy = importProjectJson(JSON.stringify(legacyObj));
-    expect(importedLegacy.schemaVersion).toBe("0.6");
+    expect(importedLegacy.schemaVersion).toBe("0.7");
+    expect(importedLegacy.components.diesel).toBeDefined();
+    expect(importedLegacy.components.diesel.enabled).toBe(false);
     expect(importedLegacy.topology?.nodes.some((n) => n.kind === "pv")).toBe(true);
     expect(importedLegacy.topology?.nodes.some((n) => n.kind === "bess")).toBe(true);
 
@@ -114,17 +118,21 @@ describe("hybrid-storage", () => {
         bess_max_discharge_kw: 0,
         biomass_enabled: true,
         biomass_rated_capacity_kw: 300,
+        diesel_enabled: true,
+        diesel_rated_capacity_kw: 200,
       },
       technical: {
         pv_generation_kwh: 1,
         biomass_generation_kwh: 1,
+        diesel_generation_kwh: 1,
         served_load_kwh: 1,
         unmet_load_kwh: 0,
         unmet_load_fraction: 0,
         curtailment_kwh: 0,
-        renewable_fraction: 1,
+        renewable_fraction: 0.75,
         bess_equivalent_full_cycles: 0,
         biomass_fuel_tons: 1,
+        diesel_fuel_liters: 10,
         avoided_emissions_tons_co2e: 1,
       },
       finance: {
@@ -146,6 +154,9 @@ describe("hybrid-storage", () => {
     expect(applied.components.pv.capacity_kwp).toBe(700);
     expect(applied.components.bess.enabled).toBe(false);
     expect(applied.components.biomass.rated_capacity_kw).toBe(300);
+    expect(applied.components.diesel.enabled).toBe(true);
+    expect(applied.components.diesel.rated_capacity_kw).toBe(200);
+    expect(applied.topology?.nodes.some((n) => n.kind === "diesel")).toBe(true);
     expect(validateSystemTopology(applied).valid).toBe(true);
 
     const scenario = saveSweepCombinationAsScenario(p, combo);

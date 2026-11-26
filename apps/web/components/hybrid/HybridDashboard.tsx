@@ -68,6 +68,7 @@ export default function HybridDashboard({
   const monthlyOption = useMemo<EChartsOption>(() => {
     const pv = result.monthly.map((m) => Math.round(m.pv_generation_kwh / 1000));
     const bio = result.monthly.map((m) => Math.round(m.biomass_generation_kwh / 1000));
+    const diesel = result.monthly.map((m) => Math.round((m.diesel_generation_kwh ?? 0) / 1000));
     const dis = result.monthly.map((m) => Math.round(m.bess_discharge_kwh / 1000));
     const imp = result.monthly.map((m) => Math.round(m.grid_import_kwh / 1000));
     const load = result.monthly.map((m) => Math.round(m.load_kwh / 1000));
@@ -95,6 +96,7 @@ export default function HybridDashboard({
       series: [
         { name: "PV", type: "bar", stack: "supply", color: colors.pv, data: pv },
         { name: "Biomass", type: "bar", stack: "supply", color: colors.biomass, data: bio },
+        { name: "Diesel", type: "bar", stack: "supply", color: colors.diesel, data: diesel },
         { name: "BESS Discharge", type: "bar", stack: "supply", color: colors.bess, data: dis },
         { name: "Grid Import", type: "bar", stack: "supply", color: colors.grid, data: imp },
         {
@@ -209,6 +211,7 @@ export default function HybridDashboard({
     const labels = hourly.local_time.slice(startStep, endStep);
     const pv = hourly.pv_generation_kw.slice(startStep, endStep);
     const bio = hourly.biomass_generation_kw.slice(startStep, endStep);
+    const diesel = (hourly.diesel_generation_kw ?? new Array(hourly.steps_count).fill(0)).slice(startStep, endStep);
     const dis = hourly.bess_discharge_kw.slice(startStep, endStep);
     const imp = hourly.grid_import_kw.slice(startStep, endStep);
     const unmet = hourly.unmet_load_kw.slice(startStep, endStep);
@@ -235,6 +238,7 @@ export default function HybridDashboard({
       series: [
         { name: "PV", type: "line", stack: "gen", areaStyle: { opacity: 0.7 }, symbol: "none", color: colors.pv, data: pv },
         { name: "Biomass", type: "line", stack: "gen", areaStyle: { opacity: 0.7 }, symbol: "none", color: colors.biomass, data: bio },
+        { name: "Diesel", type: "line", stack: "gen", areaStyle: { opacity: 0.7 }, symbol: "none", color: colors.diesel, data: diesel },
         { name: "BESS Discharge", type: "line", stack: "gen", areaStyle: { opacity: 0.65 }, symbol: "none", color: colors.bess, data: dis },
         { name: "Grid Import", type: "line", stack: "gen", areaStyle: { opacity: 0.55 }, symbol: "none", color: colors.grid, data: imp },
         { name: "Unmet Load", type: "line", stack: "gen", areaStyle: { opacity: 0.5 }, symbol: "none", color: colors.unmet, data: unmet },
@@ -386,6 +390,7 @@ export default function HybridDashboard({
     const nodeColorMap: Record<string, string> = {
       "Solar PV": colors.pv,
       Biomass: colors.biomass,
+      "Diesel Generator": colors.diesel,
       "Impor Grid": colors.grid,
       "Grid Import": colors.grid,
       "Penyimpanan BESS": colors.bess,
@@ -495,6 +500,18 @@ export default function HybridDashboard({
                 color: colors.biomass,
                 lineStyle: { width: 2 },
                 data: durationData.biomassKw,
+              },
+            ]
+          : []),
+        ...(durationData.dieselKw.some((v) => v > 0)
+          ? [
+              {
+                name: "Diesel (kW)",
+                type: "line" as const,
+                symbol: "none",
+                color: colors.diesel,
+                lineStyle: { width: 2 },
+                data: durationData.dieselKw,
               },
             ]
           : []),
@@ -620,6 +637,7 @@ export default function HybridDashboard({
       ["CAPEX PV", result.lcoe_breakdown.capex_pv ?? 0],
       ["CAPEX BESS", result.lcoe_breakdown.capex_bess ?? 0],
       ["CAPEX Biomass", result.lcoe_breakdown.capex_biomass ?? 0],
+      ["CAPEX Diesel", result.lcoe_breakdown.capex_diesel ?? 0],
       ["CAPEX BOS", result.lcoe_breakdown.capex_bos ?? 0],
       ["O&M", result.lcoe_breakdown.om ?? 0],
       [lang === "en" ? "Fuel & Logistics" : "Bahan Bakar", result.lcoe_breakdown.fuel_and_logistics ?? 0],
@@ -672,6 +690,7 @@ export default function HybridDashboard({
       "served_load_kwh",
       "pv_generation_kwh",
       "biomass_generation_kwh",
+      "diesel_generation_kwh",
       "capex_outflow",
       "gross_revenue_or_savings",
       "om_cost",
@@ -688,6 +707,7 @@ export default function HybridDashboard({
         r.served_load_kwh,
         r.pv_generation_kwh,
         r.biomass_generation_kwh,
+        r.diesel_generation_kwh ?? 0,
         r.capex_outflow,
         r.gross_revenue_or_savings,
         r.om_cost,
@@ -709,6 +729,8 @@ export default function HybridDashboard({
       "load_kw",
       "pv_generation_kw",
       "biomass_generation_kw",
+      "diesel_generation_kw",
+      "diesel_fuel_liters",
       "bess_charge_kw",
       "bess_discharge_kw",
       "grid_import_kw",
@@ -726,6 +748,8 @@ export default function HybridDashboard({
           hourly.load_kw[i],
           hourly.pv_generation_kw[i],
           hourly.biomass_generation_kw[i],
+          hourly.diesel_generation_kw?.[i] ?? 0,
+          hourly.diesel_fuel_liters?.[i] ?? 0,
           hourly.bess_charge_kw[i],
           hourly.bess_discharge_kw[i],
           hourly.grid_import_kw[i],
@@ -903,6 +927,7 @@ export default function HybridDashboard({
                           <th scope="col">Beban</th>
                           <th scope="col">PV</th>
                           <th scope="col">Biomass</th>
+                          <th scope="col">Diesel</th>
                           <th scope="col">BESS Dis.</th>
                           <th scope="col">Grid Imp.</th>
                           <th scope="col">Unmet</th>
@@ -915,6 +940,7 @@ export default function HybridDashboard({
                             <td>{formatNumber(m.load_kwh / 1000, lang, 1)}</td>
                             <td>{formatNumber(m.pv_generation_kwh / 1000, lang, 1)}</td>
                             <td>{formatNumber(m.biomass_generation_kwh / 1000, lang, 1)}</td>
+                            <td>{formatNumber((m.diesel_generation_kwh ?? 0) / 1000, lang, 1)}</td>
                             <td>{formatNumber(m.bess_discharge_kwh / 1000, lang, 1)}</td>
                             <td>{formatNumber(m.grid_import_kwh / 1000, lang, 1)}</td>
                             <td>{formatNumber(m.unmet_load_kwh / 1000, lang, 1)}</td>
@@ -1039,6 +1065,15 @@ export default function HybridDashboard({
                     ) : (
                       <p className="note"><strong>Biomass:</strong> Tidak diaktifkan</p>
                     )}
+                    {result.diesel_summary ? (
+                      <>
+                        <p className="note"><strong>Produksi Diesel (Non-Terbarukan):</strong> <span className="tabular-nums">{formatNumber(result.diesel_summary.total_generation_kwh / 1000, lang, 1)} MWh</span></p>
+                        <p className="note"><strong>Jam Operasi / Start Diesel:</strong> <span className="tabular-nums">{formatNumber(result.diesel_summary.total_operating_hours, lang, 0)} jam / {result.diesel_summary.startup_count}x</span></p>
+                        <p className="note"><strong>Konsumsi Solar / Emisi:</strong> <span className="tabular-nums">{formatNumber(result.diesel_summary.total_fuel_liters, lang, 0)} L / {formatNumber(result.diesel_summary.total_co2e_kg / 1000, lang, 1)} tCO2e</span></p>
+                      </>
+                    ) : (
+                      <p className="note"><strong>Diesel Generator:</strong> Tidak diaktifkan</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1142,7 +1177,7 @@ export default function HybridDashboard({
                       <strong>Alasan EMS:</strong> <code>{hourly.trace_reason[inspectStepIdx]}</code>
                     </p>
                     <p className="note tabular-nums">
-                      Beban: {hourly.load_kw[inspectStepIdx]} kW | PV: {hourly.pv_generation_kw[inspectStepIdx]} kW | Biomass: {hourly.biomass_generation_kw[inspectStepIdx]} kW | Charge: {hourly.bess_charge_kw[inspectStepIdx]} kW | Discharge: {hourly.bess_discharge_kw[inspectStepIdx]} kW
+                      Beban: {hourly.load_kw[inspectStepIdx]} kW | PV: {hourly.pv_generation_kw[inspectStepIdx]} kW | Biomass: {hourly.biomass_generation_kw[inspectStepIdx]} kW | Diesel: {hourly.diesel_generation_kw?.[inspectStepIdx] ?? 0} kW | Charge: {hourly.bess_charge_kw[inspectStepIdx]} kW | Discharge: {hourly.bess_discharge_kw[inspectStepIdx]} kW
                     </p>
                   </div>
                 )}
