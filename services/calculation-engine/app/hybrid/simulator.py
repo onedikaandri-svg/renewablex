@@ -9,8 +9,20 @@ from typing import Any
 import numpy as np
 
 from app.errors import EngineError
-from app.hybrid.components import PVHourlyOutput, PVWattsComponent, PVWattsConfig
+from app.hybrid.bess import BESSComponent, BESSConfig
+from app.hybrid.components import (
+    LifecycleEvent,
+    PVHourlyOutput,
+    PVWattsComponent,
+    PVWattsConfig,
+)
+from app.hybrid.dispatch import (
+    DispatchConfig,
+    DispatchContext,
+    create_dispatch_strategy,
+)
 from app.hybrid.load import LoadProfile
+from app.hybrid.pv_detailed import PVDetailedComponent, PVDetailedConfig
 from app.hybrid.time_grid import TimeConfig
 from app.hybrid.weather import WeatherDataset
 from app.version import ENGINE_VERSION
@@ -20,12 +32,14 @@ BALANCE_TOLERANCE_KW = 1e-6
 
 @dataclass(frozen=True)
 class SimulationConfig:
-    """Konfigurasi lengkap simulasi sistem hybrid Tahap 1."""
+    """Konfigurasi lengkap simulasi sistem hybrid."""
 
     project_name: str
     time_config: TimeConfig
-    pv: PVWattsConfig
+    pv: PVWattsConfig | PVDetailedConfig
     contract_version: str = "0.1"
+    bess: BESSConfig | None = None
+    dispatch: DispatchConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -98,6 +112,20 @@ class AnnualSummary:
 
 
 @dataclass(frozen=True)
+class BESSSummary:
+    """Ringkasan tahunan kinerja dan degradasi BESS."""
+
+    total_charge_kwh: float
+    total_discharge_kwh: float
+    conversion_losses_kwh: float
+    aux_load_kwh: float
+    equivalent_full_cycles: float
+    final_soc_fraction: float
+    final_effective_capacity_kwh: float
+    replacement_count: int
+
+
+@dataclass(frozen=True)
 class SimulationResult:
     """Keluaran lengkap simulasi hybrid beserta provenance dan ringkasan berjenjang."""
 
@@ -112,11 +140,17 @@ class SimulationResult:
     daily: list[DailyRow]
     monthly: list[MonthlyRow]
     summary: AnnualSummary
+    bess_soc: np.ndarray | None = None
+    bess_effective_capacity_kwh: np.ndarray | None = None
+    bess_summary: BESSSummary | None = None
+    lifecycle_events: tuple[LifecycleEvent, ...] = ()
+    trace_reasons: tuple[str, ...] = ()
+    dispatch_strategy: str | None = None
 
     def to_summary_dict(self) -> dict[str, Any]:
         """Mengembalikan ringkasan terstruktur siap serialisasi JSON."""
         m = self.weather.metadata
-        return {
+        out: dict[str, Any] = {
             "engine_version": self.engine_version,
             "contract_version": self.contract_version,
             "config_hash": self.config_hash,
@@ -136,10 +170,24 @@ class SimulationResult:
             "pv_loss_breakdown_kwh": dict(self.pv_output.loss_breakdown_kwh),
             "monthly": [asdict(row) for row in self.monthly],
         }
+        if self.dispatch_strategy is not None:
+            out["dispatch_strategy"] = self.dispatch_strategy
+        if self.bess_summary is not None:
+            out["bess_summary"] = asdict(self.bess_summary)
+        if self.lifecycle_events:
+            out["lifecycle_events"] = [asdict(ev) for ev in self.lifecycle_events]
+        return out
 
 
 def _compute_config_hash(config: SimulationConfig, weather: WeatherDataset, load_profile: LoadProfile) -> str:
-    payload = {
+    # Jaga hash Tahap 1 tetap identik bila hanya memakai komponen Tahap 1.
+    is_stage_1_only = (
+        config.contract_version == "0.1"
+        and isinstance(config.pv, PVWattsConfig)
+        and config.bess is None
+        and config.dispatch is None
+    )
+    payload: dict[str, Any] = {
         "contract_version": config.contract_version,
         "project_name": config.project_name,
         "time_config": asdict(config.time_config),
@@ -148,6 +196,11 @@ def _compute_config_hash(config: SimulationConfig, weather: WeatherDataset, load
         "load_source": load_profile.source,
         "load_total_kwh": round(load_profile.total_energy_kwh, 6),
     }
+    if not is_stage_1_only:
+        payload["pv_model"] = "detailed_v1" if isinstance(config.pv, PVDetailedConfig) else "pvwatts_v1"
+        payload["bess"] = asdict(config.bess) if config.bess is not None else None
+        payload["dispatch"] = asdict(config.dispatch) if config.dispatch is not None else None
+
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
@@ -209,8 +262,30 @@ def run_simulation(
             "TimeConfig pada profil beban tidak sama dengan konfigurasi simulasi.",
         )
 
-    pv_component = PVWattsComponent(config.pv)
+    pv_component: PVWattsComponent | PVDetailedComponent
+    if isinstance(config.pv, PVDetailedConfig):
+        pv_component = PVDetailedComponent(config.pv)
+        pv_cap_kwp = config.pv.effective_dc_capacity_kwp
+    else:
+        pv_component = PVWattsComponent(config.pv)
+        pv_cap_kwp = config.pv.capacity_kwp
     pv_output = pv_component.prepare(weather)
+
+    bess_component: BESSComponent | None = None
+    bess_state: dict[str, Any] = {}
+    if config.bess is not None:
+        bess_component = BESSComponent(config.bess)
+        sim_year = config.pv.simulation_year if isinstance(config.pv, PVDetailedConfig) else 1
+        bess_state = bess_component.initial_state(year=sim_year)
+
+    is_stage_1_loop = (
+        bess_component is None
+        and config.dispatch is None
+        and isinstance(config.pv, PVWattsConfig)
+    )
+
+    dispatch_cfg = config.dispatch if config.dispatch is not None else DispatchConfig(strategy="self_consumption")
+    strategy = None if is_stage_1_loop else create_dispatch_strategy(dispatch_cfg)
 
     n = config.time_config.steps_per_year
     load_kw = load_profile.load_kw
@@ -226,21 +301,116 @@ def run_simulation(
     curtailment_kw = np.zeros(n, dtype=np.float64)
     losses_kw = np.zeros(n, dtype=np.float64)
 
-    # Loop berurutan per langkah waktu sebagai fondasi mesin dispatch (Tahap 2 dan 3 menambah state baterai/generator).
-    pv_state: dict[str, Any] = {}
-    for t in range(n):
-        avail = pv_component.available_power_kw(t, weather, pv_state)
-        demand = float(load_kw[t])
-        served = min(avail, demand)
-        step_res = pv_component.step(t, served, weather, pv_state)
-        pv_state = step_res.state_out
+    bess_soc_series = np.zeros(n, dtype=np.float64) if bess_component is not None else None
+    bess_cap_series = np.zeros(n, dtype=np.float64) if bess_component is not None else None
+    bess_conv_losses_kw = np.zeros(n, dtype=np.float64) if bess_component is not None else None
+    bess_aux_served_kw = np.zeros(n, dtype=np.float64) if bess_component is not None else None
+    trace_reasons: list[str] = []
 
-        pv_available[t] = step_res.available_kw
-        generation_kw[t] = step_res.generation_kw
-        served_load_kw[t] = served
-        unmet_load_kw[t] = max(demand - served, 0.0)
-        curtailment_kw[t] = max(step_res.generation_kw - served, 0.0)
-        losses_kw[t] = step_res.losses_kw
+    hours_local = config.time_config.hour_of_day()
+    months_local = config.time_config.month_indices()
+
+    pv_state: dict[str, Any] = {}
+    if is_stage_1_loop:
+        for t in range(n):
+            avail = pv_component.available_power_kw(t, weather, pv_state)
+            demand = float(load_kw[t])
+            served = min(avail, demand)
+            step_res = pv_component.step(t, served, weather, pv_state)
+            pv_state = step_res.state_out
+
+            pv_available[t] = step_res.available_kw
+            generation_kw[t] = step_res.generation_kw
+            served_load_kw[t] = served
+            unmet_load_kw[t] = max(demand - served, 0.0)
+            curtailment_kw[t] = max(step_res.generation_kw - served, 0.0)
+            losses_kw[t] = step_res.losses_kw
+    else:
+        assert strategy is not None
+        for t in range(n):
+            avail = pv_component.available_power_kw(t, weather, pv_state)
+            demand = float(load_kw[t])
+            pv_night_tare = pv_component.night_tare_power_kw(t, weather)
+            bess_aux = bess_component.config.aux_load_kw if bess_component is not None else 0.0
+            parasitic = pv_night_tare + bess_aux
+
+            if bess_component is not None:
+                soc_now = float(bess_state["soc_fraction"])
+                max_chg = bess_component.max_charge_power_kw(weather, bess_state)
+                max_dis = bess_component.available_power_kw(t, weather, bess_state)
+            else:
+                soc_now = 0.0
+                max_chg = 0.0
+                max_dis = 0.0
+
+            ctx = DispatchContext(
+                step_idx=t,
+                hour_of_day=int(hours_local[t]),
+                month=int(months_local[t]),
+                load_kw=demand,
+                pv_available_kw=avail,
+                bess_soc=soc_now,
+                bess_max_charge_kw=max_chg,
+                bess_max_discharge_kw=max_dis,
+                allow_grid_import=dispatch_cfg.allow_grid_import,
+                allow_grid_export=dispatch_cfg.allow_grid_export,
+                parasitic_load_kw=parasitic,
+            )
+            decision = strategy.decide(ctx)
+            trace_reasons.append(decision.trace_reason)
+
+            pv_step = pv_component.step(t, demand, weather, pv_state)
+            pv_state = pv_step.state_out
+            pv_gen = pv_step.generation_kw
+
+            chg = 0.0
+            dis = 0.0
+            if bess_component is not None:
+                cmd = decision.bess_command_kw
+                if cmd > 0.0 and not dispatch_cfg.allow_grid_import:
+                    cmd = min(cmd, max(pv_gen - demand - parasitic, 0.0))
+                bess_step = bess_component.step(t, cmd, weather, bess_state)
+                bess_state = bess_step.state_out
+                chg = bess_step.charge_kw
+                dis = bess_step.discharge_kw
+                assert bess_soc_series is not None
+                assert bess_cap_series is not None
+                assert bess_conv_losses_kw is not None
+                bess_soc_series[t] = float(bess_state["soc_fraction"])
+                bess_cap_series[t] = float(bess_state["effective_capacity_kwh"])
+                bess_conv_losses_kw[t] = bess_step.losses_kw
+
+            if dispatch_cfg.allow_grid_import:
+                g_import = max((demand + parasitic + chg) - (pv_gen + dis), 0.0)
+            else:
+                g_import = 0.0
+
+            total_supply = pv_gen + dis + g_import
+            served_parasitic = min(total_supply, parasitic)
+            remaining_for_load = max(total_supply - served_parasitic - chg, 0.0)
+            served = min(remaining_for_load, demand)
+            surplus_after = max(total_supply - served_parasitic - chg - served, 0.0)
+
+            if dispatch_cfg.allow_grid_export:
+                g_export = surplus_after
+                curtail = 0.0
+            else:
+                g_export = 0.0
+                curtail = surplus_after
+
+            if bess_aux_served_kw is not None and parasitic > 0.0:
+                bess_aux_served_kw[t] = served_parasitic * (bess_aux / parasitic)
+
+            pv_available[t] = pv_step.available_kw
+            generation_kw[t] = pv_gen
+            charge_kw[t] = chg
+            discharge_kw[t] = dis
+            grid_import_kw[t] = g_import
+            grid_export_kw[t] = g_export
+            served_load_kw[t] = served
+            unmet_load_kw[t] = max(demand - served, 0.0)
+            curtailment_kw[t] = curtail
+            losses_kw[t] = pv_step.losses_kw + served_parasitic
 
     balance = PowerBalanceSeries(
         load_kw=load_kw,
@@ -269,11 +439,15 @@ def run_simulation(
     served_kwh = float(np.sum(served_load_kw) * h)
     unmet_kwh = float(np.sum(unmet_load_kw) * h)
     curtail_kwh = float(np.sum(curtailment_kw) * h)
+    grid_imp_kwh = float(np.sum(grid_import_kw) * h)
 
-    renewable_fraction = (served_kwh / total_load_kwh) if total_load_kwh > 0 else 0.0
+    if total_load_kwh > 0.0:
+        renewable_fraction = min(max((served_kwh - grid_imp_kwh) / total_load_kwh, 0.0), 1.0)
+    else:
+        renewable_fraction = 0.0
     total_hours = n * h
-    capacity_factor = pv_gen_kwh / (config.pv.capacity_kwp * total_hours)
-    specific_yield = pv_gen_kwh / config.pv.capacity_kwp
+    capacity_factor = pv_gen_kwh / (pv_cap_kwp * total_hours)
+    specific_yield = pv_gen_kwh / pv_cap_kwp
 
     summary = AnnualSummary(
         steps_count=n,
@@ -289,6 +463,23 @@ def run_simulation(
         max_balance_error_kw=max_err,
     )
 
+    bess_summary: BESSSummary | None = None
+    events: tuple[LifecycleEvent, ...] = ()
+    if bess_component is not None:
+        assert bess_conv_losses_kw is not None
+        assert bess_aux_served_kw is not None
+        bess_summary = BESSSummary(
+            total_charge_kwh=float(np.sum(charge_kw) * h),
+            total_discharge_kwh=float(np.sum(discharge_kw) * h),
+            conversion_losses_kwh=float(np.sum(bess_conv_losses_kw) * h),
+            aux_load_kwh=float(np.sum(bess_aux_served_kw) * h),
+            equivalent_full_cycles=float(bess_state["equivalent_full_cycles"]),
+            final_soc_fraction=float(bess_state["soc_fraction"]),
+            final_effective_capacity_kwh=float(bess_state["effective_capacity_kwh"]),
+            replacement_count=int(bess_state["replacement_count"]),
+        )
+        events = tuple(bess_state.get("events", []))
+
     return SimulationResult(
         engine_version=ENGINE_VERSION,
         contract_version=config.contract_version,
@@ -301,4 +492,10 @@ def run_simulation(
         daily=_aggregate_daily(balance, config.time_config),
         monthly=_aggregate_monthly(balance, config.time_config),
         summary=summary,
+        bess_soc=bess_soc_series,
+        bess_effective_capacity_kwh=bess_cap_series,
+        bess_summary=bess_summary,
+        lifecycle_events=events,
+        trace_reasons=tuple(trace_reasons),
+        dispatch_strategy=None if is_stage_1_loop else dispatch_cfg.strategy,
     )
