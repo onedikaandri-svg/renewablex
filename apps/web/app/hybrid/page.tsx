@@ -28,7 +28,7 @@ import {
   listProjects,
 } from "@/lib/hybrid-storage";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 
 export default function HybridProjectsPage() {
   const router = useRouter();
@@ -70,18 +70,28 @@ export default function HybridProjectsPage() {
   function handleCreateSample() {
     const created = createSampleProject();
     pushToast(
-      lang === "en"
-        ? "Sample hybrid project [REAL DATA] loaded."
-        : "Contoh proyek hybrid [REAL DATA] berhasil dimuat.",
+      tr(
+        lang,
+        "Sample hybrid project [REAL DATA] loaded.",
+        "Mantap! Contoh proyek hybrid [REAL DATA] sudah siap.",
+        "サンプルハイブリッドプロジェクト [REAL DATA] を読み込みました。",
+      ),
       "success",
     );
     router.push(`/hybrid/${created.id}/location`);
   }
 
   function handleCreateBlank() {
-    const created = createBlankProject(lang === "en" ? "New Hybrid Project" : "Proyek Hybrid Baru");
+    const created = createBlankProject(
+      tr(lang, "New Hybrid Project", "Proyek Hybrid Baru", "新規ハイブリッドプロジェクト"),
+    );
     pushToast(
-      lang === "en" ? "New hybrid project created." : "Proyek hybrid baru dibuat.",
+      tr(
+        lang,
+        "New hybrid project created.",
+        "Sip! Proyek hybrid baru berhasil dibuat.",
+        "新しいハイブリッドプロジェクトを作成しました。",
+      ),
       "success",
     );
     router.push(`/hybrid/${created.id}/location`);
@@ -92,9 +102,12 @@ export default function HybridProjectsPage() {
     if (copy) {
       refresh();
       pushToast(
-        lang === "en"
-          ? `Project "${copy.project.project_name}" duplicated.`
-          : `Proyek "${copy.project.project_name}" berhasil diduplikat.`,
+        tr(
+          lang,
+          `Project "${copy.project.project_name}" duplicated.`,
+          `Beres! Proyek "${copy.project.project_name}" sudah diduplikat.`,
+          `プロジェクト「${copy.project.project_name}」を複製しました。`,
+        ),
         "success",
       );
     }
@@ -105,9 +118,12 @@ export default function HybridProjectsPage() {
     setConfirmDeleteId(null);
     refresh();
     pushToast(
-      lang === "en"
-        ? `Project "${name}" deleted from browser storage.`
-        : `Proyek "${name}" dihapus dari browser.`,
+      tr(
+        lang,
+        `Project "${name}" deleted from browser storage.`,
+        `Proyek "${name}" sudah dihapus dari browser.`,
+        `プロジェクト「${name}」をブラウザの保存領域から削除しました。`,
+      ),
       "info",
     );
   }
@@ -116,7 +132,12 @@ export default function HybridProjectsPage() {
     const filename = `${p.project.project_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.hybrid.json`;
     downloadFile(filename, exportProjectJson(p), "application/json");
     pushToast(
-      lang === "en" ? "Project JSON file downloaded." : "Berkas JSON proyek diunduh.",
+      tr(
+        lang,
+        "Project JSON file downloaded.",
+        "Sip, file JSON proyek sudah terunduh.",
+        "プロジェクトのJSONファイルをダウンロードしました。",
+      ),
       "success",
     );
   }
@@ -128,18 +149,24 @@ export default function HybridProjectsPage() {
       const imported = importProjectJson(text);
       refresh();
       pushToast(
-        lang === "en"
-          ? `Project "${imported.project.project_name}" imported.`
-          : `Proyek "${imported.project.project_name}" berhasil diimpor.`,
+        tr(
+          lang,
+          `Project "${imported.project.project_name}" imported.`,
+          `Mantap! Proyek "${imported.project.project_name}" berhasil diimpor.`,
+          `プロジェクト「${imported.project.project_name}」をインポートしました。`,
+        ),
         "success",
       );
     } catch (err) {
       pushToast(
         err instanceof Error
           ? err.message
-          : lang === "en"
-            ? "Failed to import project JSON."
-            : "Gagal mengimpor JSON proyek.",
+          : tr(
+              lang,
+              "Failed to import project JSON.",
+              "Gagal mengimpor file JSON proyek.",
+              "プロジェクトJSONのインポートに失敗しました。",
+            ),
         "error",
       );
     }
@@ -149,36 +176,56 @@ export default function HybridProjectsPage() {
     <>
       <div className="page-head">
         <div>
-          <p className="eyebrow">{lang === "en" ? "Step 1 of 10" : "Langkah 1 dari 10"}</p>
-          <h1>{lang === "en" ? "Hybrid Energy System Projects" : "Proyek Sistem Energi Hybrid"}</h1>
+          <p className="eyebrow">{tr(lang, "Step 1 of 10", "Langkah 1 dari 10", "ステップ 1 / 10")}</p>
+          <h1>
+            {tr(
+              lang,
+              "Hybrid Energy System Projects",
+              "Proyek Sistem Energi Hybrid",
+              "ハイブリッドエネルギーシステム・プロジェクト一覧",
+            )}
+          </h1>
           <p className="lead">
-            {lang === "en"
-              ? "Compose, simulate, and analyze hybrid energy systems (PV, BESS, Biomass, Diesel, and EMS) from hourly steps to a 25-year project lifetime. Projects are saved locally in your browser and can be exported or imported as JSON."
-              : "Susun, simulasikan, dan analisis sistem energi hybrid (PV, BESS, Biomass, dan EMS) dari skala jam hingga 25 tahun. Data proyek disimpan secara lokal di browser Anda dan dapat diekspor atau diimpor sebagai JSON."}
+            {tr(
+              lang,
+              "Compose, simulate, and analyze hybrid energy systems (PV, BESS, Biomass, Diesel, and EMS) from hourly steps to a 25-year project lifetime. Projects are saved locally in your browser and can be exported or imported as JSON.",
+              "Rancang, simulasikan, dan analisis sistem energi hybrid (PV, BESS, Biomass, Diesel, dan EMS) dari skala per jam sampai 25 tahun. Semua proyek tersimpan aman di browser kamu dan bisa diekspor/impor lewat file JSON.",
+              "太陽光 (PV)、蓄電池 (BESS)、バイオマス、ディーゼル発電、およびEMSを組み合わせたハイブリッド電源システムを、1時間単位から25年間の事業期間まで設計・シミュレーションします。",
+            )}
           </p>
         </div>
         <div className="actions-inline">
           <button type="button" className="btn primary" onClick={handleCreateSample}>
-            {lang === "en" ? "Load Sample Project [REAL DATA]" : "Muat Contoh Proyek [REAL DATA]"}
+            {tr(
+              lang,
+              "Load Sample Project [REAL DATA]",
+              "Muat Proyek Contoh [REAL DATA]",
+              "サンプルプロジェクト読込 [REAL DATA]",
+            )}
           </button>
           <button type="button" className="btn ghost" onClick={handleCreateBlank}>
             <IconPlus size={15} />
-            {lang === "en" ? "Create New Project" : "Buat Proyek Baru"}
+            {tr(lang, "Create New Project", "Buat Proyek Baru", "新規プロジェクト作成")}
           </button>
           <button type="button" className="btn ghost" onClick={() => fileInputRef.current?.click()}>
             <IconUpload size={15} />
-            {lang === "en" ? "Import JSON" : "Impor JSON"}
+            {tr(lang, "Import JSON", "Impor JSON", "JSONインポート")}
           </button>
           <Link href="/hybrid/guide" className="btn ghost">
             <IconBookOpen size={15} />
-            {lang === "en" ? "Open Guide" : "Buka Panduan"}
+            {tr(lang, "Open Guide", "Buka Panduan", "利用ガイド")}
           </Link>
           <input
             ref={fileInputRef}
             type="file"
             accept=".json,application/json"
             style={{ display: "none" }}
-            aria-label={lang === "en" ? "Choose project JSON file" : "Pilih berkas JSON proyek"}
+            aria-label={tr(
+              lang,
+              "Choose project JSON file",
+              "Pilih file JSON proyek",
+              "プロジェクトJSONファイルを選択",
+            )}
             onChange={(e) => {
               void handleImportFile(e.target.files?.[0]);
               e.target.value = "";
@@ -190,33 +237,51 @@ export default function HybridProjectsPage() {
       {!ready ? (
         <div className="state" role="status">
           <p>
-            {lang === "en"
-              ? "Loading projects from local storage..."
-              : "Memuat daftar proyek dari penyimpanan lokal..."}
+            {tr(
+              lang,
+              "Loading projects from local storage...",
+              "Lagi memuat daftar proyek dari browser...",
+              "ローカルストレージからプロジェクトを読み込み中...",
+            )}
           </p>
         </div>
       ) : projects.length === 0 ? (
         <div className="state">
-          <h2>{lang === "en" ? "No saved hybrid projects yet" : "Belum ada proyek hybrid tersimpan"}</h2>
+          <h2>
+            {tr(
+              lang,
+              "No saved hybrid projects yet",
+              "Belum ada proyek hybrid tersimpan nih",
+              "保存されたハイブリッドプロジェクトがありません",
+            )}
+          </h2>
           <p>
-            {lang === "en" ? (
+            {tr(
+              lang,
               <>
                 Get started quickly by loading the complete sample hybrid project (500 kWp PV + 600 kWh BESS + 250 kW Biomass labeled{" "}
                 <code>[REAL DATA]</code>), or create a blank project from scratch.
-              </>
-            ) : (
+              </>,
               <>
-                Mulai cepat dengan memuat contoh proyek hybrid lengkap (PV 500 kWp + BESS 600 kWh + Biomass 250 kW berlabel{" "}
-                <code>[REAL DATA]</code>), atau buat proyek baru dari awal.
-              </>
+                Yuk mulai cepat dengan memuat contoh proyek hybrid lengkap (PV 500 kWp + BESS 600 kWh + Biomass 250 kW berlabel{" "}
+                <code>[REAL DATA]</code>), atau langsung bikin proyek baru dari nol!
+              </>,
+              <>
+                <code>[REAL DATA]</code> 付きサンプルプロジェクト（PV 500 kWp + 蓄電池 600 kWh + バイオマス 250 kW）を読み込んで今すぐ始めるか、新規プロジェクトを作成してください。
+              </>,
             )}
           </p>
           <div className="row" style={{ borderTop: 0, paddingTop: "0.75rem", marginTop: "0.5rem" }}>
             <button type="button" className="btn primary" onClick={handleCreateSample}>
-              {lang === "en" ? "Load Sample Project [REAL DATA]" : "Muat Contoh Proyek [REAL DATA]"}
+              {tr(
+                lang,
+                "Load Sample Project [REAL DATA]",
+                "Muat Proyek Contoh [REAL DATA]",
+                "サンプルプロジェクト読込 [REAL DATA]",
+              )}
             </button>
             <button type="button" className="btn ghost" onClick={handleCreateBlank}>
-              {lang === "en" ? "Create New Project" : "Buat Proyek Baru"}
+              {tr(lang, "Create New Project", "Buat Proyek Baru", "新規プロジェクト作成")}
             </button>
           </div>
         </div>
@@ -235,7 +300,7 @@ export default function HybridProjectsPage() {
                   </div>
                   <h3>{p.project.project_name}</h3>
                   <p className="note tabular-nums">
-                    {lang === "en" ? "Coordinates" : "Koordinat"}: {p.project.latitude.toFixed(2)}, {p.project.longitude.toFixed(2)} ({p.project.timezone})
+                    {tr(lang, "Coordinates", "Koordinat", "座標")}: {p.project.latitude.toFixed(2)}, {p.project.longitude.toFixed(2)} ({p.project.timezone})
                   </p>
                   <p className="note tabular-nums">
                     PV {formatNumber(p.components.pv.capacity_kwp, lang, 0)} kWp
@@ -244,30 +309,32 @@ export default function HybridProjectsPage() {
                     {p.components.diesel?.enabled ? ` | Diesel ${formatNumber(p.components.diesel.rated_capacity_kw, lang, 0)} kW` : ""}
                   </p>
                   <p className="note">
-                    {lang === "en" ? "Updated" : "Diperbarui"}: {new Date(p.updatedAt).toLocaleString(lang === "en" ? "en-US" : "id-ID")}
+                    {tr(lang, "Updated", "Diperbarui", "最終更新")}:{" "}
+                    {new Date(p.updatedAt).toLocaleString(tr(lang, "en-US", "id-ID", "ja-JP"))}
                   </p>
                 </div>
 
                 <div className="actions-inline">
                   <Link href={`/hybrid/${p.id}/location`} className="btn btn-sm primary">
                     <IconSliders size={14} />
-                    {lang === "en" ? "Open Configuration" : "Buka Konfigurasi"}
+                    {tr(lang, "Open Configuration", "Atur Proyek", "設定を開く")}
                   </Link>
                   {res && (
                     <Link href={`/hybrid/${p.id}/results`} className="btn btn-sm ghost">
                       <IconBarChart size={14} />
-                      {lang === "en" ? "View Results" : "Lihat Hasil"}
+                      {tr(lang, "View Results", "Lihat Hasil", "結果を見る")}
                     </Link>
                   )}
                   <button
                     type="button"
                     className="btn btn-sm btn-icon ghost"
-                    aria-label={
-                      lang === "en"
-                        ? `Duplicate project ${p.project.project_name}`
-                        : `Duplikat proyek ${p.project.project_name}`
-                    }
-                    title={lang === "en" ? "Duplicate project" : "Duplikat proyek"}
+                    aria-label={tr(
+                      lang,
+                      `Duplicate project ${p.project.project_name}`,
+                      `Duplikat proyek ${p.project.project_name}`,
+                      `プロジェクト ${p.project.project_name} を複製`,
+                    )}
+                    title={tr(lang, "Duplicate project", "Duplikat proyek", "プロジェクトを複製")}
                     onClick={() => handleDuplicate(p.id)}
                   >
                     <IconCopy size={15} />
@@ -275,12 +342,13 @@ export default function HybridProjectsPage() {
                   <button
                     type="button"
                     className="btn btn-sm btn-icon ghost"
-                    aria-label={
-                      lang === "en"
-                        ? `Export JSON for project ${p.project.project_name}`
-                        : `Ekspor JSON proyek ${p.project.project_name}`
-                    }
-                    title={lang === "en" ? "Export JSON" : "Ekspor JSON"}
+                    aria-label={tr(
+                      lang,
+                      `Export JSON for project ${p.project.project_name}`,
+                      `Ekspor JSON proyek ${p.project.project_name}`,
+                      `プロジェクト ${p.project.project_name} のJSONを出力`,
+                    )}
+                    title={tr(lang, "Export JSON", "Ekspor JSON", "JSON出力")}
                     onClick={() => handleExport(p)}
                   >
                     <IconDownload size={15} />
@@ -291,38 +359,41 @@ export default function HybridProjectsPage() {
                       <button
                         type="button"
                         className="btn btn-sm danger-ghost"
-                        aria-label={
-                          lang === "en"
-                            ? `Confirm delete project ${p.project.project_name}`
-                            : `Yakin hapus proyek ${p.project.project_name}`
-                        }
+                        aria-label={tr(
+                          lang,
+                          `Confirm delete project ${p.project.project_name}`,
+                          `Yakin hapus proyek ${p.project.project_name}`,
+                          `プロジェクト ${p.project.project_name} の削除を確定`,
+                        )}
                         onClick={() => handleConfirmDelete(p.id, p.project.project_name)}
                       >
-                        {lang === "en" ? "Confirm Delete" : "Yakin Hapus"}
+                        {tr(lang, "Confirm Delete", "Yakin Hapus", "削除を確定")}
                       </button>
                       <button
                         type="button"
                         className="btn btn-sm ghost"
-                        aria-label={
-                          lang === "en"
-                            ? `Cancel delete project ${p.project.project_name}`
-                            : `Batal hapus proyek ${p.project.project_name}`
-                        }
+                        aria-label={tr(
+                          lang,
+                          `Cancel delete project ${p.project.project_name}`,
+                          `Batal hapus proyek ${p.project.project_name}`,
+                          `プロジェクト ${p.project.project_name} の削除をキャンセル`,
+                        )}
                         onClick={() => setConfirmDeleteId(null)}
                       >
-                        {lang === "en" ? "Cancel" : "Batal"}
+                        {tr(lang, "Cancel", "Batal", "キャンセル")}
                       </button>
                     </>
                   ) : (
                     <button
                       type="button"
                       className="btn btn-sm btn-icon danger-ghost"
-                      aria-label={
-                        lang === "en"
-                          ? `Delete project ${p.project.project_name}`
-                          : `Hapus proyek ${p.project.project_name}`
-                      }
-                      title={lang === "en" ? "Delete project" : "Hapus proyek"}
+                      aria-label={tr(
+                        lang,
+                        `Delete project ${p.project.project_name}`,
+                        `Hapus proyek ${p.project.project_name}`,
+                        `プロジェクト ${p.project.project_name} を削除`,
+                      )}
+                      title={tr(lang, "Delete project", "Hapus proyek", "プロジェクトを削除")}
                       onClick={() => setConfirmDeleteId(p.id)}
                     >
                       <IconTrash size={15} />

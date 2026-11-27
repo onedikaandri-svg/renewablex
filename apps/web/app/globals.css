@@ -314,6 +314,7 @@ a[href], button, summary, select, label[for], [role="button"], [role="tab"] {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+  flex-wrap: wrap;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.1875rem;
@@ -330,6 +331,7 @@ a[href], button, summary, select, label[for], [role="button"], [role="tab"] {
   font-size: 0.8125rem;
   font-weight: 600;
   text-decoration: none;
+  white-space: nowrap;
   color: var(--muted);
   transition: background-color 0.15s ease, color 0.15s ease;
 }

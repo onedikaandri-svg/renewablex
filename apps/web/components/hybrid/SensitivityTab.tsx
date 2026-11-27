@@ -5,7 +5,7 @@ import EChart, { getChartThemeColors, type EChartsOption } from "@/components/hy
 import { ViabilityChip } from "@/components/hybrid/HybridShell";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
-import { SLOW_ENGINE_NOTE, formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
+import { slowEngineNoteFor, formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { runHybridSensitivity } from "@/lib/hybrid-api";
 import { getSensitivityResult, saveSensitivityResult } from "@/lib/hybrid-storage";
 import type {
@@ -14,7 +14,7 @@ import type {
   HybridSensitivityResponse,
   HybridSensitivityVariableId,
 } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 
 const VARIABLE_LABELS: Record<HybridSensitivityVariableId, string> = {
   capex_total: "Total CAPEX Sistem",
@@ -188,11 +188,13 @@ export default function SensitivityTab({ project }: { project: HybridProjectConf
     <div className="grid-hybrid">
       <section className="card" aria-labelledby="h-sens-cfg">
         <div className="card-header">
-          <h2 id="h-sens-cfg">Parameter Sensitivitas Hybrid</h2>
+          <h2 id="h-sens-cfg">
+            {tr(lang, "Hybrid Sensitivity Parameters", "Parameter Sensitivitas Hybrid", "ハイブリッド感度分析パラメータ")}
+          </h2>
         </div>
 
         <fieldset style={{ marginTop: 0, borderTop: 0, paddingTop: 0 }}>
-          <legend>Variabel yang Diuji</legend>
+          <legend>{tr(lang, "Variables to Test", "Variabel yang Diuji", "検証する変数")}</legend>
           {ALL_VARS.map((v) => (
             <label key={v} className="check-row">
               <input type="checkbox" checked={selectedVars.includes(v)} onChange={() => toggleVar(v)} />
@@ -235,33 +237,44 @@ export default function SensitivityTab({ project }: { project: HybridProjectConf
 
         <div className="row">
           <button type="button" className="btn primary" disabled={loading} onClick={() => void handleRunSensitivity()}>
-            {loading ? "Menghitung..." : "Hitung Sensitivitas Hybrid"}
+            {loading
+              ? tr(lang, "Calculating...", "Lagi Menghitung...", "感度分析を実行中...")
+              : tr(lang, "Run Hybrid Sensitivity", "Gas Hitung Sensitivitas", "感度分析を実行")}
           </button>
         </div>
       </section>
 
       <section aria-labelledby="h-sens-out">
-        <h2 id="h-sens-out" style={{ marginTop: 0 }}>Grafik Tornado & Matriks 5 x 5</h2>
+        <h2 id="h-sens-out" style={{ marginTop: 0 }}>
+          {tr(lang, "Tornado Chart & 5 x 5 Matrix", "Grafik Tornado & Matriks 5 x 5", "トルネード図＆5×5マトリクス")}
+        </h2>
 
         {loading && (
           <div className="state" role="status">
-            <h3>Menghitung Sensitivitas Hybrid</h3>
-            <p>Mengevaluasi pergeseran parameter teknis dan keuangan di mesin hitung Python&hellip;</p>
-            {slow && <p className="note" style={{ marginTop: "0.75rem" }}>{SLOW_ENGINE_NOTE}</p>}
+            <h3>{tr(lang, "Calculating Hybrid Sensitivity", "Lagi Menghitung Sensitivitas Hybrid", "ハイブリッド感度分析を計算中")}</h3>
+            <p>{tr(lang, "Evaluating technical and financial parameter shifts in the Python engine...", "Mengevaluasi pergeseran parameter teknis dan keuangan di mesin Python...", "Python計算エンジンで技術・財務パラメータの変動影響を計算しています...")}</p>
+            {slow && <p className="note" style={{ marginTop: "0.75rem" }}>{slowEngineNoteFor(lang)}</p>}
           </div>
         )}
 
         {!loading && errors.length > 0 && (
           <div className="state bad" role="alert">
-            <h3>Sensitivitas belum bisa dihitung</h3>
+            <h3>{tr(lang, "Sensitivity could not be calculated", "Sensitivitas belum berhasil dihitung", "感度分析を計算できませんでした")}</h3>
             <ul>{errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
           </div>
         )}
 
         {!loading && errors.length === 0 && !sensData && (
           <div className="state">
-            <h3>Belum ada hasil sensitivitas hybrid</h3>
-            <p>Pilih variabel dan tekan <strong>&ldquo;Hitung Sensitivitas Hybrid&rdquo;</strong> untuk melihat grafik Tornado serta Matriks 5 x 5.</p>
+            <h3>{tr(lang, "No hybrid sensitivity results yet", "Belum ada hasil sensitivitas nih", "まだ感度分析結果がありません")}</h3>
+            <p>
+              {tr(
+                lang,
+                <>Select variables on the left and press <strong>&ldquo;Run Hybrid Sensitivity&rdquo;</strong> to inspect the Tornado chart and 5 x 5 matrix.</>,
+                <>Pilih variabel di kiri terus klik <strong>&ldquo;Gas Hitung Sensitivitas&rdquo;</strong> buat lihat grafik Tornado dan Matriks 5 x 5!</>,
+                <>左側で変数を選択し、<strong>「感度分析を実行」</strong>を押すとトルネード図と5×5マトリクスが表示されます。</>,
+              )}
+            </p>
           </div>
         )}
 

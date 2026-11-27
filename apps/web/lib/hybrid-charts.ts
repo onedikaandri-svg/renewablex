@@ -1,4 +1,5 @@
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
+import type { LangCode } from "@/lib/preferences";
 
 export interface SankeyNodeItem {
   name: string;
@@ -22,7 +23,7 @@ export interface SankeyEnergyData {
  */
 export function buildSankeyEnergyData(
   result: HybridSimulateResponse,
-  lang: "id" | "en",
+  lang: LangCode,
 ): SankeyEnergyData {
   const pvMwh = Math.max(0, result.summary.pv_generation_kwh / 1000);
   const bioMwh = Math.max(0, result.summary.biomass_generation_kwh / 1000);
@@ -54,20 +55,35 @@ export function buildSankeyEnergyData(
           curtail: "Curtailment",
           parasitic: "Aux & Parasitic",
         }
-      : {
-          pv: "Solar PV",
-          biomass: "Biomass",
-          diesel: "Diesel Generator",
-          gridImp: "Impor Grid",
-          supplyBus: "Bus Pasokan AC",
-          bessChg: "Penyimpanan BESS",
-          distBus: "Distribusi AC",
-          bessLoss: "Rugi Konversi BESS",
-          served: "Beban Terpenuhi",
-          gridExp: "Ekspor Grid",
-          curtail: "Curtailment",
-          parasitic: "Beban Parasitik",
-        };
+      : lang === "ja"
+        ? {
+            pv: "太陽光 (PV)",
+            biomass: "バイオマス",
+            diesel: "ディーゼル発電",
+            gridImp: "系統買電",
+            supplyBus: "供給ACバス",
+            bessChg: "蓄電池 (BESS)",
+            distBus: "AC配電バス",
+            bessLoss: "蓄電池変換損失",
+            served: "供給済負荷",
+            gridExp: "系統売電",
+            curtail: "出力抑制",
+            parasitic: "補機消費電力",
+          }
+        : {
+            pv: "Solar PV",
+            biomass: "Biomass",
+            diesel: "Diesel Generator",
+            gridImp: "Impor Grid",
+            supplyBus: "Bus Pasokan AC",
+            bessChg: "Penyimpanan BESS",
+            distBus: "Distribusi AC",
+            bessLoss: "Rugi Konversi BESS",
+            served: "Beban Terpenuhi",
+            gridExp: "Ekspor Grid",
+            curtail: "Curtailment",
+            parasitic: "Beban Parasitik",
+          };
 
   const candidates: Array<{ source: string; target: string; raw: number }> = [
     { source: labels.pv, target: labels.supplyBus, raw: pvMwh },

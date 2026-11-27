@@ -7,12 +7,12 @@ import HybridShell from "@/components/hybrid/HybridShell";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
 import { translateDetailText } from "@/lib/errors-id";
-import { SLOW_ENGINE_NOTE, formatNumber, formatPercent } from "@/lib/format";
+import { slowEngineNoteFor, formatNumber, formatPercent } from "@/lib/format";
 import { getHybridJob, runHybridSimulate, submitHybridJob } from "@/lib/hybrid-api";
 import { saveSimulationResult } from "@/lib/hybrid-storage";
 import { validateSystemTopology } from "@/lib/hybrid-topology";
 import type { MultiYearMode } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 export default function HybridRunPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -48,7 +48,7 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
   if (!ready) {
     return (
       <div className="state">
-        <p>{lang === "en" ? "Loading project..." : "Memuat proyek..."}</p>
+        <p>{tr(lang, "Loading project...", "Lagi memuat proyek...", "プロジェクトを読み込み中...")}</p>
       </div>
     );
   }
@@ -60,17 +60,23 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
     setErrors([]);
     setProgress(5);
     setStepLabel(
-      lang === "en"
-        ? "Sending configuration to calculation engine..."
-        : "Mengirim konfigurasi ke mesin hitung...",
+      tr(
+        lang,
+        "Sending configuration to calculation engine...",
+        "Mengirim konfigurasi ke mesin hitung...",
+        "計算エンジンへ設定を送信中...",
+      ),
     );
 
     try {
       if (project.simulation.multi_year_mode === "scaled_year_1") {
         setStepLabel(
-          lang === "en"
-            ? "Running Year 1 8,760-hour simulation and financial analysis..."
-            : "Menjalankan simulasi 8.760 jam Tahun 1 dan analisis keuangan...",
+          tr(
+            lang,
+            "Running Year 1 8,760-hour simulation and financial analysis...",
+            "Menghitung simulasi 8.760 jam Tahun 1 dan arus kas proyek...",
+            "1年目の8,760時間シミュレーションおよび財務分析を実行中...",
+          ),
         );
         setProgress(35);
         const res = await runHybridSimulate(project);
@@ -78,11 +84,14 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
         saveSimulationResult(project.id, res, project);
         setResult(res);
         setProgress(100);
-        setStepLabel(lang === "en" ? "Simulation completed." : "Simulasi selesai.");
+        setStepLabel(tr(lang, "Simulation completed.", "Simulasi beres!", "シミュレーション完了。"));
         pushToast(
-          lang === "en"
-            ? "Hybrid simulation completed."
-            : "Simulasi hybrid berhasil diselesaikan.",
+          tr(
+            lang,
+            "Hybrid simulation completed.",
+            "Mantap! Simulasi hybrid beres dihitung.",
+            "ハイブリッドシミュレーションが完了しました。",
+          ),
           "success",
         );
         router.push(`/hybrid/${project.id}/results`);
@@ -102,9 +111,12 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
             saveSimulationResult(project.id, job.result, project);
             setResult(job.result);
             pushToast(
-              lang === "en"
-                ? "Full multi-year simulation completed."
-                : "Simulasi multi-tahun penuh selesai.",
+              tr(
+                lang,
+                "Full multi-year simulation completed.",
+                "Mantap! Simulasi multi-tahun penuh sudah beres.",
+                "全期間マルチイヤーシミュレーションが完了しました。",
+              ),
               "success",
             );
             router.push(`/hybrid/${project.id}/results`);
@@ -113,9 +125,12 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
           if (job.status === "failed") {
             const msg = job.error
               ? translateDetailText(job.error.msg)
-              : lang === "en"
-                ? "Simulation failed in calculation engine."
-                : "Simulasi gagal di mesin hitung.";
+              : tr(
+                  lang,
+                  "Simulation failed in calculation engine.",
+                  "Simulasi gagal di mesin hitung.",
+                  "計算エンジンでのシミュレーションに失敗しました。",
+                );
             setErrors([msg]);
             return;
           }
@@ -128,9 +143,12 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
         setErrors([
           err instanceof Error
             ? err.message
-            : lang === "en"
-              ? "An error occurred while running the simulation."
-              : "Terjadi kesalahan saat menjalankan simulasi.",
+            : tr(
+                lang,
+                "An error occurred while running the simulation.",
+                "Ada kendala saat menjalankan simulasi.",
+                "シミュレーションの実行中にエラーが発生しました。",
+              ),
         ]);
       }
     } finally {
@@ -144,35 +162,51 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
     <HybridShell
       project={project}
       activeStep="run"
-      title={lang === "en" ? "Review & Run Simulation" : "Ringkasan & Jalankan Simulasi"}
-      subtitle={
-        lang === "en"
-          ? "Review your project configuration summary, choose the multi-year calculation mode, and run the simulation on the engine."
-          : "Periksa ringkasan konfigurasi proyek, pilih mode kalkulasi multi-tahun, lalu jalankan simulasi pada mesin hitung."
-      }
+      title={tr(
+        lang,
+        "Review & Run Simulation",
+        "Cek Ringkasan & Jalankan Simulasi",
+        "設定確認・シミュレーション実行",
+      )}
+      subtitle={tr(
+        lang,
+        "Review your project configuration summary, choose the multi-year calculation mode, and run the simulation on the engine.",
+        "Cek dulu ringkasan proyekmu, pilih mode hitung multi-tahun, terus gas jalankan simulasi di mesin hitung!",
+        "プロジェクト設定の概要を確認し、複数年の計算モードを選択してシミュレーションを実行します。",
+      )}
       result={result}
     >
       <div className="grid-hybrid">
         <section className="card" aria-labelledby="h-run-cfg">
           <div className="card-header">
-            <h2 id="h-run-cfg">{lang === "en" ? "Configuration Summary" : "Ringkasan Konfigurasi"}</h2>
+            <h2 id="h-run-cfg">
+              {tr(lang, "Configuration Summary", "Ringkasan Konfigurasi", "設定サマリー")}
+            </h2>
           </div>
 
           {!validation.valid && (
             <div className="state bad" role="alert" style={{ marginBottom: "1rem" }}>
               <h3>
-                {lang === "en"
-                  ? "System topology is not ready for simulation"
-                  : "Topologi sistem belum siap disimulasikan"}
+                {tr(
+                  lang,
+                  "System topology is not ready for simulation",
+                  "Topologi sistem belum siap disimulasikan nih",
+                  "システム構成に未解決のエラーがあります",
+                )}
               </h3>
               <ul>
                 {validation.errors.map((err, i) => (
-                  <li key={i}>{lang === "en" ? err.messageEn : err.messageId}</li>
+                  <li key={i}>{lang === "id" ? err.messageId : err.messageEn}</li>
                 ))}
               </ul>
               <div className="row" style={{ borderTop: 0, paddingTop: "0.5rem", marginTop: "0.25rem" }}>
                 <Link href={`/hybrid/${project.id}/system`} className="btn btn-sm primary">
-                  {lang === "en" ? "Fix in System Design (Step 4)" : "Perbaiki di Desain Sistem (Halaman 4)"}
+                  {tr(
+                    lang,
+                    "Fix in System Design (Step 4)",
+                    "Perbaiki di Desain Sistem (Langkah 4)",
+                    "システム設計（ステップ4）で修正する",
+                  )}
                 </Link>
               </div>
             </div>
@@ -180,27 +214,33 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
 
           {validation.warnings.length > 0 && (
             <div className="warn" role="note">
-              <h3>{lang === "en" ? "Topology Notes" : "Catatan Topologi"}</h3>
+              <h3>{tr(lang, "Topology Notes", "Catatan Topologi", "構成に関する注記")}</h3>
               <ul>
                 {validation.warnings.map((w, i) => (
-                  <li key={i}>{lang === "en" ? w.messageEn : w.messageId}</li>
+                  <li key={i}>{lang === "id" ? w.messageId : w.messageEn}</li>
                 ))}
               </ul>
             </div>
           )}
 
           <p className="note">
-            <strong>{lang === "en" ? "Location:" : "Lokasi:"}</strong> {project.project.latitude}, {project.project.longitude} ({project.project.timezone})
+            <strong>{tr(lang, "Location:", "Lokasi:", "地点:")}</strong> {project.project.latitude}, {project.project.longitude} ({project.project.timezone})
           </p>
           <p className="note">
-            <strong>{lang === "en" ? "Load:" : "Beban:"}</strong>{" "}
+            <strong>{tr(lang, "Load:", "Profil Beban:", "電力負荷:")}</strong>{" "}
             {project.load_profile.mode === "csv"
-              ? lang === "en"
-                ? `Uploaded CSV (${project.load_profile.csv_filename || "not selected"})`
-                : `CSV unggahan (${project.load_profile.csv_filename || "belum dipilih"})`
-              : lang === "en"
-                ? `Synthetic ${formatNumber(project.load_profile.base_load_kw, lang, 0)} to ${formatNumber(project.load_profile.peak_load_kw, lang, 0)} kW`
-                : `Sintetis ${formatNumber(project.load_profile.base_load_kw, lang, 0)} - ${formatNumber(project.load_profile.peak_load_kw, lang, 0)} kW`}
+              ? tr(
+                  lang,
+                  `Uploaded CSV (${project.load_profile.csv_filename || "not selected"})`,
+                  `File CSV (${project.load_profile.csv_filename || "belum dipilih"})`,
+                  `CSVアップロード (${project.load_profile.csv_filename || "未選択"})`,
+                )
+              : tr(
+                  lang,
+                  `Synthetic ${formatNumber(project.load_profile.base_load_kw, lang, 0)} to ${formatNumber(project.load_profile.peak_load_kw, lang, 0)} kW`,
+                  `Sintetis ${formatNumber(project.load_profile.base_load_kw, lang, 0)} sampai ${formatNumber(project.load_profile.peak_load_kw, lang, 0)} kW`,
+                  `合成プロファイル ${formatNumber(project.load_profile.base_load_kw, lang, 0)} 〜 ${formatNumber(project.load_profile.peak_load_kw, lang, 0)} kW`,
+                )}
           </p>
           <p className="note">
             <strong>PV:</strong> {formatNumber(project.components.pv.capacity_kwp, lang, 0)} kWp ({project.components.pv.model})
@@ -209,38 +249,35 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
             <strong>BESS:</strong>{" "}
             {project.components.bess.enabled
               ? `${formatNumber(project.components.bess.nominal_capacity_kwh, lang, 0)} kWh (${formatNumber(project.components.bess.max_charge_kw, lang, 0)} kW)`
-              : lang === "en"
-                ? "Disabled"
-                : "Nonaktif"}
+              : tr(lang, "Disabled", "Nonaktif", "無効")}
           </p>
           <p className="note">
             <strong>Biomass:</strong>{" "}
             {project.components.biomass.enabled
               ? `${formatNumber(project.components.biomass.rated_capacity_kw, lang, 0)} kW (${project.components.biomass.fuel_preset})`
-              : lang === "en"
-                ? "Disabled"
-                : "Nonaktif"}
+              : tr(lang, "Disabled", "Nonaktif", "無効")}
           </p>
           <p className="note">
             <strong>Diesel Generator:</strong>{" "}
             {project.components.diesel?.enabled
-              ? `${formatNumber(project.components.diesel.rated_capacity_kw, lang, 0)} kW (${lang === "en" ? "non-renewable" : "non-terbarukan"})`
-              : lang === "en"
-                ? "Disabled"
-                : "Nonaktif"}
+              ? `${formatNumber(project.components.diesel.rated_capacity_kw, lang, 0)} kW (${tr(lang, "non-renewable", "non-terbarukan", "非再エネ")})`
+              : tr(lang, "Disabled", "Nonaktif", "無効")}
           </p>
           <p className="note">
-            <strong>{lang === "en" ? "EMS Strategy:" : "Strategi EMS:"}</strong> {project.simulation.dispatch_strategy}
+            <strong>{tr(lang, "EMS Strategy:", "Strategi EMS:", "EMS戦略:")}</strong> {project.simulation.dispatch_strategy}
           </p>
           <p className="note">
-            <strong>{lang === "en" ? "Economics:" : "Ekonomi:"}</strong>{" "}
-            {lang === "en"
-              ? `${project.simulation.project_lifetime_years}-year lifetime, WACC ${formatPercent(project.finance.discount_rate, lang, 1)}, tariff ${formatNumber(project.finance.electricity_tariff_per_kwh, lang, 0)} ${project.project.currency_code}/kWh`
-              : `Umur ${project.simulation.project_lifetime_years} tahun, WACC ${formatPercent(project.finance.discount_rate, lang, 1)}, tarif ${formatNumber(project.finance.electricity_tariff_per_kwh, lang, 0)} ${project.project.currency_code}/kWh`}
+            <strong>{tr(lang, "Economics:", "Ekonomi:", "経済条件:")}</strong>{" "}
+            {tr(
+              lang,
+              `${project.simulation.project_lifetime_years}-year lifetime, WACC ${formatPercent(project.finance.discount_rate, lang, 1)}, tariff ${formatNumber(project.finance.electricity_tariff_per_kwh, lang, 0)} ${project.project.currency_code}/kWh`,
+              `Umur ${project.simulation.project_lifetime_years} tahun, WACC ${formatPercent(project.finance.discount_rate, lang, 1)}, tarif ${formatNumber(project.finance.electricity_tariff_per_kwh, lang, 0)} ${project.project.currency_code}/kWh`,
+              `事業期間 ${project.simulation.project_lifetime_years}年、WACC ${formatPercent(project.finance.discount_rate, lang, 1)}、電力単価 ${formatNumber(project.finance.electricity_tariff_per_kwh, lang, 0)} ${project.project.currency_code}/kWh`,
+            )}
           </p>
 
           <fieldset>
-            <legend>{lang === "en" ? "Multi-Year Simulation Mode" : "Mode Simulasi Multi-Tahun"}</legend>
+            <legend>{tr(lang, "Multi-Year Simulation Mode", "Mode Hitung Multi-Tahun", "複数年シミュレーションモード")}</legend>
             <label className="check-row">
               <input
                 type="radio"
@@ -254,14 +291,11 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
                 }
               />
               <span>
-                {lang === "en" ? (
-                  <>
-                    Fast Scaled Year 1 Mode (<code>scaled_year_1</code>, Default)
-                  </>
-                ) : (
-                  <>
-                    Mode Cepat Tahun 1 Terskalakan (<code>scaled_year_1</code>, Bawaan)
-                  </>
+                {tr(
+                  lang,
+                  <>Fast Scaled Year 1 Mode (<code>scaled_year_1</code>, Default)</>,
+                  <>Mode Cepat Proyeksi Tahun 1 (<code>scaled_year_1</code>, Rekomendasi)</>,
+                  <>高速1年目スケールモード (<code>scaled_year_1</code>、標準)</>,
                 )}
               </span>
             </label>
@@ -278,14 +312,11 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
                 }
               />
               <span>
-                {lang === "en" ? (
-                  <>
-                    Full {project.simulation.project_lifetime_years}-Year Hourly Simulation via Async Job (<code>full_hourly</code>)
-                  </>
-                ) : (
-                  <>
-                    Simulasi Penuh {project.simulation.project_lifetime_years} Tahun via Job Asinkron (<code>full_hourly</code>)
-                  </>
+                {tr(
+                  lang,
+                  <>Full {project.simulation.project_lifetime_years}-Year Hourly Simulation via Async Job (<code>full_hourly</code>)</>,
+                  <>Simulasi Penuh {project.simulation.project_lifetime_years} Tahun per Jam via Job Asinkron (<code>full_hourly</code>)</>,
+                  <>全{project.simulation.project_lifetime_years}年間・時間別フルシミュレーション (<code>full_hourly</code>)</>,
                 )}
               </span>
             </label>
@@ -294,16 +325,12 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
           <div className="row">
             <button type="button" className="btn primary" disabled={running || !validation.valid} onClick={() => void handleRun()}>
               {running
-                ? lang === "en"
-                  ? "Calculating..."
-                  : "Sedang Menghitung..."
-                : lang === "en"
-                  ? "Run Simulation"
-                  : "Jalankan Simulasi"}
+                ? tr(lang, "Calculating...", "Lagi Menghitung...", "計算実行中...")
+                : tr(lang, "Run Simulation", "Gas Jalankan Simulasi", "シミュレーションを実行")}
             </button>
             {result && (
               <Link href={`/hybrid/${project.id}/results`} className="btn ghost">
-                {lang === "en" ? "Open Last Results Dashboard" : "Buka Dasbor Hasil Terakhir"}
+                {tr(lang, "Open Last Results Dashboard", "Lihat Hasil Terakhir", "前回の結果ダッシュボードを開く")}
               </Link>
             )}
           </div>
@@ -311,27 +338,30 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
 
         <section aria-labelledby="h-run-status">
           <h2 id="h-run-status" style={{ marginTop: 0 }}>
-            {lang === "en" ? "Simulation Execution Status" : "Status Eksekusi Simulasi"}
+            {tr(lang, "Simulation Execution Status", "Status Eksekusi Simulasi", "シミュレーション実行ステータス")}
           </h2>
 
           {running && (
             <div className="state" role="status">
-              <h3>{lang === "en" ? "Processing Hybrid Simulation" : "Memproses Simulasi Hybrid"}</h3>
+              <h3>{tr(lang, "Processing Hybrid Simulation", "Lagi Memproses Simulasi Hybrid", "ハイブリッドシミュレーション処理中")}</h3>
               <p>{stepLabel}</p>
-              <div className="progress-track" aria-label={lang === "en" ? "Simulation progress" : "Progres simulasi"}>
+              <div className="progress-track" aria-label={tr(lang, "Simulation progress", "Progres simulasi", "計算進捗")}>
                 <div className="progress-fill" style={{ width: `${progress}%` }} />
               </div>
               <p className="note tabular-nums">
-                {progress}% {lang === "en" ? "completed" : "selesai"}
+                {progress}% {tr(lang, "completed", "selesai", "完了")}
               </p>
               {slow && (
                 <div style={{ marginTop: "1rem", padding: "0.875rem", background: "var(--surface-subtle)", borderRadius: "var(--radius-md)" }}>
                   <p className="note" style={{ color: "var(--text)", fontWeight: 600 }}>
-                    {lang === "en"
-                      ? "The calculation engine may be waking up from sleep mode."
-                      : "Mesin hitung mungkin sedang bangun dari mode tidur."}
+                    {tr(
+                      lang,
+                      "The calculation engine may be waking up from sleep mode.",
+                      "Mesin hitung sepertinya lagi bangun dari mode tidur.",
+                      "計算エンジンがスリープ状態から起動しています。",
+                    )}
                   </p>
-                  <p className="note">{SLOW_ENGINE_NOTE}</p>
+                  <p className="note">{slowEngineNoteFor(lang)}</p>
                 </div>
               )}
             </div>
@@ -339,28 +369,34 @@ export default function HybridRunPage({ params }: { params: Promise<{ projectId:
 
           {!running && errors.length > 0 && (
             <div className="state bad" role="alert">
-              <h3>{lang === "en" ? "Simulation did not succeed" : "Simulasi belum berhasil"}</h3>
+              <h3>{tr(lang, "Simulation did not succeed", "Simulasi belum berhasil nih", "シミュレーションを実行できませんでした")}</h3>
               <ul>{errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
               <p>
-                {lang === "en"
-                  ? 'Fix the related parameters, then press "Run Simulation" again.'
-                  : 'Perbaiki parameter terkait, lalu tekan "Jalankan Simulasi" kembali.'}
+                {tr(
+                  lang,
+                  'Fix the related parameters, then press "Run Simulation" again.',
+                  'Cek dan perbaiki parameter yang terkait, terus klik "Gas Jalankan Simulasi" lagi ya.',
+                  '関連するパラメータを修正してから、もう一度「シミュレーションを実行」を押してください。',
+                )}
               </p>
             </div>
           )}
 
           {!running && errors.length === 0 && (
             <div className="state">
-              <h3>{lang === "en" ? "Ready to run" : "Siap dijalankan"}</h3>
+              <h3>{tr(lang, "Ready to run", "Siap digas!", "実行準備完了")}</h3>
               <p>
-                {lang === "en" ? (
+                {tr(
+                  lang,
                   <>
                     Press <strong>&ldquo;Run Simulation&rdquo;</strong> to execute the Python hybrid calculation engine (8,760-hour power balance and multi-year cash flow). Once finished, you will be redirected to the Results Dashboard.
-                  </>
-                ) : (
+                  </>,
                   <>
-                    Tekan tombol <strong>&ldquo;Jalankan Simulasi&rdquo;</strong> untuk menjalankan mesin hitung hybrid Python (neraca daya 8.760 jam dan arus kas multi-tahun). Setelah selesai, Anda akan diarahkan ke Dasbor Hasil.
-                  </>
+                    Klik tombol <strong>&ldquo;Gas Jalankan Simulasi&rdquo;</strong> di kiri buat mulai hitung neraca energi 8.760 jam dan arus kas multi-tahun di mesin Python. Begitu beres, kamu otomatis dibawa ke Dasbor Hasil!
+                  </>,
+                  <>
+                    左側の<strong>「シミュレーションを実行」</strong>ボタンを押すと、Python計算エンジンで8,760時間の電力収支と複数年キャッシュフローを計算します。完了後、自動的に結果ダッシュボードへ移動します。
+                  </>,
                 )}
               </p>
             </div>

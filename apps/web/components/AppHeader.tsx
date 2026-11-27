@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { IconBookOpen, IconLayers, IconMoon, IconSun, IconZap } from "@/components/Icons";
 import { getProject, HYBRID_PROJECT_UPDATED_EVENT, saveProject } from "@/lib/hybrid-storage";
-import { usePreferences, type CurrencyCode } from "@/lib/preferences";
+import { tr, usePreferences, type CurrencyCode } from "@/lib/preferences";
 
 const HYBRID_STUDIO_VERSION = "v0.7.0";
 
@@ -94,22 +94,22 @@ export default function AppHeader() {
         </Link>
 
         <div className="header-controls">
-          <nav className="mode-nav" aria-label={lang === "en" ? "Workspace mode" : "Mode kerja"}>
+          <nav className="mode-nav" aria-label={tr(lang, "Workspace mode", "Mode kerja", "ワークスペースモード")}>
             <Link href="/" className="mode-link" aria-current={!isHybrid ? "page" : undefined}>
               <IconZap size={15} />
-              {lang === "en" ? "Quick PV" : "Mode Cepat PV"}
+              {tr(lang, "Quick PV", "Mode Cepat PV", "太陽光簡易試算")}
             </Link>
             <Link href="/hybrid" className="mode-link" aria-current={isHybrid && !isGuide ? "page" : undefined}>
               <IconLayers size={15} />
-              {lang === "en" ? "Hybrid Design" : "Desain Hybrid"}
+              {tr(lang, "Hybrid Design", "Desain Hybrid", "ハイブリッド設計")}
             </Link>
             <Link href="/hybrid/guide" className="mode-link" aria-current={isGuide ? "page" : undefined}>
               <IconBookOpen size={15} />
-              {lang === "en" ? "Guide" : "Panduan"}
+              {tr(lang, "Guide", "Panduan", "ガイド")}
             </Link>
           </nav>
 
-          <div className="seg-group" role="group" aria-label={lang === "en" ? "Currency" : "Mata uang"}>
+          <div className="seg-group" role="group" aria-label={tr(lang, "Currency", "Mata uang", "通貨")}>
             <button
               type="button"
               className="seg-btn"
@@ -128,7 +128,15 @@ export default function AppHeader() {
             </button>
           </div>
 
-          <div className="seg-group" role="group" aria-label={lang === "en" ? "Language" : "Bahasa"}>
+          <div className="seg-group" role="group" aria-label={tr(lang, "Language", "Bahasa", "言語")}>
+            <button
+              type="button"
+              className="seg-btn"
+              aria-pressed={lang === "en"}
+              onClick={() => setLang("en")}
+            >
+              EN
+            </button>
             <button
               type="button"
               className="seg-btn"
@@ -140,20 +148,20 @@ export default function AppHeader() {
             <button
               type="button"
               className="seg-btn"
-              aria-pressed={lang === "en"}
-              onClick={() => setLang("en")}
+              aria-pressed={lang === "ja"}
+              onClick={() => setLang("ja")}
             >
-              EN
+              JA
             </button>
           </div>
 
-          <div className="seg-group" role="group" aria-label={lang === "en" ? "Color theme" : "Tema warna"}>
+          <div className="seg-group" role="group" aria-label={tr(lang, "Color theme", "Tema warna", "カラーテーマ")}>
             <button
               type="button"
               className="seg-btn seg-icon"
               aria-pressed={theme === "light"}
-              aria-label={lang === "en" ? "Light theme" : "Tema Terang"}
-              title={lang === "en" ? "Light theme" : "Tema Terang"}
+              aria-label={tr(lang, "Light theme", "Tema Terang", "ライトテーマ")}
+              title={tr(lang, "Light theme", "Tema Terang", "ライトテーマ")}
               onClick={() => setTheme("light")}
             >
               <IconSun size={15} />
@@ -162,8 +170,8 @@ export default function AppHeader() {
               type="button"
               className="seg-btn seg-icon"
               aria-pressed={theme === "dark"}
-              aria-label={lang === "en" ? "Dark theme" : "Tema Gelap"}
-              title={lang === "en" ? "Dark theme" : "Tema Gelap"}
+              aria-label={tr(lang, "Dark theme", "Tema Gelap", "ダークテーマ")}
+              title={tr(lang, "Dark theme", "Tema Gelap", "ダークテーマ")}
               onClick={() => setTheme("dark")}
             >
               <IconMoon size={15} />

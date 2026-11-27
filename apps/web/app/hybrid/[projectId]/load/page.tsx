@@ -6,9 +6,9 @@ import HybridShell from "@/components/hybrid/HybridShell";
 import RangeNumberField from "@/components/hybrid/RangeNumberField";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
-import { SLOW_ENGINE_NOTE, formatNumber, formatPercent } from "@/lib/format";
+import { slowEngineNoteFor, formatNumber, formatPercent } from "@/lib/format";
 import { previewHybridLoad } from "@/lib/hybrid-api";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 type LoadShapePresetId = "engine_default" | "industrial_24h" | "commercial_day" | "residential_evening" | "custom";
@@ -278,12 +278,24 @@ export default function HybridLoadPage({ params }: { params: Promise<{ projectId
     try {
       const res = await previewHybridLoad(project);
       updateProject((p) => ({ ...p, loadPreview: res }));
-      pushToast("Profil beban berhasil divalidasi oleh mesin.", "success");
+      pushToast(
+        tr(
+          lang,
+          "Load profile validated by the calculation engine.",
+          "Mantap! Profil beban sudah lolos validasi mesin.",
+          "電力負荷プロファイルが計算エンジンで検証されました。",
+        ),
+        "success",
+      );
     } catch (err) {
       if (err instanceof ApiError) {
         setErrorMsg([...err.problems.general, ...Object.values(err.problems.fields)].join(" "));
       } else {
-        setErrorMsg(err instanceof Error ? err.message : "Gagal memvalidasi profil beban.");
+        setErrorMsg(
+          err instanceof Error
+            ? err.message
+            : tr(lang, "Failed to validate load profile.", "Gagal memvalidasi profil beban.", "負荷プロファイルの検証に失敗しました。"),
+        );
       }
     } finally {
       setLoading(false);
@@ -298,31 +310,49 @@ export default function HybridLoadPage({ params }: { params: Promise<{ projectId
       load_profile: { ...p.load_profile, mode: "csv", csv_text: text, csv_filename: file.name },
       loadPreview: null,
     }));
-    pushToast(`Berkas "${file.name}" dimuat. Klik Pratinjau & Validasi Beban.`, "info");
+    pushToast(
+      tr(
+        lang,
+        `File "${file.name}" loaded. Click Preview & Validate Load.`,
+        `Sip, file "${file.name}" sudah masuk. Klik Cek & Validasi Beban ya!`,
+        `ファイル「${file.name}」を読み込みました。「負荷プレビュー・検証」を押してください。`,
+      ),
+      "info",
+    );
   }
 
   return (
     <HybridShell
       project={project}
       activeStep="load"
-      title={lang === "en" ? "Electrical Load Profile" : "Profil Beban Listrik (8.760 Jam)"}
-      subtitle="Bangun profil beban sintetis dari parameter atau unggah berkas CSV 8.760 jam per tahun."
+      title={tr(
+        lang,
+        "Electrical Load Profile (8,760 Hours)",
+        "Profil Beban Listrik (8.760 Jam)",
+        "電力負荷プロファイル（8,760時間）",
+      )}
+      subtitle={tr(
+        lang,
+        "Build a synthetic hourly load profile from parameters or upload your own 8,760-hour annual CSV file.",
+        "Bikin profil beban otomatis dari parameter harian/bulanan, atau unggah file CSV 8.760 jam milikmu sendiri.",
+        "パラメータから時間別負荷プロファイルを合成するか、8,760時間の年間CSVファイルをアップロードします。",
+      )}
       result={result}
     >
       <div className="grid-hybrid">
         <section className="card" aria-labelledby="h-load-in">
           <div className="card-header">
-            <h2 id="h-load-in">Sumber Profil Beban</h2>
+            <h2 id="h-load-in">{tr(lang, "Load Profile Source", "Sumber Profil Beban", "負荷データソース")}</h2>
           </div>
 
-          <div className="seg-group" role="group" aria-label="Mode profil beban">
+          <div className="seg-group" role="group" aria-label={tr(lang, "Load profile mode", "Mode profil beban", "負荷プロファイルモード")}>
             <button
               type="button"
               className="seg-btn"
               aria-pressed={lp.mode === "synthetic"}
               onClick={() => updateProject((p) => ({ ...p, load_profile: { ...p.load_profile, mode: "synthetic" } }))}
             >
-              Pembangkit Sintetis
+              {tr(lang, "Synthetic Builder", "Profil Otomatis (Sintetis)", "合成プロファイル生成")}
             </button>
             <button
               type="button"
@@ -330,7 +360,7 @@ export default function HybridLoadPage({ params }: { params: Promise<{ projectId
               aria-pressed={lp.mode === "csv"}
               onClick={() => updateProject((p) => ({ ...p, load_profile: { ...p.load_profile, mode: "csv" } }))}
             >
-              Unggah CSV 8.760 Jam
+              {tr(lang, "Upload 8,760h CSV", "Unggah CSV 8.760 Jam", "8,760時間CSVアップロード")}
             </button>
           </div>
 
@@ -494,32 +524,43 @@ export default function HybridLoadPage({ params }: { params: Promise<{ projectId
 
           <div className="row">
             <button type="button" className="btn primary" disabled={loading} onClick={() => void handlePreview()}>
-              {loading ? "Memvalidasi Beban..." : "Pratinjau & Validasi Beban"}
+              {loading
+                ? tr(lang, "Validating Load...", "Lagi Memvalidasi Beban...", "負荷データを検証中...")
+                : tr(lang, "Preview & Validate Load", "Cek & Validasi Beban", "負荷プレビュー・検証")}
             </button>
           </div>
         </section>
 
         <section aria-labelledby="h-load-out">
-          <h2 id="h-load-out" style={{ marginTop: 0 }}>Pratinjau Profil Beban</h2>
+          <h2 id="h-load-out" style={{ marginTop: 0 }}>
+            {tr(lang, "Load Profile Preview", "Pratinjau Profil Beban", "負荷プロファイルプレビュー")}
+          </h2>
 
           {loading && (
             <div className="state" role="status">
-              <p>Memvalidasi deret beban 8.760 langkah di mesin hitung&hellip;</p>
-              {slow && <p className="note" style={{ marginTop: "0.75rem" }}>{SLOW_ENGINE_NOTE}</p>}
+              <p>{tr(lang, "Validating 8,760-step load series in calculation engine...", "Lagi memvalidasi deret beban 8.760 jam di mesin hitung...", "計算エンジンで8,760ステップの負荷系列を検証中...")}</p>
+              {slow && <p className="note" style={{ marginTop: "0.75rem" }}>{slowEngineNoteFor(lang)}</p>}
             </div>
           )}
 
           {!loading && errorMsg && (
             <div className="state bad" role="alert">
-              <h3>Data beban belum valid</h3>
+              <h3>{tr(lang, "Load data is not valid yet", "Data beban belum valid nih", "負荷データにエラーがあります")}</h3>
               <p>{errorMsg}</p>
             </div>
           )}
 
           {!loading && !errorMsg && !loadPreview && (
             <div className="state">
-              <h3>Belum ada pratinjau beban</h3>
-              <p>Tekan &ldquo;Pratinjau &amp; Validasi Beban&rdquo; untuk melihat kurva harian rata-rata dan peta panas 8.760 jam.</p>
+              <h3>{tr(lang, "No load preview yet", "Belum ada pratinjau beban", "負荷プレビューがまだありません")}</h3>
+              <p>
+                {tr(
+                  lang,
+                  'Press "Preview & Validate Load" to view the 24-hour average daily curve and 8,760-hour heatmap.',
+                  'Klik "Cek & Validasi Beban" buat lihat kurva harian rata-rata dan heatmap 8.760 jam.',
+                  '「負荷プレビュー・検証」を押すと、24時間平均負荷曲線と8,760時間ヒートマップが表示されます。',
+                )}
+              </p>
             </div>
           )}
 

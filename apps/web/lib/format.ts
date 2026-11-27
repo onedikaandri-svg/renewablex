@@ -9,7 +9,17 @@ export const fixed = (n: number, digits: number) =>
 export const money = (v: number, currency: string) => `${fmt(v / 1e9, 2)} miliar ${currency}`;
 
 // Pesan saat server Render sedang bangun dari mode tidur (free tier).
-export const SLOW_ENGINE_NOTE = "Server gratis ini butuh waktu hingga 50 detik untuk bangun dari mode tidur. Mohon tunggu dan jangan tutup halaman ini.";
+export const SLOW_ENGINE_NOTE = "Server gratis ini butuh waktu sekitar 30 sampai 50 detik buat bangun dari mode tidur. Tunggu sebentar ya, jangan tutup halaman ini.";
+
+export function slowEngineNoteFor(lang: LangCode): string {
+  if (lang === "id") {
+    return "Server gratis ini butuh waktu sekitar 30 sampai 50 detik buat bangun dari mode tidur. Tunggu sebentar ya, jangan tutup halaman ini.";
+  }
+  if (lang === "ja") {
+    return "無料サーバーがスリープ状態から起動するまで最大50秒ほどかかります。このページを閉じずにそのままお待ちください。";
+  }
+  return "The free compute server takes up to 50 seconds to wake up from sleep mode. Please wait and keep this tab open.";
+}
 
 // Teks `disclaimer` dari mesin berbahasa Inggris, jadi web menulis sendiri berdasarkan `scope`.
 export function disclaimerId(scope: string): string {
@@ -18,7 +28,9 @@ export function disclaimerId(scope: string): string {
 }
 
 export function localeFor(lang: LangCode): string {
-  return lang === "en" ? "en-US" : "id-ID";
+  if (lang === "en") return "en-US";
+  if (lang === "ja") return "ja-JP";
+  return "id-ID";
 }
 
 export function formatNumber(n: number, lang: LangCode = "id", digits = 0): string {

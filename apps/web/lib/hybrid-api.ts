@@ -1,4 +1,5 @@
 import { API_URL, ApiError, NetworkError, parseProblems } from "@/lib/api";
+import type { LangCode } from "@/lib/preferences";
 import type {
   HybridEmsRuleSet,
   HybridEmsValidationResponse,
@@ -434,7 +435,7 @@ export async function downloadHybridExcelReport(
   params: {
     cfg: HybridProjectConfig;
     result: HybridSimulateResponse;
-    language: "id" | "en";
+    language: LangCode;
     sweepResult?: HybridSweepResult | null;
     sensitivityResult?: HybridSensitivityResponse | null;
   },
@@ -443,9 +444,10 @@ export async function downloadHybridExcelReport(
   const { hourly_year_1: _hourly, daily: _daily, ...compactResult } = params.result as HybridSimulateResponse & {
     daily?: unknown;
   };
+  const backendLang: "id" | "en" = params.language === "id" ? "id" : "en";
   const body = {
     contract_version: "0.7",
-    language: params.language,
+    language: backendLang,
     project_config: buildCompactBaseRequest(params.cfg),
     simulation_result: compactResult,
     sweep_result: params.sweepResult ?? null,
