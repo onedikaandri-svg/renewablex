@@ -7,7 +7,7 @@ import { ViabilityChip } from "@/components/hybrid/HybridShell";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
 import { translateDetailText } from "@/lib/errors-id";
-import { SLOW_ENGINE_NOTE, downloadFile, formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
+import { slowEngineNoteFor, downloadFile, formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { cancelHybridSweepJob, getHybridSweepJob, submitHybridSweepJob } from "@/lib/hybrid-api";
 import { buildExportFilenameSlug, buildSweepCsv } from "@/lib/hybrid-export";
 import {
@@ -24,7 +24,7 @@ import type {
   HybridSweepResult,
   SweepSortBy,
 } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 
 function parseAxisNumbers(text: string): number[] {
   const parts = text
@@ -308,7 +308,9 @@ export default function SweepTab({
     <div className="grid-hybrid">
       <section className="card" aria-labelledby="h-sweep-form">
         <div className="card-header">
-          <h2 id="h-sweep-form">Rentang Ukuran Sapuan (Gaya HOMER)</h2>
+          <h2 id="h-sweep-form">
+            {tr(lang, "Sizing Sweep Ranges (HOMER Style)", "Rentang Ukuran Sizing (Gaya HOMER)", "設備容量スイープ範囲（HOMER方式）")}
+          </h2>
           <button
             type="button"
             className="btn btn-sm ghost"
@@ -319,12 +321,17 @@ export default function SweepTab({
               setDieselText("0");
             }}
           >
-            Muat Contoh [REAL DATA]
+            {tr(lang, "Load Sample [REAL DATA]", "Isi Contoh [REAL DATA]", "サンプル読込 [REAL DATA]")}
           </button>
         </div>
 
         <p className="note">
-          Masukkan daftar ukuran dipisah koma. Isi <code>0</code> pada BESS, Biomass, atau Diesel untuk menguji kombinasi tanpa komponen tersebut.
+          {tr(
+            lang,
+            <>Enter comma-separated sizing candidates. Include <code>0</code> for BESS, Biomass, or Diesel to test combinations without that component.</>,
+            <>Masukkan kandidat ukuran dipisah koma. Isi angka <code>0</code> di BESS, Biomass, atau Diesel kalau mau ikut mengetes skenario tanpa komponen tersebut.</>,
+            <>カンマ区切りで候補容量を入力します。蓄電池・バイオマス・ディーゼルに <code>0</code> を含めると、その設備なしの組み合わせも比較できます。</>,
+          )}
         </p>
 
         <div className="fld">
@@ -408,31 +415,37 @@ export default function SweepTab({
             disabled={running || Boolean(axisError)}
             onClick={() => void handleRunSweep()}
           >
-            {running ? "Menjalankan Sapuan..." : "Jalankan Sapuan Kombinasi"}
+            {running
+              ? tr(lang, "Running Sweep...", "Lagi Menjalankan Sizing...", "スイープ計算中...")
+              : tr(lang, "Run Sizing Sweep", "Gas Cari Ukuran Optimal", "容量スイープを実行")}
           </button>
           {running && activeJobId && (
             <button type="button" className="btn danger-ghost" onClick={() => void handleCancelSweep()}>
-              Batalkan Sapuan
+              {tr(lang, "Cancel Sweep", "Batalkan", "キャンセル")}
             </button>
           )}
         </div>
       </section>
 
       <section aria-labelledby="h-sweep-out">
-        <h2 id="h-sweep-out" style={{ marginTop: 0 }}>Hasil Sapuan Kombinasi</h2>
+        <h2 id="h-sweep-out" style={{ marginTop: 0 }}>
+          {tr(lang, "Sizing Sweep Results", "Hasil Pencarian Ukuran Optimal", "容量スイープ結果")}
+        </h2>
 
         {running && (
           <div className="state" role="status">
-            <h3>Memproses Sapuan Kombinasi</h3>
+            <h3>{tr(lang, "Processing Sizing Sweep", "Lagi Memproses Kombinasi Ukuran", "組み合わせシミュレーション処理中")}</h3>
             <p>{progressText}</p>
-            <div className="progress-track" aria-label="Progres sapuan kombinasi">
+            <div className="progress-track" aria-label={tr(lang, "Sweep progress", "Progres sapuan kombinasi", "スイープ進捗")}>
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
-            <p className="note tabular-nums">{progress}% selesai</p>
+            <p className="note tabular-nums">{progress}% {tr(lang, "completed", "selesai", "完了")}</p>
             {slow && (
               <div style={{ marginTop: "1rem", padding: "0.875rem", background: "var(--surface-subtle)", borderRadius: "var(--radius-md)" }}>
-                <p className="note" style={{ color: "var(--text)", fontWeight: 600 }}>Mesin hitung mungkin sedang bangun dari mode tidur.</p>
-                <p className="note">{SLOW_ENGINE_NOTE}</p>
+                <p className="note" style={{ color: "var(--text)", fontWeight: 600 }}>
+                  {tr(lang, "The calculation engine may be waking up from sleep mode.", "Mesin hitung sepertinya lagi bangun dari mode tidur.", "計算エンジンがスリープ状態から起動しています。")}
+                </p>
+                <p className="note">{slowEngineNoteFor(lang)}</p>
               </div>
             )}
           </div>
@@ -440,11 +453,11 @@ export default function SweepTab({
 
         {!running && errors.length > 0 && (
           <div className="state bad" role="alert">
-            <h3>Sapuan kombinasi belum berhasil</h3>
+            <h3>{tr(lang, "Sizing sweep did not succeed", "Pencarian ukuran belum berhasil", "スイープ計算を実行できませんでした")}</h3>
             <ul>{errors.map((e, i) => <li key={i}>{e}</li>)}</ul>
             <div className="row" style={{ borderTop: 0, paddingTop: "0.5rem" }}>
               <button type="button" className="btn ghost" onClick={() => void handleRunSweep()}>
-                Jalankan Ulang Sapuan
+                {tr(lang, "Re-run Sweep", "Coba Jalankan Lagi", "再実行する")}
               </button>
             </div>
           </div>
@@ -452,9 +465,14 @@ export default function SweepTab({
 
         {!running && errors.length === 0 && !sweepResult && (
           <div className="state">
-            <h3>Belum ada hasil sapuan kombinasi</h3>
+            <h3>{tr(lang, "No sizing sweep results yet", "Belum ada hasil pencarian ukuran nih", "まだスイープ結果がありません")}</h3>
             <p>
-              Tentukan kandidat kapasitas PV, BESS, dan Biomass di sebelah kiri, lalu tekan <strong>&ldquo;Jalankan Sapuan Kombinasi&rdquo;</strong> untuk mencari konfigurasi paling ekonomis.
+              {tr(
+                lang,
+                <>Set your candidate PV, BESS, and Biomass sizes on the left, then press <strong>&ldquo;Run Sizing Sweep&rdquo;</strong> to find the most cost-effective configuration.</>,
+                <>Isi kandidat kapasitas PV, BESS, dan Biomass di panel kiri, terus klik <strong>&ldquo;Gas Cari Ukuran Optimal&rdquo;</strong> buat nemuin kombinasi paling hemat!</>,
+                <>左側でPV・蓄電池・バイオマスの候補容量を指定し、<strong>「容量スイープを実行」</strong>を押すと最も経済的な構成を探索します。</>,
+              )}
             </p>
           </div>
         )}

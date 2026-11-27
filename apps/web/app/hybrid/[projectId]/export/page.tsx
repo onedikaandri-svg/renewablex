@@ -6,12 +6,12 @@ import HybridShell from "@/components/hybrid/HybridShell";
 import PrintReportPreview, { type PrintReportSections } from "@/components/hybrid/PrintReportPreview";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
-import { SLOW_ENGINE_NOTE, downloadFile } from "@/lib/format";
+import { slowEngineNoteFor, downloadFile } from "@/lib/format";
 import { downloadHybridExcelReport } from "@/lib/hybrid-api";
 import { buildCashflowCsv, buildExportFilenameSlug, buildHourlyCsv, buildSweepCsv, downloadBlob } from "@/lib/hybrid-export";
 import { getSensitivityResult, getSweepResult } from "@/lib/hybrid-storage";
 import type { HybridSensitivityResponse, HybridSweepResult } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 export default function HybridExportPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -54,7 +54,7 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
   if (!ready) {
     return (
       <div className="state" role="status">
-        <p>{lang === "en" ? "Loading report export page..." : "Memuat halaman ekspor laporan..."}</p>
+        <p>{tr(lang, "Loading report export page...", "Lagi memuat halaman ekspor laporan...", "レポート出力画面を読み込み中...")}</p>
       </div>
     );
   }
@@ -79,9 +79,12 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
       });
       downloadBlob(filename, blob);
       pushToast(
-        lang === "en"
-          ? `Excel workbook "${filename}" downloaded.`
-          : `Buku kerja Excel "${filename}" berhasil diunduh.`,
+        tr(
+          lang,
+          `Excel workbook "${filename}" downloaded.`,
+          `Mantap! File Excel "${filename}" sudah terunduh.`,
+          `Excelブック「${filename}」をダウンロードしました。`,
+        ),
         "success",
       );
     } catch (err) {
@@ -92,9 +95,12 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
         setExcelError(
           err instanceof Error
             ? err.message
-            : lang === "en"
-              ? "Failed to generate Excel workbook."
-              : "Gagal membuat berkas Excel.",
+            : tr(
+                lang,
+                "Failed to generate Excel workbook.",
+                "Gagal menyusun file Excel.",
+                "Excelファイルの生成に失敗しました。",
+              ),
         );
       }
     } finally {
@@ -107,9 +113,12 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
     const csv = buildHourlyCsv(result);
     if (!csv) {
       pushToast(
-        lang === "en"
-          ? "8,760-hour data is not available in this simulation cache. Re-run the simulation from Step 7."
-          : "Data 8.760 jam tidak tersedia pada cache simulasi ini. Jalankan ulang simulasi dari Halaman 7.",
+        tr(
+          lang,
+          "8,760-hour data is not available in this simulation cache. Re-run the simulation from Step 7.",
+          "Data 8.760 jam belum ada di cache browser ini. Yuk jalankan ulang simulasi dari Langkah 7!",
+          "このキャッシュには8,760時間データが含まれていません。ステップ7から再計算を実行してください。",
+        ),
         "error",
       );
       return;
@@ -143,29 +152,46 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
     <HybridShell
       project={project}
       activeStep="export"
-      title={lang === "en" ? "Export Reports & Raw Data" : "Ekspor Laporan PDF, Excel & Data Mentah"}
-      subtitle={
-        lang === "en"
-          ? "Download presentation-ready engineering and financial reports in PDF format, multi-sheet Excel workbooks, or 8,760-hour CSV files."
-          : "Unduh laporan teknik dan keuangan siap presentasi dalam format PDF, buku kerja Excel multi-sheet, maupun CSV 8.760 jam."
-      }
+      title={tr(
+        lang,
+        "Export Reports & Raw Data",
+        "Ekspor Laporan PDF, File Excel & Data Mentah",
+        "レポート出力（PDF・Excel・CSV生データ）",
+      )}
+      subtitle={tr(
+        lang,
+        "Download presentation-ready engineering and financial reports in PDF format, multi-sheet Excel workbooks, or 8,760-hour CSV files.",
+        "Unduh laporan teknis & keuangan siap presentasi dalam format PDF A4, file Excel multi-sheet, atau CSV deret 8.760 jam.",
+        "プレゼン・提出用のA4技術・財務PDFレポート、マルチシートExcelブック (.xlsx)、8,760時間CSVをダウンロードできます。",
+      )}
       result={result}
     >
       {!result ? (
         <div className="state">
           <h2>
-            {lang === "en"
-              ? "No simulation results to export yet"
-              : "Belum ada hasil simulasi untuk diekspor"}
+            {tr(
+              lang,
+              "No simulation results to export yet",
+              "Belum ada hasil simulasi buat diekspor nih",
+              "出力可能なシミュレーション結果がまだありません",
+            )}
           </h2>
           <p>
-            {lang === "en"
-              ? "PDF, Excel, and CSV reports require real simulation results from the backend calculation engine."
-              : "Laporan PDF, Excel, dan CSV membutuhkan hasil simulasi nyata dari mesin hitung backend."}
+            {tr(
+              lang,
+              "PDF, Excel, and CSV reports require real simulation results from the backend calculation engine.",
+              "Laporan PDF, Excel, dan CSV butuh hasil hitungan nyata dari mesin backend. Yuk jalankan dulu simulasinya!",
+              "PDF・Excel・CSVレポートの出力には、バックエンド計算エンジンのシミュレーション結果が必要です。",
+            )}
           </p>
           <div className="row" style={{ borderTop: 0, paddingTop: "0.75rem", marginTop: "0.5rem" }}>
             <Link href={`/hybrid/${project.id}/run`} className="btn primary">
-              {lang === "en" ? "Go to Step 7: Run Simulation" : "Ke Halaman 7: Jalankan Simulasi"}
+              {tr(
+                lang,
+                "Go to Step 7: Run Simulation",
+                "Ke Halaman 7: Gas Simulasi",
+                "ステップ7へ: シミュレーションを実行",
+              )}
             </Link>
           </div>
         </div>
@@ -175,51 +201,54 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
             {/* Kartu 1: PDF Cetak A4 (Opsi P1) */}
             <section className="card" aria-labelledby="h-exp-pdf">
               <div className="card-header">
-                <h2 id="h-exp-pdf">{lang === "en" ? "PDF Report (A4)" : "Laporan PDF (A4)"}</h2>
-                <span className="chip">{lang === "en" ? "Crisp Vector" : "Vektor Tajam"}</span>
+                <h2 id="h-exp-pdf">{tr(lang, "PDF Report (A4)", "Laporan PDF (A4)", "PDFレポート (A4)")}</h2>
+                <span className="chip">{tr(lang, "Crisp Vector", "Vektor Tajam", "高精細ベクター")}</span>
               </div>
               <p className="note">
-                {lang === "en" ? (
+                {tr(
+                  lang,
                   <>
                     Formats an A4 print document with a light-theme Year 1 SVG Flow Schematic. Choose <strong>&ldquo;Save as PDF&rdquo;</strong> in your browser print dialog.
-                  </>
-                ) : (
+                  </>,
                   <>
-                    Menyusun dokumen cetak A4 dengan Skema Aliran SVG Tahun 1 bertema terang. Pilih <strong>&ldquo;Simpan sebagai PDF&rdquo;</strong> pada dialog cetak browser.
-                  </>
+                    Menyiapkan dokumen A4 rapi lengkap dengan Skema Aliran SVG Tahun 1. Tinggal pilih <strong>&ldquo;Save as PDF / Simpan sebagai PDF&rdquo;</strong> di jendela print browser kamu.
+                  </>,
+                  <>
+                    1年目のSVGエネルギー潮流図を含むA4印刷レイアウトを生成します。ブラウザの印刷ダイアログで<strong>「PDFに保存」</strong>を選択してください。
+                  </>,
                 )}
               </p>
               <div className="fld">
                 <label className="check-row">
                   <input type="checkbox" checked={sections.executive} onChange={(e) => setSections((s) => ({ ...s, executive: e.target.checked }))} />
-                  <span>{lang === "en" ? "Executive Summary & KPIs" : "Ringkasan Eksekutif & KPI"}</span>
+                  <span>{tr(lang, "Executive Summary & KPIs", "Ringkasan Eksekutif & KPI", "エグゼクティブサマリー＆主要KPI")}</span>
                 </label>
                 <label className="check-row">
                   <input type="checkbox" checked={sections.schematic} onChange={(e) => setSections((s) => ({ ...s, schematic: e.target.checked }))} />
-                  <span>{lang === "en" ? "Year 1 SVG Energy Schematic" : "Skema Aliran SVG Tahun 1"}</span>
+                  <span>{tr(lang, "Year 1 SVG Energy Schematic", "Skema Aliran Energi SVG (Tahun 1)", "1年目SVGエネルギー潮流図")}</span>
                 </label>
                 <label className="check-row">
                   <input type="checkbox" checked={sections.monthly} onChange={(e) => setSections((s) => ({ ...s, monthly: e.target.checked }))} />
-                  <span>{lang === "en" ? "Monthly Energy Table" : "Tabel Energi Bulanan"}</span>
+                  <span>{tr(lang, "Monthly Energy Table", "Tabel Energi Bulanan", "月別エネルギー収支表")}</span>
                 </label>
                 <label className="check-row">
                   <input type="checkbox" checked={sections.cashflow} onChange={(e) => setSections((s) => ({ ...s, cashflow: e.target.checked }))} />
-                  <span>{lang === "en" ? "Annual Cash Flow Table" : "Tabel Arus Kas Tahunan"}</span>
+                  <span>{tr(lang, "Annual Cash Flow Table", "Tabel Arus Kas Tahunan", "年次キャッシュフロー表")}</span>
                 </label>
                 <label className="check-row">
                   <input type="checkbox" checked={sections.assumptions} onChange={(e) => setSections((s) => ({ ...s, assumptions: e.target.checked }))} />
-                  <span>{lang === "en" ? "Assumptions Appendix [REAL DATA]" : "Lampiran Asumsi [REAL DATA]"}</span>
+                  <span>{tr(lang, "Assumptions Appendix [REAL DATA]", "Lampiran Asumsi [REAL DATA]", "前提条件一覧 [REAL DATA]")}</span>
                 </label>
                 {sweepResult && (
                   <label className="check-row">
                     <input type="checkbox" checked={sections.sweep} onChange={(e) => setSections((s) => ({ ...s, sweep: e.target.checked }))} />
-                    <span>{lang === "en" ? "Sweep Results Summary" : "Ringkasan Hasil Sapuan"}</span>
+                    <span>{tr(lang, "Sweep Results Summary", "Ringkasan Hasil Sizing (Sweep)", "容量スイープ結果サマリー")}</span>
                   </label>
                 )}
               </div>
               <div className="row">
                 <button type="button" className="btn primary" onClick={() => window.print()}>
-                  {lang === "en" ? "Print / Save as PDF" : "Cetak / Simpan sebagai PDF"}
+                  {tr(lang, "Print / Save as PDF", "Cetak / Simpan PDF", "印刷 / PDFとして保存")}
                 </button>
               </div>
             </section>
@@ -227,38 +256,32 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
             {/* Kartu 2: Buku Kerja Excel .xlsx (Opsi E1 Backend) */}
             <section className="card" aria-labelledby="h-exp-xlsx">
               <div className="card-header">
-                <h2 id="h-exp-xlsx">{lang === "en" ? "Excel Workbook (.xlsx)" : "Buku Kerja Excel (.xlsx)"}</h2>
+                <h2 id="h-exp-xlsx">{tr(lang, "Excel Workbook (.xlsx)", "File Excel (.xlsx)", "Excelブック (.xlsx)")}</h2>
                 <span className="chip">Multi-Sheet</span>
               </div>
               <p className="note">
-                {lang === "en" ? (
-                  <>
-                    Generated directly by the Python backend (<code>openpyxl</code>) with ready-to-use number formatting:
-                  </>
-                ) : (
-                  <>
-                    Dibuat langsung oleh backend Python (<code>openpyxl</code>) dengan format angka siap pakai:
-                  </>
+                {tr(
+                  lang,
+                  <>Generated directly by the Python backend (<code>openpyxl</code>) with ready-to-use number formatting:</>,
+                  <>Disusun langsung oleh mesin Python (<code>openpyxl</code>) dengan format tabel & angka siap olah:</>,
+                  <>Pythonバックエンド (<code>openpyxl</code>) で数値書式付きのマルチシートを生成します:</>,
                 )}
               </p>
               <ul style={{ margin: "0.5rem 0", paddingLeft: "1.25rem", fontSize: "0.875rem", color: "var(--muted)" }}>
-                <li><code>Ringkasan</code> ({lang === "en" ? "KPIs, LCOE, Emissions" : "KPI, LCOE, Emisi"})</li>
-                <li><code>Energi_Bulanan</code> ({lang === "en" ? "12 months + Total" : "12 bulan + Total"})</li>
-                <li><code>Arus_Kas_Tahunan</code> ({lang === "en" ? "Year 0 to N" : "Tahun 0 sampai N"})</li>
+                <li><code>Ringkasan</code> ({tr(lang, "KPIs, LCOE, Emissions", "KPI, LCOE, Emisi", "主要KPI・LCOE・排出量")})</li>
+                <li><code>Energi_Bulanan</code> ({tr(lang, "12 months + Total", "12 bulan + Total", "12ヶ月分＋合計")})</li>
+                <li><code>Arus_Kas_Tahunan</code> ({tr(lang, "Year 0 to N", "Tahun 0 sampai N", "0年目〜N年目")})</li>
                 <li><code>Asumsi_Konfigurasi</code> (<code>[REAL DATA]</code>)</li>
               </ul>
               {sweepResult && (
                 <label className="check-row">
                   <input type="checkbox" checked={includeSweepInExcel} onChange={(e) => setIncludeSweepInExcel(e.target.checked)} />
                   <span>
-                    {lang === "en" ? (
-                      <>
-                        Include <code>Hasil_Sapuan</code> sheet
-                      </>
-                    ) : (
-                      <>
-                        Sertakan sheet <code>Hasil_Sapuan</code>
-                      </>
+                    {tr(
+                      lang,
+                      <>Include <code>Hasil_Sapuan</code> sheet</>,
+                      <>Sertakan sheet <code>Hasil_Sapuan</code></>,
+                      <><code>Hasil_Sapuan</code> シートを含める</>,
                     )}
                   </span>
                 </label>
@@ -267,21 +290,18 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
                 <label className="check-row">
                   <input type="checkbox" checked={includeSensInExcel} onChange={(e) => setIncludeSensInExcel(e.target.checked)} />
                   <span>
-                    {lang === "en" ? (
-                      <>
-                        Include <code>Sensitivitas</code> sheet
-                      </>
-                    ) : (
-                      <>
-                        Sertakan sheet <code>Sensitivitas</code>
-                      </>
+                    {tr(
+                      lang,
+                      <>Include <code>Sensitivitas</code> sheet</>,
+                      <>Sertakan sheet <code>Sensitivitas</code></>,
+                      <><code>Sensitivitas</code> シートを含める</>,
                     )}
                   </span>
                 </label>
               )}
 
               {excelLoading && excelSlow && (
-                <p className="note" style={{ marginTop: "0.5rem" }}>{SLOW_ENGINE_NOTE}</p>
+                <p className="note" style={{ marginTop: "0.5rem" }}>{slowEngineNoteFor(lang)}</p>
               )}
               {excelError && (
                 <div className="state bad" role="alert" style={{ marginTop: "0.5rem" }}>
@@ -292,12 +312,8 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
               <div className="row">
                 <button type="button" className="btn primary" disabled={excelLoading} onClick={() => void handleDownloadExcel()}>
                   {excelLoading
-                    ? lang === "en"
-                      ? "Generating Excel..."
-                      : "Menyusun Excel..."
-                    : lang === "en"
-                      ? "Download Excel Workbook (.xlsx)"
-                      : "Unduh Buku Kerja Excel (.xlsx)"}
+                    ? tr(lang, "Generating Excel...", "Lagi Menyusun Excel...", "Excelファイルを生成中...")
+                    : tr(lang, "Download Excel Workbook (.xlsx)", "Unduh File Excel (.xlsx)", "Excelブック (.xlsx) をダウンロード")}
                 </button>
               </div>
             </section>
@@ -305,19 +321,25 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
             {/* Kartu 3: CSV 8.760 Jam & JSON */}
             <section className="card" aria-labelledby="h-exp-csv">
               <div className="card-header">
-                <h2 id="h-exp-csv">{lang === "en" ? "Raw CSV & JSON Data" : "Data Mentah CSV & JSON"}</h2>
-                <span className="chip">{lang === "en" ? "8,760 Hours" : "8.760 Jam"}</span>
+                <h2 id="h-exp-csv">{tr(lang, "Raw CSV & JSON Data", "Data Mentah CSV & JSON", "CSV・JSON生データ")}</h2>
+                <span className="chip">{tr(lang, "8,760 Hours", "8.760 Jam", "8,760時間")}</span>
               </div>
               <p className="note">
-                {lang === "en"
-                  ? "CSV files include a UTF-8 BOM marker so numeric columns open cleanly in Excel."
-                  : "Berkas CSV sudah dilengkapi penanda UTF-8 BOM agar kolom angka langsung terbuka rapi di Excel."}
+                {tr(
+                  lang,
+                  "CSV files include a UTF-8 BOM marker so numeric columns open cleanly in Excel.",
+                  "File CSV sudah dilengkapi UTF-8 BOM supaya begitu dibuka di Excel kolomnya langsung rapi.",
+                  "CSVファイルはUTF-8 BOM付きで出力されるため、Excelでそのまま文字化けせずに開けます。",
+                )}
               </p>
               {!result.hourly_year_1 && (
                 <p className="note" style={{ marginTop: "0.5rem", color: "var(--warntext)" }}>
-                  {lang === "en"
-                    ? "The 8,760-hour series is not cached in this result (for example due to browser storage limits). Re-run the simulation in Step 7 if you need hourly CSV."
-                    : "Deret 8.760 jam tidak tersimpan di cache hasil ini (misalnya karena kuota browser). Jalankan ulang simulasi di Halaman 7 jika membutuhkan CSV per jam."}
+                  {tr(
+                    lang,
+                    "The 8,760-hour series is not cached in this result (for example due to browser storage limits). Re-run the simulation in Step 7 if you need hourly CSV.",
+                    "Deret 8.760 jam tidak tersimpan di cache ini (karena batas memori browser). Jalankan ulang simulasi di Langkah 7 kalau butuh CSV per jam ya.",
+                    "ブラウザ容量制限のため8,760時間シリーズがキャッシュされていません。時間別CSVが必要な場合はステップ7で再計算してください。",
+                  )}
                 </p>
               )}
               <div className="row" style={{ flexDirection: "column", alignItems: "stretch" }}>
@@ -327,18 +349,18 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
                   disabled={!result.hourly_year_1}
                   onClick={handleDownloadHourlyCsv}
                 >
-                  {lang === "en" ? "Download 8,760-Hour Time Series CSV" : "Unduh CSV Deret Waktu 8.760 Jam"}
+                  {tr(lang, "Download 8,760-Hour Time Series CSV", "Unduh CSV 8.760 Jam", "8,760時間時系列CSVをダウンロード")}
                 </button>
                 <button type="button" className="btn ghost" onClick={handleDownloadCashflowCsv}>
-                  {lang === "en" ? "Download Annual Cash Flow CSV" : "Unduh CSV Arus Kas Tahunan"}
+                  {tr(lang, "Download Annual Cash Flow CSV", "Unduh CSV Arus Kas Tahunan", "年次キャッシュフローCSVをダウンロード")}
                 </button>
                 {sweepResult && (
                   <button type="button" className="btn ghost" onClick={handleDownloadSweepCsv}>
-                    {lang === "en" ? "Download Sweep Combinations CSV" : "Unduh CSV Hasil Sapuan Kombinasi"}
+                    {tr(lang, "Download Sweep Combinations CSV", "Unduh CSV Hasil Sizing (Sweep)", "容量スイープ結果CSVをダウンロード")}
                   </button>
                 )}
                 <button type="button" className="btn ghost" onClick={handleDownloadJson}>
-                  {lang === "en" ? "Download Project & Result JSON Bundle" : "Unduh Berkas Proyek & Hasil JSON"}
+                  {tr(lang, "Download Project & Result JSON Bundle", "Unduh Paket JSON Proyek & Hasil", "プロジェクト＆結果JSONバンドルを保存")}
                 </button>
               </div>
             </section>
@@ -346,7 +368,12 @@ export default function HybridExportPage({ params }: { params: Promise<{ project
 
           <div className="sec">
             <h2 className="no-print">
-              {lang === "en" ? "Print Report Layout Preview (A4)" : "Pratinjau Tata Letak Laporan Cetak (A4)"}
+              {tr(
+                lang,
+                "Print Report Layout Preview (A4)",
+                "Pratinjau Laporan Cetak (A4)",
+                "印刷レポートプレビュー (A4)",
+              )}
             </h2>
             <PrintReportPreview
               project={project}

@@ -5,7 +5,7 @@ import HybridShell from "@/components/hybrid/HybridShell";
 import ScenarioCompareTab from "@/components/hybrid/ScenarioCompareTab";
 import SensitivityTab from "@/components/hybrid/SensitivityTab";
 import SweepTab from "@/components/hybrid/SweepTab";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 type CompareTabKey = "sweep" | "scenarios" | "sensitivity";
@@ -38,7 +38,14 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
   if (!ready) {
     return (
       <div className="state" role="status">
-        <p>Memuat halaman perbandingan dan sapuan&hellip;</p>
+        <p>
+          {tr(
+            lang,
+            "Loading comparison and sizing sweep page...",
+            "Lagi memuat halaman perbandingan & sizing...",
+            "比較・最適容量スイープ画面を読み込み中...",
+          )}
+        </p>
       </div>
     );
   }
@@ -51,15 +58,21 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
     <HybridShell
       project={project}
       activeStep="compare"
-      title={lang === "en" ? "Optimization Sweep, Scenarios & Sensitivity" : "Sapuan Kombinasi, Perbandingan Skenario & Sensitivitas"}
-      subtitle={
-        lang === "en"
-          ? "Search HOMER-style optimal component sizing, compare project scenarios side by side, and run hybrid parameter sensitivity."
-          : "Cari ukuran komponen optimal gaya HOMER, bandingkan skenario proyek berdampingan, dan uji sensitivitas parameter hybrid."
-      }
+      title={tr(
+        lang,
+        "Optimization Sweep, Scenarios & Sensitivity",
+        "Cari Ukuran Optimal (Sweep), Bandingkan Skenario & Sensitivitas",
+        "最適容量スイープ・シナリオ比較・感度分析",
+      )}
+      subtitle={tr(
+        lang,
+        "Search HOMER-style optimal component sizing, compare project scenarios side by side, and run hybrid parameter sensitivity.",
+        "Cari kombinasi kapasitas komponen paling hemat ala HOMER, bandingkan beberapa skenario sekaligus, dan uji sensitivitas parameter.",
+        "HOMER方式で最適な設備容量の組み合わせを探索し、複数シナリオの横並び比較とパラメータ感度分析を実行します。",
+      )}
       result={result}
     >
-      <div className="tabs" role="tablist" aria-label={lang === "en" ? "Comparison views" : "Tab perbandingan sistem hybrid"}>
+      <div className="tabs" role="tablist" aria-label={tr(lang, "Comparison views", "Tab perbandingan sistem hybrid", "比較・分析タブ")}>
         <button
           ref={(el) => { tabRefs.current.sweep = el; }}
           type="button"
@@ -72,7 +85,7 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
           onClick={() => setActiveTab("sweep")}
           onKeyDown={(e) => handleTabKeyDown(e, "sweep")}
         >
-          {lang === "en" ? "Component Sweep" : "Sapuan Kombinasi HOMER"}
+          {tr(lang, "Component Sizing Sweep", "Cari Ukuran Optimal (Sweep)", "設備容量スイープ (HOMER方式)")}
         </button>
         <button
           ref={(el) => { tabRefs.current.scenarios = el; }}
@@ -86,7 +99,7 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
           onClick={() => setActiveTab("scenarios")}
           onKeyDown={(e) => handleTabKeyDown(e, "scenarios")}
         >
-          {lang === "en" ? "Compare Scenarios" : "Bandingkan Skenario Proyek"}
+          {tr(lang, "Compare Scenarios", "Bandingkan Skenario", "シナリオ横並び比較")}
         </button>
         <button
           ref={(el) => { tabRefs.current.sensitivity = el; }}
@@ -100,7 +113,7 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
           onClick={() => setActiveTab("sensitivity")}
           onKeyDown={(e) => handleTabKeyDown(e, "sensitivity")}
         >
-          {lang === "en" ? "Hybrid Sensitivity" : "Sensitivitas Hybrid (Tornado & 5x5)"}
+          {tr(lang, "Hybrid Sensitivity", "Sensitivitas (Tornado & 5x5)", "感度分析（トルネード＆5x5）")}
         </button>
       </div>
 

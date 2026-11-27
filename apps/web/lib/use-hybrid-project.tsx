@@ -8,7 +8,7 @@ import {
   HYBRID_PROJECT_UPDATED_EVENT,
   saveProject,
 } from "@/lib/hybrid-storage";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
 
 export function useHybridProject(projectId: string) {
@@ -51,15 +51,18 @@ export function MissingProjectState() {
   const { lang } = usePreferences();
   return (
     <div className="sec state bad" role="alert">
-      <h2>{lang === "en" ? "Project not found" : "Proyek tidak ditemukan"}</h2>
+      <h2>{tr(lang, "Project not found", "Proyek tidak ketemu", "プロジェクトが見つかりません")}</h2>
       <p>
-        {lang === "en"
-          ? "This project does not exist in this browser's storage or has been deleted."
-          : "Proyek tidak ada di penyimpanan browser ini atau telah dihapus."}
+        {tr(
+          lang,
+          "This project does not exist in this browser's storage or has been deleted.",
+          "Proyek ini belum ada di penyimpanan browser ini atau sudah dihapus.",
+          "このブラウザのローカルストレージにプロジェクトが存在しないか、すでに削除されています。",
+        )}
       </p>
       <div className="row" style={{ borderTop: 0, paddingTop: "0.75rem", marginTop: "0.5rem" }}>
         <Link href="/hybrid" className="btn primary">
-          {lang === "en" ? "Back to Projects List" : "Kembali ke Daftar Proyek"}
+          {tr(lang, "Back to Projects List", "Balik ke Daftar Proyek", "プロジェクト一覧へ戻る")}
         </Link>
       </div>
     </div>

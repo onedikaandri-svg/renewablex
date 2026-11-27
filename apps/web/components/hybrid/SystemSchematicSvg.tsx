@@ -13,7 +13,7 @@ import {
   serializeSchematicSvgWithLightTheme,
 } from "@/lib/hybrid-topology";
 import type { HybridProjectConfig, HybridSimulateResponse, TopologyNode, TopologyNodeKind } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences, type LangCode } from "@/lib/preferences";
 
 const SERIES_COLOR_BY_KIND: Record<TopologyNodeKind, string> = {
   pv: "var(--series-pv)",
@@ -25,27 +25,27 @@ const SERIES_COLOR_BY_KIND: Record<TopologyNodeKind, string> = {
   grid: "var(--series-grid)",
 };
 
-function nodeHeading(kind: TopologyNodeKind, lang: "id" | "en", config: HybridProjectConfig): string {
+function nodeHeading(kind: TopologyNodeKind, lang: LangCode, config: HybridProjectConfig): string {
   switch (kind) {
     case "pv":
-      return `Solar PV (${config.components.pv.model === "detailed_v1" ? "SAM 8-Tahap" : "PVWatts"})`;
+      return `Solar PV (${config.components.pv.model === "detailed_v1" ? tr(lang, "SAM 8-Stage", "SAM 8-Tahap", "SAM 8段階") : "PVWatts"})`;
     case "bess":
-      return lang === "en" ? "BESS (Battery)" : "BESS (Baterai)";
+      return tr(lang, "BESS (Battery)", "BESS (Baterai)", "蓄電池 (BESS)");
     case "biomass":
       return `Biomass (${config.components.biomass.fuel_preset.toUpperCase()})`;
     case "diesel":
-      return "Diesel Generator";
+      return tr(lang, "Diesel Generator", "Diesel Generator", "ディーゼル発電");
     case "ac_bus":
       return "AC BUS";
     case "load":
-      return lang === "en" ? "Electrical Load" : "Beban Listrik";
+      return tr(lang, "Electrical Load", "Beban Listrik", "電力負荷");
     case "grid":
-      return lang === "en" ? "Utility Grid" : "Jaringan Grid";
+      return tr(lang, "Utility Grid", "Jaringan Grid", "電力系統");
   }
 }
 
-function formatMwh(kwh: number, lang: "id" | "en"): string {
-  return `${formatNumber(kwh / 1000, lang, 1)} ${lang === "en" ? "MWh/yr" : "MWh/thn"}`;
+function formatMwh(kwh: number, lang: LangCode): string {
+  return `${formatNumber(kwh / 1000, lang, 1)} ${tr(lang, "MWh/yr", "MWh/thn", "MWh/年")}`;
 }
 
 export default function SystemSchematicSvg({
@@ -66,10 +66,10 @@ export default function SystemSchematicSvg({
     return (
       <div className="chart-card">
         <div className="chart-head">
-          <h3>{lang === "en" ? "Hybrid System Schematic" : "Skema Sistem Hybrid"}</h3>
+          <h3>{tr(lang, "Hybrid System Schematic", "Skema Sistem Hybrid", "ハイブリッドシステム構成図")}</h3>
         </div>
         <div className="state" role="status">
-          <p>{lang === "en" ? "Loading system schematic..." : "Memuat skema aliran sistem..."}</p>
+          <p>{tr(lang, "Loading system schematic...", "Memuat skema aliran sistem...", "システム構成図を読み込み中...")}</p>
         </div>
       </div>
     );
@@ -79,10 +79,10 @@ export default function SystemSchematicSvg({
     return (
       <div className="chart-card">
         <div className="chart-head">
-          <h3>{lang === "en" ? "Hybrid System Schematic" : "Skema Sistem Hybrid"}</h3>
+          <h3>{tr(lang, "Hybrid System Schematic", "Skema Sistem Hybrid", "ハイブリッドシステム構成図")}</h3>
         </div>
         <div className="state bad" role="alert">
-          <p>{errorMessage || (lang === "en" ? "Failed to render system schematic." : "Gagal menampilkan skema sistem.")}</p>
+          <p>{errorMessage || tr(lang, "Failed to render system schematic.", "Gagal menampilkan skema sistem.", "システム構成図の表示に失敗しました。")}</p>
         </div>
       </div>
     );
@@ -217,14 +217,14 @@ export default function SystemSchematicSvg({
     <div className="chart-card">
       <div className="chart-head">
         <div>
-          <h3>{lang === "en" ? "Hybrid System Schematic (Year 1 Flow)" : "Skema Aliran Energi Sistem Hybrid (Tahun 1)"}</h3>
+          <h3>{tr(lang, "Hybrid System Schematic (Year 1 Flow)", "Skema Aliran Energi Sistem Hybrid (Tahun 1)", "ハイブリッドシステムエネルギー潮流図（1年目）")}</h3>
         </div>
         <div className="actions-inline">
           <span className="chip">{config.simulation.dispatch_strategy}</span>
           {result && (
             <button type="button" className="btn btn-sm ghost" onClick={handleDownloadSvg}>
               <IconDownload size={14} />
-              Unduh SVG
+              {tr(lang, "Download SVG", "Unduh SVG", "SVGを保存")}
             </button>
           )}
         </div>

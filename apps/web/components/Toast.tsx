@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { IconClose } from "@/components/Icons";
+import { tr, usePreferences } from "@/lib/preferences";
 
 export interface ToastItem {
   id: string;
@@ -16,6 +17,7 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { lang } = usePreferences();
   const [items, setItems] = useState<ToastItem[]>([]);
 
   useEffect(() => {
@@ -53,8 +55,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               className="seg-btn seg-icon"
               style={{ color: "inherit", minWidth: "2.75rem", minHeight: "2.75rem" }}
               onClick={() => setItems((prev) => prev.filter((x) => x.id !== item.id))}
-              aria-label="Tutup notifikasi"
-              title="Tutup notifikasi"
+              aria-label={tr(lang, "Dismiss notification", "Tutup notifikasi", "通知を閉じる")}
+              title={tr(lang, "Dismiss notification", "Tutup notifikasi", "通知を閉じる")}
             >
               <IconClose size={16} />
             </button>

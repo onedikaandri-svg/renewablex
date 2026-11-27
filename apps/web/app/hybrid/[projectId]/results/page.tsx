@@ -4,7 +4,7 @@ import Link from "next/link";
 import { use } from "react";
 import HybridDashboard from "@/components/hybrid/HybridDashboard";
 import HybridShell from "@/components/hybrid/HybridShell";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 export default function HybridResultsPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -15,7 +15,14 @@ export default function HybridResultsPage({ params }: { params: Promise<{ projec
   if (!ready) {
     return (
       <div className="state" role="status">
-        <p>{lang === "en" ? "Loading project simulation results..." : "Memuat hasil simulasi proyek..."}</p>
+        <p>
+          {tr(
+            lang,
+            "Loading project simulation results...",
+            "Lagi memuat hasil simulasi proyek...",
+            "シミュレーション結果を読み込み中...",
+          )}
+        </p>
       </div>
     );
   }
@@ -28,29 +35,46 @@ export default function HybridResultsPage({ params }: { params: Promise<{ projec
     <HybridShell
       project={project}
       activeStep="results"
-      title={lang === "en" ? "Simulation Results Dashboard" : "Dasbor Hasil Simulasi Hybrid"}
-      subtitle={
-        lang === "en"
-          ? "All metrics and charts below come directly from the RenewableX backend calculation engine."
-          : "Seluruh angka dan grafik di bawah berasal langsung dari mesin hitung backend RenewableX."
-      }
+      title={tr(
+        lang,
+        "Simulation Results Dashboard",
+        "Dasbor Hasil Simulasi Hybrid",
+        "ハイブリッド・シミュレーション結果ダッシュボード",
+      )}
+      subtitle={tr(
+        lang,
+        "All metrics and charts below come directly from the RenewableX backend calculation engine.",
+        "Semua angka dan grafik di bawah ini murni hasil hitungan mesin backend RenewableX.",
+        "以下のすべての指標およびグラフは、RenewableX バックエンド計算エンジンから直接出力されたものです。",
+      )}
       result={result}
     >
       {!result ? (
         <div className="state">
           <h2>
-            {lang === "en"
-              ? "No simulation results for this project yet"
-              : "Belum ada hasil simulasi untuk proyek ini"}
+            {tr(
+              lang,
+              "No simulation results for this project yet",
+              "Proyek ini belum ada hasil simulasinya nih",
+              "このプロジェクトのシミュレーション結果がまだありません",
+            )}
           </h2>
           <p>
-            {lang === "en"
-              ? "Open Step 7 (Run) to execute the hybrid simulation and display its charts and financial analysis here."
-              : "Buka Halaman 7 (Jalankan) untuk mengeksekusi simulasi hybrid dan menampilkan grafik serta analisis keuangannya di sini."}
+            {tr(
+              lang,
+              "Open Step 7 (Run) to execute the hybrid simulation and display its charts and financial analysis here.",
+              "Yuk mampir ke Langkah 7 (Jalankan) buat gas simulasi hybrid supaya grafik dan analisis keuangannya tampil di sini!",
+              "ステップ7（計算実行）を開いてハイブリッドシミュレーションを実行すると、グラフと財務分析がここに表示されます。",
+            )}
           </p>
           <div className="row" style={{ borderTop: 0, paddingTop: "0.75rem", marginTop: "0.5rem" }}>
             <Link href={`/hybrid/${project.id}/run`} className="btn primary">
-              {lang === "en" ? "Go to Step 7: Run Simulation" : "Ke Halaman Jalankan Simulasi"}
+              {tr(
+                lang,
+                "Go to Step 7: Run Simulation",
+                "Ke Halaman 7: Gas Simulasi",
+                "ステップ7へ: シミュレーションを実行",
+              )}
             </Link>
           </div>
         </div>

@@ -7,7 +7,7 @@ import HybridShell from "@/components/hybrid/HybridShell";
 import { IconClipboard, IconClose, IconCopy, IconMapPin, IconSearch } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
-import { SLOW_ENGINE_NOTE, formatNumber } from "@/lib/format";
+import { slowEngineNoteFor, formatNumber } from "@/lib/format";
 import { fetchHybridPresets, previewHybridWeather } from "@/lib/hybrid-api";
 import type { HybridPresetsResponse } from "@/lib/hybrid-types";
 import {
@@ -18,7 +18,7 @@ import {
   type GeocodeSuggestion,
 } from "@/lib/location-utils";
 import { parseWeatherFileContent } from "@/lib/weather-file-utils";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 const LocationMapPicker = dynamic(() => import("@/components/hybrid/LocationMapPicker"), {
@@ -252,15 +252,29 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
       }));
       pushToast(
         isCustom
-          ? "Pratinjau data cuaca kustom 8.760 jam berhasil divalidasi oleh mesin."
-          : "Data cuaca PVGIS v5.3 TMY berhasil diambil.",
+          ? tr(
+              lang,
+              "8,760-hour custom weather data validated by the engine.",
+              "Mantap! Data cuaca kustom 8.760 jam sudah lolos validasi mesin.",
+              "8,760時間のカスタム気象データがエンジンで検証されました。",
+            )
+          : tr(
+              lang,
+              "PVGIS v5.3 TMY weather data fetched.",
+              "Mantap! Data cuaca PVGIS v5.3 TMY berhasil ditarik.",
+              "PVGIS v5.3 TMY 気象データを取得しました。",
+            ),
         "success",
       );
     } catch (err) {
       if (err instanceof ApiError) {
         setErrorMsg([...err.problems.general, ...Object.values(err.problems.fields)].join(" "));
       } else {
-        setErrorMsg(err instanceof Error ? err.message : "Gagal mengambil data cuaca.");
+        setErrorMsg(
+          err instanceof Error
+            ? err.message
+            : tr(lang, "Failed to fetch weather data.", "Gagal mengambil data cuaca.", "気象データの取得に失敗しました。"),
+        );
       }
     } finally {
       setLoading(false);
@@ -271,18 +285,30 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
     <HybridShell
       project={project}
       activeStep="location"
-      title={lang === "en" ? "Location & Solar Resource" : "Lokasi & Sumber Daya Cuaca"}
-      subtitle="Cari kota atau kawasan industri, pilih titik pada peta interaktif, lalu ambil data cuaca TMY per jam dari PVGIS v5.3."
+      title={tr(
+        lang,
+        "Location & Solar Resource",
+        "Lokasi & Sumber Daya Cuaca",
+        "プロジェクト地点・日射気象リソース",
+      )}
+      subtitle={tr(
+        lang,
+        "Search a city or industrial estate, pick a point on the interactive map, and fetch hourly TMY weather data from PVGIS v5.3.",
+        "Cari kota atau kawasan industri, klik titiknya di peta interaktif, lalu tarik data cuaca 8.760 jam dari PVGIS v5.3.",
+        "都市・工業団地を検索するか地図上で地点を選択し、PVGIS v5.3 から時間別TMY気象データを取得します。",
+      )}
       result={result}
     >
       <div className="grid-hybrid">
         <section className="card" aria-labelledby="h-loc">
           <div className="card-header">
-            <h2 id="h-loc">Identitas &amp; Koordinat Lokasi</h2>
+            <h2 id="h-loc">
+              {tr(lang, "Project Identity & Coordinates", "Identitas & Koordinat Lokasi", "プロジェクト名・地点座標")}
+            </h2>
           </div>
 
           <div className="fld" style={{ marginTop: 0 }}>
-            <label htmlFor="loc-name">Nama Proyek</label>
+            <label htmlFor="loc-name">{tr(lang, "Project Name", "Nama Proyek", "プロジェクト名")}</label>
             <input
               id="loc-name"
               type="text"
@@ -293,14 +319,26 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
 
           <div className="fld search-box-wrap">
             <div className="label-row">
-              <label htmlFor="loc-search">Cari Kota / Kabupaten / Kawasan Industri</label>
+              <label htmlFor="loc-search">
+                {tr(
+                  lang,
+                  "Search City / Regency / Industrial Estate",
+                  "Cari Kota / Kabupaten / Kawasan Industri",
+                  "都市・県・工業団地を検索",
+                )}
+              </label>
               <span className="unit">OpenStreetMap</span>
             </div>
             <div className="search-input-row">
               <input
                 id="loc-search"
                 type="search"
-                placeholder="Ketik mis. Cikarang, Gresik, Morowali, Balikpapan..."
+                placeholder={tr(
+                  lang,
+                  "Type e.g. Cikarang, Gresik, Morowali, Balikpapan...",
+                  "Ketik mis. Cikarang, Gresik, Morowali, Balikpapan...",
+                  "例: Cikarang, Surabaya, Tokyo, Osaka...",
+                )}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoComplete="off"
@@ -309,8 +347,8 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
                 <button
                   type="button"
                   className="btn ghost btn-sm btn-icon"
-                  aria-label="Bersihkan pencarian lokasi"
-                  title="Bersihkan pencarian lokasi"
+                  aria-label={tr(lang, "Clear location search", "Bersihkan pencarian lokasi", "検索キーワードをクリア")}
+                  title={tr(lang, "Clear location search", "Bersihkan pencarian lokasi", "検索キーワードをクリア")}
                   onClick={() => {
                     setSearchQuery("");
                     setSearchResults([]);
@@ -325,7 +363,13 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
 
             {searchLoading && (
               <p className="note" role="status" style={{ marginTop: "0.375rem" }}>
-                <IconSearch size={13} /> Mencari wilayah &ldquo;{searchQuery.trim()}&rdquo; di OpenStreetMap Nominatim&hellip;
+                <IconSearch size={13} />{" "}
+                {tr(
+                  lang,
+                  `Searching "${searchQuery.trim()}" on OpenStreetMap Nominatim...`,
+                  `Lagi mencari "${searchQuery.trim()}" di OpenStreetMap Nominatim...`,
+                  `OpenStreetMap Nominatim で「${searchQuery.trim()}」を検索中...`,
+                )}
               </p>
             )}
 
@@ -337,12 +381,17 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
 
             {!searchLoading && !searchError && hasSearched && searchResults.length === 0 && (
               <p className="note" role="status" style={{ marginTop: "0.375rem" }}>
-                Lokasi tidak ditemukan untuk &ldquo;{searchQuery.trim()}&rdquo;. Coba kata kunci kota/kabupaten lain atau klik langsung pada peta.
+                {tr(
+                  lang,
+                  `No location found for "${searchQuery.trim()}". Try another city name or click directly on the map.`,
+                  `Lokasi "${searchQuery.trim()}" belum ketemu. Coba kata kunci kota lain atau klik langsung di peta ya.`,
+                  `「${searchQuery.trim()}」に一致する地点が見つかりませんでした。別の都市名を試すか地図上をクリックしてください。`,
+                )}
               </p>
             )}
 
             {!searchLoading && searchResults.length > 0 && (
-              <ul className="search-results-list" role="listbox" aria-label="Hasil pencarian lokasi OpenStreetMap">
+              <ul className="search-results-list" role="listbox" aria-label={tr(lang, "OpenStreetMap location results", "Hasil pencarian lokasi OpenStreetMap", "OpenStreetMap 検索結果")}>
                 {searchResults.map((item) => (
                   <li key={item.id} className="search-result-item" role="option" aria-selected="false">
                     <button
@@ -369,16 +418,23 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
             )}
 
             <p className="osm-attribution">
-              Geocoding oleh{" "}
+              {tr(lang, "Geocoding by", "Geocoding oleh", "ジオコーディング提供:")}{" "}
               <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer">
                 OpenStreetMap Nominatim
               </a>{" "}
-              (&copy; kontributor OpenStreetMap, lisensi ODbL).
+              (&copy; OpenStreetMap contributors, ODbL).
             </p>
           </div>
 
           <div className="fld">
-            <label htmlFor="loc-preset">Jalan Pintas Preset Kota Indonesia [REAL DATA]</label>
+            <label htmlFor="loc-preset">
+              {tr(
+                lang,
+                "Indonesian City Presets [REAL DATA]",
+                "Pintasan Preset Kota Indonesia [REAL DATA]",
+                "インドネシア主要都市プリセット [REAL DATA]",
+              )}
+            </label>
             <select
               id="loc-preset"
               defaultValue=""
@@ -396,10 +452,25 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
                   },
                   weatherPreview: null,
                 }));
-                pushToast(`Preset ${hit.name} diterapkan.`, "info");
+                pushToast(
+                  tr(
+                    lang,
+                    `Preset ${hit.name} applied.`,
+                    `Sip, preset ${hit.name} sudah dipasang.`,
+                    `プリセット「${hit.name}」を適用しました。`,
+                  ),
+                  "info",
+                );
               }}
             >
-              <option value="">Pilih kota preset (tersedia saat offline)...</option>
+              <option value="">
+                {tr(
+                  lang,
+                  "Select a city preset (available offline)...",
+                  "Pilih kota preset (bisa dipakai saat offline)...",
+                  "都市プリセットを選択（オフライン利用可）...",
+                )}
+              </option>
               {locations.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.name} ({l.latitude}, {l.longitude})
@@ -410,14 +481,26 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
 
           <div className="fld">
             <div className="label-row">
-              <label htmlFor="loc-paste">Tempel Koordinat Cepat / URL Google Maps</label>
+              <label htmlFor="loc-paste">
+                {tr(
+                  lang,
+                  "Quick Paste Coordinates / Google Maps URL",
+                  "Tempel Koordinat Cepat / Link Google Maps",
+                  "座標または Google マップURLの貼り付け",
+                )}
+              </label>
               <span className="unit">Lat, Lon</span>
             </div>
             <div className="coord-paste-row">
               <input
                 id="loc-paste"
                 type="text"
-                placeholder="Contoh: -6.2834, 107.1521 atau URL Google Maps"
+                placeholder={tr(
+                  lang,
+                  "e.g. -6.2834, 107.1521 or Google Maps URL",
+                  "Contoh: -6.2834, 107.1521 atau link Google Maps",
+                  "例: -6.2834, 107.1521 または GoogleマップURL",
+                )}
                 value={pasteInput}
                 aria-invalid={pasteError ? "true" : "false"}
                 onChange={(e) => {
@@ -432,7 +515,7 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
                     e.preventDefault();
                     setPasteInput(`${check.data.latitude}, ${check.data.longitude}`);
                     setPasteError("");
-                    applyCoordinates(check.data.latitude, check.data.longitude, "koordinat tempel");
+                    applyCoordinates(check.data.latitude, check.data.longitude, "pasted coordinates");
                   }
                 }}
                 onKeyDown={(e) => {
@@ -447,7 +530,7 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
                 className="btn ghost btn-sm"
                 onClick={() => handleApplyPasteInput(pasteInput)}
               >
-                <IconClipboard size={15} /> Terapkan
+                <IconClipboard size={15} /> {tr(lang, "Apply", "Terapkan", "適用")}
               </button>
             </div>
             {pasteError && (
@@ -459,7 +542,7 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
 
           <div className="grid-2">
             <div className="fld">
-              <label htmlFor="loc-lat">Lintang (Latitude)</label>
+              <label htmlFor="loc-lat">{tr(lang, "Latitude", "Lintang (Latitude)", "緯度 (Latitude)")}</label>
               <input
                 id="loc-lat"
                 type="number"
@@ -485,7 +568,7 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
               />
             </div>
             <div className="fld">
-              <label htmlFor="loc-lon">Bujur (Longitude)</label>
+              <label htmlFor="loc-lon">{tr(lang, "Longitude", "Bujur (Longitude)", "経度 (Longitude)")}</label>
               <input
                 id="loc-lon"
                 type="number"
@@ -512,24 +595,24 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
             </div>
           </div>
 
-          <div className="coord-badge-bar" aria-label="Koordinat aktif proyek">
+          <div className="coord-badge-bar" aria-label={tr(lang, "Active project coordinates", "Koordinat aktif proyek", "現在のプロジェクト座標")}>
             <span className="coord-badge-value">
               <IconMapPin size={16} />
-              <span>Koordinat aktif: {formattedActiveCoords}</span>
+              <span>{tr(lang, "Active coordinates", "Koordinat aktif", "現在座標")}: {formattedActiveCoords}</span>
             </span>
             <button
               type="button"
               className="btn ghost btn-sm"
               onClick={() => void handleCopyCoordinates()}
-              aria-label={`Salin koordinat ${formattedActiveCoords}`}
-              title="Salin koordinat ke papan klip"
+              aria-label={tr(lang, `Copy coordinates ${formattedActiveCoords}`, `Salin koordinat ${formattedActiveCoords}`, `座標 ${formattedActiveCoords} をコピー`)}
+              title={tr(lang, "Copy coordinates to clipboard", "Salin koordinat ke papan klip", "座標をクリップボードにコピー")}
             >
-              <IconCopy size={14} /> Salin Koordinat
+              <IconCopy size={14} /> {tr(lang, "Copy Coordinates", "Salin Koordinat", "座標をコピー")}
             </button>
           </div>
 
           <div className="fld">
-            <label htmlFor="loc-tz">Zona Waktu Lokal</label>
+            <label htmlFor="loc-tz">{tr(lang, "Local Timezone", "Zona Waktu Lokal", "ローカルタイムゾーン")}</label>
             <select
               id="loc-tz"
               value={project.project.timezone}
@@ -543,7 +626,9 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
           </div>
 
           <div className="fld">
-            <label htmlFor="loc-weather-src">Sumber Data Cuaca 8.760 Jam</label>
+            <label htmlFor="loc-weather-src">
+              {tr(lang, "8,760-Hour Weather Data Source", "Sumber Data Cuaca 8.760 Jam", "8,760時間 気象データソース")}
+            </label>
             <select
               id="loc-weather-src"
               value={project.simulation.weather_source}
@@ -561,14 +646,35 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
                 }));
               }}
             >
-              <option value="pvgis_tmy">PVGIS v5.3 TMY (Otomatis dari Koordinat)</option>
-              <option value="custom_json">Unggah Berkas Cuaca Kustom (CSV / JSON / EPW 8.760 Jam)</option>
+              <option value="pvgis_tmy">
+                {tr(
+                  lang,
+                  "PVGIS v5.3 TMY (Automatic from Coordinates)",
+                  "PVGIS v5.3 TMY (Otomatis dari Koordinat)",
+                  "PVGIS v5.3 TMY（座標から自動取得）",
+                )}
+              </option>
+              <option value="custom_json">
+                {tr(
+                  lang,
+                  "Upload Custom Weather File (CSV / JSON / EPW 8,760h)",
+                  "Unggah File Cuaca Kustom (CSV / JSON / EPW 8.760 Jam)",
+                  "カスタム気象ファイルをアップロード (CSV / JSON / EPW 8,760時間)",
+                )}
+              </option>
             </select>
           </div>
 
           {project.simulation.weather_source === "custom_json" && (
             <div className="fld">
-              <label htmlFor="loc-weather-file">Pilih Berkas Cuaca Kustom (CSV / JSON / EPW 8.760 Jam)</label>
+              <label htmlFor="loc-weather-file">
+                {tr(
+                  lang,
+                  "Choose Custom Weather File (CSV / JSON / EPW 8,760h)",
+                  "Pilih File Cuaca Kustom (CSV / JSON / EPW 8.760 Jam)",
+                  "カスタム気象ファイルを選択 (CSV / JSON / EPW 8,760時間)",
+                )}
+              </label>
               <input
                 id="loc-weather-file"
                 type="file"
@@ -576,11 +682,21 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
                 onChange={(e) => void handleWeatherFileUpload(e.target.files?.[0])}
               />
               <p className="note" style={{ marginTop: "0.375rem" }}>
-                Mendukung CSV (kolom <code>ghi</code>, <code>dni</code>, <code>dhi</code>, <code>temp</code>, <code>wind</code>), JSON (array 8.760 jam), atau EnergyPlus EPW.
+                {tr(
+                  lang,
+                  <>Supports CSV (columns <code>ghi</code>, <code>dni</code>, <code>dhi</code>, <code>temp</code>, <code>wind</code>), JSON (8,760-hour array), or EnergyPlus EPW.</>,
+                  <>Mendukung CSV (kolom <code>ghi</code>, <code>dni</code>, <code>dhi</code>, <code>temp</code>, <code>wind</code>), JSON (array 8.760 jam), atau EnergyPlus EPW.</>,
+                  <>CSV（<code>ghi</code>, <code>dni</code>, <code>dhi</code>, <code>temp</code>, <code>wind</code> 列）、JSON（8,760時間配列）、または EnergyPlus EPW に対応します。</>,
+                )}
               </p>
               {project.simulation.weather_filename && project.simulation.weather_data && (
                 <p className="note" style={{ color: "var(--success)", fontWeight: 600 }}>
-                  Berkas termuat: {project.simulation.weather_filename} (8.760 jam tervalidasi)
+                  {tr(
+                    lang,
+                    `Loaded file: ${project.simulation.weather_filename} (8,760 hours validated)`,
+                    `File siap: ${project.simulation.weather_filename} (8.760 jam tervalidasi)`,
+                    `読込済ファイル: ${project.simulation.weather_filename}（8,760時間検証済）`,
+                  )}
                 </p>
               )}
               {uploadError && (
@@ -594,10 +710,10 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
           <div className="row">
             <button type="button" className="btn primary" disabled={loading} onClick={() => void handleFetchWeather()}>
               {loading
-                ? "Memproses Data Cuaca..."
+                ? tr(lang, "Fetching Weather Data...", "Lagi Mengambil Data Cuaca...", "気象データを取得中...")
                 : project.simulation.weather_source === "custom_json"
-                  ? "Pratinjau & Validasi Cuaca Kustom"
-                  : "Ambil Data Cuaca PVGIS"}
+                  ? tr(lang, "Preview & Validate Custom Weather", "Cek & Validasi Cuaca Kustom", "カスタム気象データを検証")
+                  : tr(lang, "Fetch PVGIS Weather Data", "Tarik Data Cuaca PVGIS", "PVGIS気象データを取得")}
             </button>
           </div>
         </section>
@@ -606,9 +722,16 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
           <div className="card location-map-card" aria-labelledby="h-map-picker">
             <div className="card-header">
               <div>
-                <h2 id="h-map-picker">Peta Interaktif Titik Proyek</h2>
+                <h2 id="h-map-picker">
+                  {tr(lang, "Interactive Project Location Map", "Peta Interaktif Titik Proyek", "インタラクティブ地点マップ")}
+                </h2>
                 <p className="note" style={{ fontSize: "0.8125rem", marginTop: "0.1875rem" }}>
-                  Klik pada peta atau geser pin ungu untuk memilih lokasi tepat proyek Anda.
+                  {tr(
+                    lang,
+                    "Click on the map or drag the purple pin to pick your exact project site.",
+                    "Klik di peta atau geser pin ungu buat pilih titik lokasi proyekmu.",
+                    "地図上をクリックするか紫のピンをドラッグして地点を指定してください。",
+                  )}
                 </p>
               </div>
               <span className="chip tabular-nums">{formattedActiveCoords}</span>
@@ -623,26 +746,42 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
             />
           </div>
 
-          <h2 id="h-weather-out" style={{ marginTop: 0 }}>Pratinjau Sumber Daya Cuaca</h2>
+          <h2 id="h-weather-out" style={{ marginTop: 0 }}>
+            {tr(lang, "Solar & Weather Resource Preview", "Pratinjau Sumber Daya Cuaca", "日射・気象リソースプレビュー")}
+          </h2>
 
           {loading && (
             <div className="state" role="status">
-              <p>Menghubungi mesin hitung dan PVGIS v5.3 TMY&hellip;</p>
-              {slow && <p className="note" style={{ marginTop: "0.75rem" }}>{SLOW_ENGINE_NOTE}</p>}
+              <p>{tr(lang, "Contacting calculation engine and PVGIS v5.3 TMY...", "Lagi menghubungi mesin hitung dan PVGIS v5.3 TMY...", "計算エンジンおよび PVGIS v5.3 TMY に接続中...")}</p>
+              {slow && <p className="note" style={{ marginTop: "0.75rem" }}>{slowEngineNoteFor(lang)}</p>}
             </div>
           )}
 
           {!loading && errorMsg && (
             <div className="state bad" role="alert">
-              <h3>Gagal mengambil data cuaca</h3>
+              <h3>{tr(lang, "Failed to fetch weather data", "Gagal mengambil data cuaca", "気象データの取得に失敗しました")}</h3>
               <p>{errorMsg}</p>
             </div>
           )}
 
           {!loading && !errorMsg && !weatherPreview && (
             <div className="state">
-              <h3>Belum ada pratinjau cuaca untuk titik ini</h3>
-              <p>Tekan tombol &ldquo;Ambil Data Cuaca PVGIS&rdquo; di panel kiri untuk melihat irradiansi dan suhu tahunan pada koordinat {formattedActiveCoords}.</p>
+              <h3>
+                {tr(
+                  lang,
+                  "No weather preview for this location yet",
+                  "Belum ada pratinjau cuaca buat titik ini",
+                  "この地点の気象プレビューがまだありません",
+                )}
+              </h3>
+              <p>
+                {tr(
+                  lang,
+                  `Press "Fetch PVGIS Weather Data" on the left panel to inspect annual solar irradiance and temperature at ${formattedActiveCoords}.`,
+                  `Klik tombol "Tarik Data Cuaca PVGIS" di panel kiri buat lihat radiasi surya dan suhu tahunan di koordinat ${formattedActiveCoords}.`,
+                  `左パネルの「PVGIS気象データを取得」を押すと、座標 ${formattedActiveCoords} の年間日射量と気温を表示します。`,
+                )}
+              </p>
             </div>
           )}
 

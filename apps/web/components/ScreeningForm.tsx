@@ -1,4 +1,5 @@
 import { GROUPS, idOf, isVisible, type Values } from "@/lib/form";
+import { tr, usePreferences } from "@/lib/preferences";
 
 interface Props {
   values: Values;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function ScreeningForm({ values, errors, busy, onChange, onSubmit, onReset }: Props) {
+  const { lang } = usePreferences();
   return (
     <form noValidate onSubmit={(e) => { e.preventDefault(); if (!busy) onSubmit(); }}>
       {GROUPS.map((g) => (
@@ -53,10 +55,12 @@ export default function ScreeningForm({ values, errors, busy, onChange, onSubmit
       ))}
       <div className="row">
         <button className="btn primary" type="submit" aria-disabled={busy}>
-          {busy ? "Menghitung..." : "Hitung Estimasi"}
+          {busy
+            ? tr(lang, "Calculating...", "Lagi Menghitung...", "計算中...")
+            : tr(lang, "Calculate Estimate", "Hitung Estimasi", "試算を実行")}
         </button>
         <button className="btn ghost" type="button" aria-disabled={busy} onClick={() => { if (!busy) onReset(); }}>
-          Kosongkan Form
+          {tr(lang, "Clear Form", "Kosongkan Form", "フォームをクリア")}
         </button>
       </div>
     </form>

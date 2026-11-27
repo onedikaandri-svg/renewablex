@@ -6,7 +6,7 @@ import SystemSchematicSvg from "@/components/hybrid/SystemSchematicSvg";
 import { formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { serializeSchematicSvgWithLightTheme } from "@/lib/hybrid-topology";
 import type { HybridProjectConfig, HybridSimulateResponse, HybridSweepResult } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 
 export interface PrintReportSections {
   executive: boolean;
@@ -59,7 +59,7 @@ export default function PrintReportPreview({
           <p className="print-eyebrow">RenewableX Hybrid Engineering Report</p>
           <h2 style={{ margin: "0.2rem 0 0.25rem", color: "#061B31" }}>{project.project.project_name}</h2>
           <p style={{ margin: 0, fontSize: "0.8125rem", color: "#5A687D" }}>
-            Lokasi: {project.project.latitude}, {project.project.longitude} ({project.project.timezone}) | Cuaca: {result.weather_source.provider} ({result.weather_source.dataset ?? "TMY"}) | Mesin v{result.engine_version}
+            {tr(lang, "Location", "Lokasi", "地点")}: {project.project.latitude}, {project.project.longitude} ({project.project.timezone}) | {tr(lang, "Weather", "Cuaca", "気象データ")}: {result.weather_source.provider} ({result.weather_source.dataset ?? "TMY"}) | Engine v{result.engine_version}
           </p>
         </div>
         <div>
@@ -69,46 +69,66 @@ export default function PrintReportPreview({
 
       {sections.executive && (
         <section className="print-block">
-          <h3>1. Ringkasan Eksekutif (Teknis, Keuangan, dan Emisi)</h3>
+          <h3>
+            {tr(
+              lang,
+              "1. Executive Summary (Technical, Financial & Emissions)",
+              "1. Ringkasan Eksekutif (Teknis, Keuangan, dan Emisi)",
+              "1. エグゼクティブサマリー（技術・財務・CO2削減）",
+            )}
+          </h3>
           <div className="print-kpi-grid">
             <div className="print-kpi">
-              <span>NPV ({fin?.project_lifetime_years ?? 25} thn)</span>
+              <span>NPV ({fin?.project_lifetime_years ?? 25} {tr(lang, "yrs", "thn", "年")})</span>
               <strong>{fin ? formatCompactCurrency(fin.npv, curr, lang) : "-"}</strong>
             </div>
             <div className="print-kpi">
-              <span>IRR Proyek</span>
-              <strong>{fin && fin.irr !== null ? formatPercent(fin.irr, lang, 2) : "Tidak tersedia"}</strong>
+              <span>{tr(lang, "Project IRR", "IRR Proyek", "プロジェクトIRR")}</span>
+              <strong>{fin && fin.irr !== null ? formatPercent(fin.irr, lang, 2) : tr(lang, "N/A", "Tidak tersedia", "該当なし")}</strong>
             </div>
             <div className="print-kpi">
               <span>LCOE</span>
               <strong>{fin ? `${formatCurrency(fin.lcoe, curr, lang, 0)}/kWh` : "-"}</strong>
             </div>
             <div className="print-kpi">
-              <span>Payback Sederhana / Terdiskonto</span>
+              <span>{tr(lang, "Simple / Disc. Payback", "Payback Sederhana / Terdiskonto", "回収期間（単純／割引）")}</span>
               <strong>
-                {fin && fin.simple_payback_years !== null ? `${formatNumber(fin.simple_payback_years, lang, 1)} thn` : "-"} /{" "}
-                {fin && fin.discounted_payback_years !== null ? `${formatNumber(fin.discounted_payback_years, lang, 1)} thn` : "-"}
+                {fin && fin.simple_payback_years !== null ? `${formatNumber(fin.simple_payback_years, lang, 1)} ${tr(lang, "yrs", "thn", "年")}` : "-"} /{" "}
+                {fin && fin.discounted_payback_years !== null ? `${formatNumber(fin.discounted_payback_years, lang, 1)} ${tr(lang, "yrs", "thn", "年")}` : "-"}
               </strong>
             </div>
             <div className="print-kpi">
-              <span>Pangsa Terbarukan</span>
+              <span>{tr(lang, "Renewable Share", "Porsi Terbarukan", "再エネ比率")}</span>
               <strong>{formatPercent(result.summary.renewable_fraction, lang, 1)}</strong>
             </div>
             <div className="print-kpi">
-              <span>Emisi Dihindari</span>
-              <strong>{em ? `${formatNumber(em.avoided_emissions_tons_co2e, lang, 0)} ton CO2e` : "-"}</strong>
+              <span>{tr(lang, "Avoided Emissions", "Emisi Dihindari", "CO2削減量")}</span>
+              <strong>{em ? `${formatNumber(em.avoided_emissions_tons_co2e, lang, 0)} ${tr(lang, "tCO2e", "ton CO2e", "t-CO2e")}` : "-"}</strong>
             </div>
           </div>
 
           <p className="print-note">
-            <strong>Kinerja Tahun 1:</strong> Total beban {formatNumber(result.summary.total_load_kwh / 1000, lang, 1)} MWh, produksi PV {formatNumber(result.summary.pv_generation_kwh / 1000, lang, 1)} MWh, produksi Biomass {formatNumber(result.summary.biomass_generation_kwh / 1000, lang, 1)} MWh, produksi Diesel {formatNumber((result.summary.diesel_generation_kwh ?? 0) / 1000, lang, 1)} MWh, beban terpenuhi {formatNumber(result.summary.served_load_kwh / 1000, lang, 1)} MWh, unmet load {formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} MWh, galat neraca daya maks {result.summary.max_balance_error_kw.toExponential(2)} kW.
+            <strong>{tr(lang, "Year 1 Performance:", "Kinerja Tahun 1:", "1年目実績:")}</strong>{" "}
+            {tr(
+              lang,
+              `Total load ${formatNumber(result.summary.total_load_kwh / 1000, lang, 1)} MWh, PV generation ${formatNumber(result.summary.pv_generation_kwh / 1000, lang, 1)} MWh, Biomass generation ${formatNumber(result.summary.biomass_generation_kwh / 1000, lang, 1)} MWh, Diesel generation ${formatNumber((result.summary.diesel_generation_kwh ?? 0) / 1000, lang, 1)} MWh, served load ${formatNumber(result.summary.served_load_kwh / 1000, lang, 1)} MWh, unmet load ${formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} MWh, max power balance error ${result.summary.max_balance_error_kw.toExponential(2)} kW.`,
+              `Total beban ${formatNumber(result.summary.total_load_kwh / 1000, lang, 1)} MWh, produksi PV ${formatNumber(result.summary.pv_generation_kwh / 1000, lang, 1)} MWh, produksi Biomass ${formatNumber(result.summary.biomass_generation_kwh / 1000, lang, 1)} MWh, produksi Diesel ${formatNumber((result.summary.diesel_generation_kwh ?? 0) / 1000, lang, 1)} MWh, beban terpenuhi ${formatNumber(result.summary.served_load_kwh / 1000, lang, 1)} MWh, unmet load ${formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} MWh, selisih neraca daya maks ${result.summary.max_balance_error_kw.toExponential(2)} kW.`,
+              `総負荷 ${formatNumber(result.summary.total_load_kwh / 1000, lang, 1)} MWh、PV発電量 ${formatNumber(result.summary.pv_generation_kwh / 1000, lang, 1)} MWh、バイオマス発電量 ${formatNumber(result.summary.biomass_generation_kwh / 1000, lang, 1)} MWh、ディーゼル発電量 ${formatNumber((result.summary.diesel_generation_kwh ?? 0) / 1000, lang, 1)} MWh、供給済負荷 ${formatNumber(result.summary.served_load_kwh / 1000, lang, 1)} MWh、未供給負荷 ${formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} MWh、電力収支最大誤差 ${result.summary.max_balance_error_kw.toExponential(2)} kW。`,
+            )}
           </p>
         </section>
       )}
 
       {sections.schematic && (
         <section className="print-block">
-          <h3>2. Skema Aliran Energi Sistem Hybrid (Tahun 1)</h3>
+          <h3>
+            {tr(
+              lang,
+              "2. Hybrid System Energy Flow Schematic (Year 1)",
+              "2. Skema Aliran Energi Sistem Hybrid (Tahun 1)",
+              "2. ハイブリッドシステム・エネルギー潮流図（1年目）",
+            )}
+          </h3>
           {lightSchematicSvg ? (
             <div
               className="print-svg-frame"
@@ -122,7 +142,14 @@ export default function PrintReportPreview({
 
       {sections.monthly && (
         <section className="print-block">
-          <h3>3. Ringkasan Energi Bulanan (MWh)</h3>
+          <h3>
+            {tr(
+              lang,
+              "3. Monthly Energy Summary (MWh)",
+              "3. Ringkasan Energi Bulanan (MWh)",
+              "3. 月別エネルギー収支サマリー (MWh)",
+            )}
+          </h3>
           <table className="print-table">
             <thead>
               <tr>

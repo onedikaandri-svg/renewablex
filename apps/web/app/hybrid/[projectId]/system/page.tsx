@@ -8,7 +8,7 @@ import { useToast } from "@/components/Toast";
 import { fetchHybridPresets } from "@/lib/hybrid-api";
 import { resolveProjectTopology, validateSystemTopology } from "@/lib/hybrid-topology";
 import type { HybridPresetsResponse } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 export default function HybridSystemPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -35,23 +35,46 @@ export default function HybridSystemPage({ params }: { params: Promise<{ project
     return topo.nodes[0]?.id ?? "node-pv";
   }, [project, selectedNodeId]);
 
-  if (!ready) return <div className="state"><p>Memuat proyek&hellip;</p></div>;
+  if (!ready) {
+    return (
+      <div className="state">
+        <p>{tr(lang, "Loading project...", "Lagi memuat proyek...", "プロジェクトを読み込み中...")}</p>
+      </div>
+    );
+  }
   if (!project) return <MissingProjectState />;
 
   return (
     <HybridShell
       project={project}
       activeStep="system"
-      title={lang === "en" ? "Interactive System Architecture" : "Desain Skema & Parameter Sistem"}
-      subtitle="Susun komponen pada kanvas interaktif, hubungkan ke AC Bus, lalu klik komponen untuk mengatur parameter fisiknya."
+      title={tr(
+        lang,
+        "Interactive System Architecture",
+        "Desain Skema & Parameter Komponen",
+        "インタラクティブ・システム構成設計",
+      )}
+      subtitle={tr(
+        lang,
+        "Arrange components on the interactive canvas, connect them to the AC Bus, and click any component to tune its physical parameters.",
+        "Susun komponen di kanvas interaktif, sambungkan ke AC Bus, terus klik komponennya buat atur kapasitas dan parameter teknis.",
+        "キャンバス上にコンポーネントを配置してACバスへ接続し、各設備をクリックして物理パラメータを設定します。",
+      )}
       result={result}
     >
       {validation.errors.length > 0 && (
         <div className="state bad" role="alert" style={{ marginBottom: "1rem" }}>
-          <h3>{lang === "en" ? "Topology errors must be fixed" : "Topologi sistem perlu diperbaiki"}</h3>
+          <h3>
+            {tr(
+              lang,
+              "Topology errors must be fixed",
+              "Ada koneksi topologi yang perlu dibereskan",
+              "トポロジーエラーの修正が必要です",
+            )}
+          </h3>
           <ul>
             {validation.errors.map((err, idx) => (
-              <li key={idx}>{lang === "en" ? err.messageEn : err.messageId}</li>
+              <li key={idx}>{lang === "id" ? err.messageId : err.messageEn}</li>
             ))}
           </ul>
         </div>
@@ -59,10 +82,10 @@ export default function HybridSystemPage({ params }: { params: Promise<{ project
 
       {validation.warnings.length > 0 && (
         <div className="warn" role="note">
-          <h3>{lang === "en" ? "Topology notes" : "Catatan topologi skema"}</h3>
+          <h3>{tr(lang, "Topology notes", "Catatan topologi skema", "構成に関する注記")}</h3>
           <ul>
             {validation.warnings.map((w, idx) => (
-              <li key={idx}>{lang === "en" ? w.messageEn : w.messageId}</li>
+              <li key={idx}>{lang === "id" ? w.messageId : w.messageEn}</li>
             ))}
           </ul>
         </div>

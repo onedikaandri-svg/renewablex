@@ -27,13 +27,21 @@ import type {
   TopologyNodeKind,
   TopologyValidationResult,
 } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences, type LangCode } from "@/lib/preferences";
 
-const OPTIONAL_KINDS: Array<{ kind: TopologyNodeKind; addId: string; addEn: string; labelId: string; labelEn: string }> = [
-  { kind: "bess", addId: "Tambah BESS", addEn: "Add BESS", labelId: "BESS (Baterai)", labelEn: "BESS (Battery)" },
-  { kind: "biomass", addId: "Tambah Biomass", addEn: "Add Biomass", labelId: "Biomass", labelEn: "Biomass" },
-  { kind: "diesel", addId: "Tambah Diesel", addEn: "Add Diesel", labelId: "Diesel Generator", labelEn: "Diesel Generator" },
-  { kind: "grid", addId: "Tambah Grid", addEn: "Add Grid", labelId: "Jaringan Grid", labelEn: "Utility Grid" },
+const OPTIONAL_KINDS: Array<{
+  kind: TopologyNodeKind;
+  addId: string;
+  addEn: string;
+  addJa: string;
+  labelId: string;
+  labelEn: string;
+  labelJa: string;
+}> = [
+  { kind: "bess", addId: "Tambah BESS", addEn: "Add BESS", addJa: "蓄電池を追加", labelId: "BESS (Baterai)", labelEn: "BESS (Battery)", labelJa: "蓄電池 (BESS)" },
+  { kind: "biomass", addId: "Tambah Biomass", addEn: "Add Biomass", addJa: "バイオマスを追加", labelId: "Biomass", labelEn: "Biomass", labelJa: "バイオマス" },
+  { kind: "diesel", addId: "Tambah Diesel", addEn: "Add Diesel", addJa: "ディーゼルを追加", labelId: "Diesel Generator", labelEn: "Diesel Generator", labelJa: "ディーゼル発電" },
+  { kind: "grid", addId: "Tambah Grid", addEn: "Add Grid", addJa: "電力系統を追加", labelId: "Jaringan Grid", labelEn: "Utility Grid", labelJa: "電力系統" },
 ];
 
 const SERIES_COLOR_BY_KIND: Record<TopologyNodeKind, string> = {
@@ -46,58 +54,58 @@ const SERIES_COLOR_BY_KIND: Record<TopologyNodeKind, string> = {
   grid: "var(--series-grid)",
 };
 
-function nodeTitle(kind: TopologyNodeKind, lang: "id" | "en"): string {
+function nodeTitle(kind: TopologyNodeKind, lang: LangCode): string {
   switch (kind) {
     case "pv":
-      return "Solar PV";
+      return tr(lang, "Solar PV", "Solar PV", "太陽光 (PV)");
     case "bess":
-      return lang === "en" ? "BESS Storage" : "BESS (Baterai)";
+      return tr(lang, "BESS Storage", "BESS (Baterai)", "蓄電池 (BESS)");
     case "biomass":
-      return "Biomass";
+      return tr(lang, "Biomass", "Biomass", "バイオマス");
     case "diesel":
-      return "Diesel Generator";
+      return tr(lang, "Diesel Generator", "Diesel Generator", "ディーゼル発電");
     case "ac_bus":
       return "AC BUS";
     case "load":
-      return lang === "en" ? "Electrical Load" : "Beban Listrik";
+      return tr(lang, "Electrical Load", "Beban Listrik", "電力負荷");
     case "grid":
-      return lang === "en" ? "Utility Grid" : "Jaringan Grid";
+      return tr(lang, "Utility Grid", "Jaringan Grid", "電力系統");
   }
 }
 
-function nodeMetricText(project: HybridProjectConfig, node: TopologyNode, connected: boolean, lang: "id" | "en"): string {
+function nodeMetricText(project: HybridProjectConfig, node: TopologyNode, connected: boolean, lang: LangCode): string {
   const { pv, bess, biomass, diesel } = project.components;
   switch (node.kind) {
     case "pv":
       return connected
         ? `${formatNumber(pv.capacity_kwp, lang, 0)} kWp | Inv ${formatNumber(pv.inverter_ac_kw, lang, 0)} kW`
-        : (lang === "en" ? "Disconnected from AC Bus" : "Terputus dari AC Bus");
+        : tr(lang, "Disconnected from AC Bus", "Terputus dari AC Bus", "ACバス未接続");
     case "bess":
       return connected
         ? `${formatNumber(bess.nominal_capacity_kwh, lang, 0)} kWh | ${formatNumber(bess.max_charge_kw, lang, 0)} kW`
-        : (lang === "en" ? "Disconnected (Inactive)" : "Terputus (Nonaktif)");
+        : tr(lang, "Disconnected (Inactive)", "Terputus (Nonaktif)", "未接続（無効）");
     case "biomass":
       return connected
         ? `${formatNumber(biomass.rated_capacity_kw, lang, 0)} kW | ${biomass.fuel_preset.toUpperCase()}`
-        : (lang === "en" ? "Disconnected (Inactive)" : "Terputus (Nonaktif)");
+        : tr(lang, "Disconnected (Inactive)", "Terputus (Nonaktif)", "未接続（無効）");
     case "diesel":
       return connected
         ? `${formatNumber(diesel.rated_capacity_kw, lang, 0)} kW | ${formatNumber(diesel.min_load_fraction * 100, lang, 0)}% min`
-        : (lang === "en" ? "Disconnected (Inactive)" : "Terputus (Nonaktif)");
+        : tr(lang, "Disconnected (Inactive)", "Terputus (Nonaktif)", "未接続（無効）");
     case "ac_bus":
       return project.simulation.dispatch_strategy;
     case "load":
       return project.load_profile.mode === "csv"
-        ? `CSV (${project.load_profile.csv_filename || "kustom"})`
-        : `${formatNumber(project.load_profile.peak_load_kw, lang, 0)} kW ${lang === "en" ? "peak" : "puncak"}`;
+        ? `CSV (${project.load_profile.csv_filename || "custom"})`
+        : `${formatNumber(project.load_profile.peak_load_kw, lang, 0)} kW ${tr(lang, "peak", "puncak", "ピーク")}`;
     case "grid": {
-      if (!connected) return lang === "en" ? "Off-grid (Disconnected)" : "Off-grid (Terputus)";
+      if (!connected) return tr(lang, "Off-grid (Disconnected)", "Off-grid (Terputus)", "オフグリッド（未接続）");
       const imp = project.simulation.dispatch_params.allow_grid_import;
       const exp = project.simulation.dispatch_params.allow_grid_export;
-      if (imp && exp) return lang === "en" ? "Import & Export" : "Impor & Ekspor";
-      if (imp) return lang === "en" ? "Import Only" : "Hanya Impor";
-      if (exp) return lang === "en" ? "Export Only" : "Hanya Ekspor";
-      return lang === "en" ? "Connected" : "Terhubung";
+      if (imp && exp) return tr(lang, "Import & Export", "Impor & Ekspor", "買電・売電");
+      if (imp) return tr(lang, "Import Only", "Hanya Impor", "買電のみ");
+      if (exp) return tr(lang, "Export Only", "Hanya Ekspor", "売電のみ");
+      return tr(lang, "Connected", "Terhubung", "接続済");
     }
   }
 }
@@ -403,25 +411,56 @@ export default function SchematicCanvas({
   }
 
   const statusChip = !validation.valid
-    ? { cls: "chip chip-unviable", label: `${validation.errors.length} Galat Topologi` }
+    ? {
+        cls: "chip chip-unviable",
+        label: tr(
+          lang,
+          `${validation.errors.length} Topology Errors`,
+          `${validation.errors.length} Error Topologi`,
+          `トポロジーエラー ${validation.errors.length}件`,
+        ),
+      }
     : validation.warnings.length > 0
-      ? { cls: "chip chip-marginal", label: `${validation.warnings.length} Peringatan` }
-      : { cls: "chip chip-viable", label: lang === "en" ? "Valid Topology" : "Topologi Valid" };
+      ? {
+          cls: "chip chip-marginal",
+          label: tr(
+            lang,
+            `${validation.warnings.length} Warnings`,
+            `${validation.warnings.length} Catatan`,
+            `注意事項 ${validation.warnings.length}件`,
+          ),
+        }
+      : {
+          cls: "chip chip-viable",
+          label: tr(lang, "Valid Topology", "Topologi Siap!", "トポロジー正常"),
+        };
 
   return (
     <section className="card" aria-labelledby="h-canvas">
       <div className="card-header">
         <div>
-          <h2 id="h-canvas">{lang === "en" ? "Interactive System Schematic" : "Kanvas Skema Sistem Interaktif"}</h2>
+          <h2 id="h-canvas">
+            {tr(
+              lang,
+              "Interactive System Schematic",
+              "Kanvas Skema Sistem Interaktif",
+              "インタラクティブ・システム構成キャンバス",
+            )}
+          </h2>
           <p className="note">
-            Seret komponen untuk mengatur tata letak, tarik titik port ke AC Bus untuk menyambung, atau klik komponen untuk mengatur parameternya.
+            {tr(
+              lang,
+              "Drag components to arrange layout, pull port dots to the AC Bus to connect, or click any component to tune its parameters.",
+              "Geser komponen buat atur posisi, tarik titik port ke AC Bus buat nyambungin, atau klik komponen buat atur parameternya.",
+              "コンポーネントをドラッグして配置し、ポートをACバスへ繋いで接続するか、クリックして詳細パラメータを設定します。",
+            )}
           </p>
         </div>
         <span className={statusChip.cls}>{statusChip.label}</span>
       </div>
 
       {/* Bilah alat kanvas */}
-      <div className="canvas-toolbar" role="toolbar" aria-label={lang === "en" ? "Schematic canvas tools" : "Alat kanvas skema"}>
+      <div className="canvas-toolbar" role="toolbar" aria-label={tr(lang, "Schematic canvas tools", "Alat kanvas skema", "構成キャンバスツール")}>
         <div className="actions-inline">
           {OPTIONAL_KINDS.map((item) => {
             const exists = topology.nodes.some((n) => n.kind === item.kind);
@@ -434,8 +473,8 @@ export default function SchematicCanvas({
               >
                 <ComponentIcon kind={item.kind} size={15} />
                 {exists
-                  ? (lang === "en" ? `Select ${item.labelEn}` : `Pilih ${item.labelId}`)
-                  : (lang === "en" ? item.addEn : item.addId)}
+                  ? tr(lang, `Select ${item.labelEn}`, `Pilih ${item.labelId}`, `${item.labelJa}を選択`)
+                  : tr(lang, item.addEn, item.addId, item.addJa)}
               </button>
             );
           })}
@@ -445,21 +484,21 @@ export default function SchematicCanvas({
           <button
             type="button"
             className="btn btn-sm btn-icon ghost"
-            aria-label={lang === "en" ? "Zoom out canvas" : "Perkecil tampilan kanvas"}
-            title={lang === "en" ? "Zoom out" : "Perkecil tampilan"}
+            aria-label={tr(lang, "Zoom out canvas", "Perkecil tampilan kanvas", "キャンバスを縮小")}
+            title={tr(lang, "Zoom out", "Perkecil tampilan", "縮小")}
             disabled={zoom <= MIN_ZOOM}
             onClick={() => onChangeProject(setTopologyViewport(project, { zoom: zoom - ZOOM_STEP }))}
           >
             <IconZoomOut size={16} />
           </button>
-          <span className="chip tabular-nums" aria-label="Tingkat perbesaran kanvas">
+          <span className="chip tabular-nums" aria-label={tr(lang, "Canvas zoom level", "Tingkat perbesaran kanvas", "表示倍率")}>
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
             className="btn btn-sm btn-icon ghost"
-            aria-label={lang === "en" ? "Zoom in canvas" : "Perbesar tampilan kanvas"}
-            title={lang === "en" ? "Zoom in" : "Perbesar tampilan"}
+            aria-label={tr(lang, "Zoom in canvas", "Perbesar tampilan kanvas", "キャンバスを拡大")}
+            title={tr(lang, "Zoom in", "Perbesar tampilan", "拡大")}
             disabled={zoom >= MAX_ZOOM}
             onClick={() => onChangeProject(setTopologyViewport(project, { zoom: zoom + ZOOM_STEP }))}
           >
@@ -468,11 +507,19 @@ export default function SchematicCanvas({
           <button
             type="button"
             className="btn btn-sm btn-icon ghost"
-            aria-label={lang === "en" ? "Reset canvas layout" : "Reset tata letak kanvas"}
-            title={lang === "en" ? "Reset layout" : "Reset Tata Letak"}
+            aria-label={tr(lang, "Reset canvas layout", "Reset tata letak kanvas", "レイアウトをリセット")}
+            title={tr(lang, "Reset layout", "Reset Tata Letak", "レイアウトをリセット")}
             onClick={() => {
               onChangeProject(resetTopologyLayout(project));
-              onNotify?.("Tata letak kanvas dikembalikan ke posisi rapi awal.", "info");
+              onNotify?.(
+                tr(
+                  lang,
+                  "Canvas layout reset to default position.",
+                  "Sip, posisi kanvas sudah dirapikan ulang.",
+                  "キャンバスの配置を初期状態にリセットしました。",
+                ),
+                "info",
+              );
             }}
           >
             <IconRotateCcw size={16} />
@@ -719,9 +766,15 @@ export default function SchematicCanvas({
       </div>
 
       {/* Mode ringkas ramah layar 360px dan daftar aksi cepat komponen */}
-      <div className="canvas-mobile-list" aria-label="Daftar aksi cepat komponen skema">
+      <div className="canvas-mobile-list" aria-label={tr(lang, "Quick component actions list", "Daftar aksi cepat komponen skema", "コンポーネントクイック操作一覧")}>
         <p className="note" style={{ marginBottom: "0.5rem" }}>
-          <strong>Kontrol Cepat Komponen:</strong> Ketuk untuk mengatur parameter atau menyambung ke AC Bus (target sentuh 44px).
+          <strong>{tr(lang, "Quick Component Controls:", "Kontrol Cepat Komponen:", "クイック操作:")}</strong>{" "}
+          {tr(
+            lang,
+            "Tap to configure parameters or connect to the AC Bus (44px touch targets).",
+            "Klik buat atur parameter atau sambungin ke AC Bus.",
+            "タップしてパラメータ設定またはACバスへの接続を行います。",
+          )}
         </p>
         <div className="canvas-mobile-grid">
           {topology.nodes.map((node) => {
@@ -738,7 +791,11 @@ export default function SchematicCanvas({
                 <div className="actions-inline" style={{ justifyContent: "space-between", marginBottom: "0.375rem" }}>
                   <strong style={{ color: "var(--navytext)" }}>{nodeTitle(node.kind, lang)}</strong>
                   <span className={`chip ${isConnected ? "chip-viable" : "chip-marginal"}`}>
-                    {isBus ? "Bus Utama" : isConnected ? "Terhubung" : "Terputus"}
+                    {isBus
+                      ? tr(lang, "Main Bus", "Bus Utama", "メインバス")
+                      : isConnected
+                        ? tr(lang, "Connected", "Terhubung", "接続済")
+                        : tr(lang, "Disconnected", "Terputus", "未接続")}
                   </span>
                 </div>
                 <p className="note tabular-nums" style={{ marginBottom: "0.625rem" }}>
@@ -750,7 +807,7 @@ export default function SchematicCanvas({
                     className={`btn btn-sm ${isSelected ? "primary" : "ghost"}`}
                     onClick={() => onSelectNode(node.id)}
                   >
-                    Atur Parameter
+                    {tr(lang, "Configure", "Atur Parameter", "詳細設定")}
                   </button>
                   {!isBus && (
                     isConnected ? (
@@ -759,7 +816,7 @@ export default function SchematicCanvas({
                         className="btn btn-sm ghost"
                         onClick={() => handleDisconnectDirect(node.id)}
                       >
-                        Putuskan
+                        {tr(lang, "Disconnect", "Putuskan", "接続解除")}
                       </button>
                     ) : (
                       <button
@@ -767,7 +824,7 @@ export default function SchematicCanvas({
                         className="btn btn-sm primary"
                         onClick={() => handleConnectDirect(node.id)}
                       >
-                        Hubungkan ke AC Bus
+                        {tr(lang, "Connect to AC Bus", "Hubungkan ke AC Bus", "ACバスに接続")}
                       </button>
                     )
                   )}
@@ -777,7 +834,7 @@ export default function SchematicCanvas({
                       className="btn btn-sm danger-ghost"
                       onClick={() => handleRemoveOptional(node.id, node.kind)}
                     >
-                      Hapus
+                      {tr(lang, "Remove", "Hapus", "削除")}
                     </button>
                   )}
                 </div>
@@ -789,16 +846,30 @@ export default function SchematicCanvas({
 
       {/* Ringkasan teks aksesibel untuk pembaca layar */}
       <details className="more">
-        <summary>Ringkasan Koneksi Topologi (Teks Aksesibel)</summary>
+        <summary>
+          {tr(
+            lang,
+            "Topology Connection Summary (Accessible Text)",
+            "Ringkasan Koneksi Topologi (Teks Aksesibel)",
+            "トポロジー接続一覧（テキスト表示）",
+          )}
+        </summary>
         <div className="tw tw-auto">
           <table className="sens-main">
-            <caption>Daftar komponen pada skema sistem hybrid dan status koneksinya ke AC Bus</caption>
+            <caption>
+              {tr(
+                lang,
+                "Components on the hybrid schematic and their AC Bus connection status",
+                "Daftar komponen pada skema sistem hybrid dan status koneksinya ke AC Bus",
+                "ハイブリッド構成キャンバス上のコンポーネントおよびACバス接続状態",
+              )}
+            </caption>
             <thead>
               <tr>
-                <th>Komponen</th>
-                <th>Peran</th>
-                <th>Status Koneksi</th>
-                <th>Posisi Kanvas (X, Y)</th>
+                <th>{tr(lang, "Component", "Komponen", "コンポーネント")}</th>
+                <th>{tr(lang, "Role", "Peran", "区分")}</th>
+                <th>{tr(lang, "Connection Status", "Status Koneksi", "接続状態")}</th>
+                <th>{tr(lang, "Canvas Position (X, Y)", "Posisi Kanvas (X, Y)", "座標 (X, Y)")}</th>
               </tr>
             </thead>
             <tbody>
@@ -807,8 +878,14 @@ export default function SchematicCanvas({
                 return (
                   <tr key={`row-${node.id}`}>
                     <th>{nodeTitle(node.kind, lang)}</th>
-                    <td>{isRequiredNodeKind(node.kind) ? "Wajib" : "Opsional"}</td>
-                    <td>{node.kind === "ac_bus" ? "Pusat AC Bus" : connected ? "Terhubung ke AC Bus" : "Terputus"}</td>
+                    <td>{isRequiredNodeKind(node.kind) ? tr(lang, "Required", "Wajib", "必須") : tr(lang, "Optional", "Opsional", "任意")}</td>
+                    <td>
+                      {node.kind === "ac_bus"
+                        ? tr(lang, "AC Bus Hub", "Pusat AC Bus", "中央ACバス")
+                        : connected
+                          ? tr(lang, "Connected to AC Bus", "Terhubung ke AC Bus", "ACバス接続済")
+                          : tr(lang, "Disconnected", "Terputus", "未接続")}
+                    </td>
                     <td className="tabular-nums">{node.x}, {node.y}</td>
                   </tr>
                 );

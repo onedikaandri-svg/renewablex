@@ -7,7 +7,7 @@ import { ViabilityChip } from "@/components/hybrid/HybridShell";
 import { formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
 import { getSimulationResult, listProjects } from "@/lib/hybrid-storage";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 
 interface ScenarioEntry {
   project: HybridProjectConfig;
@@ -148,18 +148,46 @@ export default function ScenarioCompareTab({
       <div className="card" style={{ marginBottom: "1rem" }}>
         <div className="card-header">
           <div>
-            <h2>Pilih Skenario Proyek untuk Dibandingkan (2 sampai 4 Skenario)</h2>
-            <p className="note">Hanya proyek yang sudah dijalankan simulasinya di Halaman 7 yang dapat dibandingkan.</p>
+            <h2>
+              {tr(
+                lang,
+                "Select Project Scenarios to Compare (2 to 4 Scenarios)",
+                "Pilih Skenario Proyek buat Dibandingkan (2 sampai 4 Skenario)",
+                "比較するプロジェクトシナリオを選択（2〜4件）",
+              )}
+            </h2>
+            <p className="note">
+              {tr(
+                lang,
+                "Only projects that have been simulated on Step 7 can be compared side by side.",
+                "Hanya proyek yang sudah dihitung simulasinya di Langkah 7 yang bisa dibandingkan.",
+                "ステップ7でシミュレーション実行済みのプロジェクトのみ横並び比較できます。",
+              )}
+            </p>
           </div>
           <Link href="/hybrid" className="btn btn-sm ghost">
-            Kelola Daftar Proyek
+            {tr(lang, "Manage Projects List", "Kelola Daftar Proyek", "プロジェクト一覧を管理")}
           </Link>
         </div>
 
         {simulatedEntries.length === 0 ? (
           <div className="state">
-            <h3>Belum ada skenario tersimulasikan</h3>
-            <p>Jalankan simulasi pada minimal dua proyek (atau simpan pemenang sapuan sebagai skenario baru lalu jalankan simulasinya).</p>
+            <h3>
+              {tr(
+                lang,
+                "No simulated scenarios yet",
+                "Belum ada skenario yang sudah disimulasikan nih",
+                "シミュレーション済みのシナリオがありません",
+              )}
+            </h3>
+            <p>
+              {tr(
+                lang,
+                "Run simulations on at least two projects (or save a sweep winner as a new scenario and simulate it).",
+                "Yuk jalankan simulasi di minimal dua proyek (atau simpan pemenang sizing sebagai skenario baru terus jalankan simulasinya).",
+                "少なくとも2つのプロジェクトでシミュレーションを実行してください（またはスイープ結果から新規シナリオを保存して実行してください）。",
+              )}
+            </p>
           </div>
         ) : (
           <div className="grid-2">
