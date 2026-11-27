@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { IconChevronLeft, IconChevronRight } from "@/components/Icons";
+import { isSimulationResultStale } from "@/lib/hybrid-storage";
 import { usePreferences } from "@/lib/preferences";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
 
@@ -21,7 +22,13 @@ const STEPS = [
 
 export type HybridStepKey = (typeof STEPS)[number]["key"];
 
-export function ViabilityChip({ status }: { status?: "viable" | "marginal" | "unviable" | null }) {
+export function ViabilityChip({
+  status,
+  stale = false,
+}: {
+  status?: "viable" | "marginal" | "unviable" | null;
+  stale?: boolean;
+}) {
   const { lang } = usePreferences();
   if (!status) {
     return <span className="chip">{lang === "en" ? "Not simulated" : "Belum disimulasikan"}</span>;
@@ -31,6 +38,15 @@ export function ViabilityChip({ status }: { status?: "viable" | "marginal" | "un
     marginal: lang === "en" ? "Marginal" : "Marjinal",
     unviable: lang === "en" ? "Unviable" : "Tidak Layak",
   };
+  if (stale) {
+    return (
+      <span className="chip chip-marginal">
+        {lang === "en"
+          ? `${labels[status]} (Needs Re-run)`
+          : `${labels[status]} (Perlu Diperbarui)`}
+      </span>
+    );
+  }
   return <span className={`chip chip-${status}`}>{labels[status]}</span>;
 }
 
@@ -53,6 +69,7 @@ export default function HybridShell({
   const currentIdx = STEPS.findIndex((s) => s.key === activeStep);
   const prevStep = currentIdx > 0 ? STEPS[currentIdx - 1] : null;
   const nextStep = currentIdx >= 0 && currentIdx < STEPS.length - 1 ? STEPS[currentIdx + 1] : null;
+  const isStale = Boolean(result && isSimulationResultStale(project, result));
 
   return (
     <>
@@ -82,9 +99,24 @@ export default function HybridShell({
           <p className="lead">{subtitle}</p>
         </div>
         <div className="actions-inline">
-          <ViabilityChip status={result?.finance_summary?.viability_status ?? null} />
+          <ViabilityChip status={result?.finance_summary?.viability_status ?? null} stale={isStale} />
         </div>
       </div>
+
+      {isStale && (
+        <div className="warn no-print" role="status">
+          <div className="actions-inline" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <p style={{ margin: 0 }}>
+              {lang === "en"
+                ? "Project configuration has changed since the last simulation run. Re-run the simulation to refresh dashboard charts and export reports."
+                : "Konfigurasi proyek telah berubah sejak simulasi terakhir dijalankan. Jalankan ulang simulasi agar angka dan grafik di dasbor serta laporan ekspor diperbarui."}
+            </p>
+            <Link href={`/hybrid/${project.id}/run`} className="btn btn-sm primary">
+              {lang === "en" ? "Go to Step 7: Re-run Simulation" : "Ke Halaman 7: Jalankan Ulang"}
+            </Link>
+          </div>
+        </div>
+      )}
 
       {children}
 

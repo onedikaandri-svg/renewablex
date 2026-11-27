@@ -52,7 +52,11 @@ export default function HybridComparePage({ params }: { params: Promise<{ projec
       project={project}
       activeStep="compare"
       title={lang === "en" ? "Optimization Sweep, Scenarios & Sensitivity" : "Sapuan Kombinasi, Perbandingan Skenario & Sensitivitas"}
-      subtitle="Cari ukuran komponen optimal gaya HOMER, bandingkan skenario proyek berdampingan, dan uji sensitivitas parameter hybrid."
+      subtitle={
+        lang === "en"
+          ? "Search HOMER-style optimal component sizing, compare project scenarios side by side, and run hybrid parameter sensitivity."
+          : "Cari ukuran komponen optimal gaya HOMER, bandingkan skenario proyek berdampingan, dan uji sensitivitas parameter hybrid."
+      }
       result={result}
     >
       <div className="tabs" role="tablist" aria-label={lang === "en" ? "Comparison views" : "Tab perbandingan sistem hybrid"}>

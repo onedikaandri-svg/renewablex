@@ -40,12 +40,13 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
               <select
                 id="econ-curr"
                 value={project.project.currency_code}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const nextCurr = e.target.value as "IDR" | "USD";
                   updateProject((p) => ({
                     ...p,
-                    project: { ...p.project, currency_code: e.target.value as "IDR" | "USD" },
-                  }))
-                }
+                    project: { ...p.project, currency_code: nextCurr },
+                  }));
+                }}
               >
                 <option value="IDR">IDR (Rupiah)</option>
                 <option value="USD">USD (Dolar AS)</option>

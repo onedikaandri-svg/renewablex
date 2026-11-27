@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   applySweepCombinationToProject,
   buildSampleProject,
+  computeProjectConfigFingerprint,
   createBlankProject,
   createSampleProject,
   deleteProject,
@@ -12,7 +13,9 @@ import {
   getSimulationResult,
   getSweepResult,
   importProjectJson,
+  isSimulationResultStale,
   listProjects,
+  saveProject,
   saveSensitivityResult,
   saveSimulationResult,
   saveSweepCombinationAsScenario,
@@ -166,5 +169,82 @@ describe("hybrid-storage", () => {
     deleteProject(p.id);
     expect(getSweepResult(p.id)).toBeNull();
     expect(getSensitivityResult(p.id)).toBeNull();
+  });
+
+  it("mendeteksi hasil simulasi kedaluwarsa (stale) dari sidik jari konfigurasi maupun fallback waktu", () => {
+    const project = createSampleProject();
+    const fpInitial = computeProjectConfigFingerprint(project);
+
+    // Perubahan hanya pada weatherPreview, loadPreview, atau updatedAt tidak boleh mengubah sidik jari
+    const withPreviews = {
+      ...project,
+      updatedAt: "2099-01-01T00:00:00.000Z",
+      weatherPreview: {
+        engine_version: "0.7.0",
+        contract_version: "0.7",
+      } as unknown as typeof project.weatherPreview,
+      loadPreview: {
+        engine_version: "0.7.0",
+        contract_version: "0.7",
+      } as unknown as typeof project.loadPreview,
+    };
+    expect(computeProjectConfigFingerprint(withPreviews)).toBe(fpInitial);
+
+    const fakeResult = {
+      engine_version: "0.7.0",
+      contract_version: "0.7",
+      config_hash: "sha256:test",
+      calculated_at: "2026-01-10T10:00:00.000Z",
+    } as unknown as HybridSimulateResponse;
+
+    saveSimulationResult(project.id, fakeResult, project);
+    const loadedResult = getSimulationResult(project.id);
+    expect(isSimulationResultStale(project, loadedResult)).toBe(false);
+    expect(isSimulationResultStale(withPreviews, loadedResult)).toBe(false);
+
+    // Perubahan pada kapasitas PV menandai hasil lama sebagai stale
+    const modifiedPv = saveProject({
+      ...project,
+      components: {
+        ...project.components,
+        pv: { ...project.components.pv, capacity_kwp: 750 },
+      },
+    });
+    expect(computeProjectConfigFingerprint(modifiedPv)).not.toBe(fpInitial);
+    expect(isSimulationResultStale(modifiedPv, loadedResult)).toBe(true);
+
+    // Perubahan pada kapasitas BESS menandai hasil lama sebagai stale
+    const modifiedBess = {
+      ...project,
+      components: {
+        ...project.components,
+        bess: { ...project.components.bess, nominal_capacity_kwh: 900 },
+      },
+    };
+    expect(isSimulationResultStale(modifiedBess, loadedResult)).toBe(true);
+
+    // Perubahan pada koordinat lokasi menandai hasil lama sebagai stale
+    const modifiedLocation = {
+      ...project,
+      project: { ...project.project, latitude: -7.25, longitude: 112.75 },
+    };
+    expect(isSimulationResultStale(modifiedLocation, loadedResult)).toBe(true);
+
+    // Fallback perbandingan waktu (project.updatedAt > result.calculated_at) untuk hasil lama tanpa metadata fingerprint
+    const legacyProject = buildSampleProject("legacy-1");
+    legacyProject.updatedAt = "2026-05-02T12:00:00.000Z";
+    const legacyFreshResult = {
+      engine_version: "0.5.0",
+      contract_version: "0.5",
+      config_hash: "sha256:legacy",
+      calculated_at: "2026-05-03T12:00:00.000Z",
+    } as unknown as HybridSimulateResponse;
+    expect(isSimulationResultStale(legacyProject, legacyFreshResult)).toBe(false);
+
+    const legacyStaleResult = {
+      ...legacyFreshResult,
+      calculated_at: "2026-05-01T12:00:00.000Z",
+    } as unknown as HybridSimulateResponse;
+    expect(isSimulationResultStale(legacyProject, legacyStaleResult)).toBe(true);
   });
 });

@@ -19,8 +19,19 @@ import type {
 
 const PROJECTS_KEY = "renewablex.hybrid.projects.v1";
 const RESULT_KEY_PREFIX = "renewablex.hybrid.result.v1.";
+const RESULT_META_KEY_PREFIX = "renewablex.hybrid.result_meta.v1.";
 const SWEEP_KEY_PREFIX = "renewablex.hybrid.sweep.v1.";
 const SENSITIVITY_KEY_PREFIX = "renewablex.hybrid.sensitivity.v1.";
+export const HYBRID_PROJECT_UPDATED_EVENT = "renewablex:hybrid-project-updated";
+
+function emitProjectUpdated(projectId: string): void {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") return;
+  try {
+    window.dispatchEvent(new CustomEvent(HYBRID_PROJECT_UPDATED_EVENT, { detail: { projectId } }));
+  } catch {
+    // Abaikan pada lingkungan tes minimal tanpa CustomEvent.
+  }
+}
 
 export const DEFAULT_DIESEL_COMPONENT: HybridDieselComponentConfig = {
   enabled: false,
@@ -297,6 +308,7 @@ export function saveProject(project: HybridProjectConfig): HybridProjectConfig {
     all.push(updated);
   }
   writeAllRaw(all);
+  emitProjectUpdated(updated.id);
   return updated;
 }
 
@@ -328,12 +340,14 @@ export function deleteProject(projectId: string): void {
   if (typeof window !== "undefined") {
     try {
       window.localStorage.removeItem(`${RESULT_KEY_PREFIX}${projectId}`);
+      window.localStorage.removeItem(`${RESULT_META_KEY_PREFIX}${projectId}`);
       window.localStorage.removeItem(`${SWEEP_KEY_PREFIX}${projectId}`);
       window.localStorage.removeItem(`${SENSITIVITY_KEY_PREFIX}${projectId}`);
     } catch {
       // Abaikan.
     }
   }
+  emitProjectUpdated(projectId);
 }
 
 export function exportProjectJson(project: HybridProjectConfig): string {
@@ -390,13 +404,148 @@ export function importProjectJson(jsonText: string): HybridProjectConfig {
   });
 }
 
-export function saveSimulationResult(projectId: string, result: HybridSimulateResponse): void {
-  if (typeof window === "undefined") return;
+function canonicalizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalizeValue(item));
+  }
+  if (value !== null && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const sortedKeys = Object.keys(obj).sort();
+    const out: Record<string, unknown> = {};
+    for (const key of sortedKeys) {
+      const v = obj[key];
+      if (v !== undefined) {
+        out[key] = canonicalizeValue(v);
+      }
+    }
+    return out;
+  }
+  return value;
+}
+
+export function computeProjectConfigFingerprint(project: HybridProjectConfig): string {
+  const norm = normalizeProject(project);
+  const topo = resolveProjectTopology(norm);
+  const edges = [...topo.edges]
+    .map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      flowType: edge.flowType,
+    }))
+    .sort((a, b) =>
+      `${a.source}->${a.target}:${a.flowType}`.localeCompare(`${b.source}->${b.target}:${b.flowType}`),
+    );
+
+  const payload = canonicalizeValue({
+    project: norm.project,
+    simulation: norm.simulation,
+    load_profile: norm.load_profile,
+    components: norm.components,
+    finance: norm.finance,
+    topology_edges: edges,
+  });
+
+  const serialized = JSON.stringify(payload);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < serialized.length; i++) {
+    const ch = serialized.charCodeAt(i);
+    h1 ^= ch;
+    h1 = Math.imul(h1, 0x01000193);
+    h2 ^= ch;
+    h2 = Math.imul(h2, 0x85ebca6b);
+  }
+  const hex1 = (h1 >>> 0).toString(16).padStart(8, "0");
+  const hex2 = (h2 >>> 0).toString(16).padStart(8, "0");
+  return `rx-fp-v1:${hex1}${hex2}:${serialized.length}`;
+}
+
+interface StoredSimulationResultMeta {
+  fingerprint: string;
+  savedAt: string;
+}
+
+type ResultWithOptionalFingerprint = HybridSimulateResponse & {
+  _client_config_fingerprint?: string;
+};
+
+function readResultMeta(projectId: string): StoredSimulationResultMeta | null {
+  if (typeof window === "undefined") return null;
   try {
-    window.localStorage.setItem(`${RESULT_KEY_PREFIX}${projectId}`, JSON.stringify(result));
+    const raw = window.localStorage.getItem(`${RESULT_META_KEY_PREFIX}${projectId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredSimulationResultMeta>;
+    if (typeof parsed?.fingerprint === "string" && parsed.fingerprint.length > 0) {
+      return {
+        fingerprint: parsed.fingerprint,
+        savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : "",
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function isSimulationResultStale(
+  project: HybridProjectConfig | null | undefined,
+  result: HybridSimulateResponse | null | undefined,
+): boolean {
+  if (!project || !result) return false;
+  const currentFp = computeProjectConfigFingerprint(project);
+  const inlineFp = (result as ResultWithOptionalFingerprint)._client_config_fingerprint;
+  const storedMeta = readResultMeta(project.id);
+  const baselineFp =
+    typeof inlineFp === "string" && inlineFp.length > 0
+      ? inlineFp
+      : storedMeta?.fingerprint ?? null;
+
+  if (baselineFp) {
+    return baselineFp !== currentFp;
+  }
+
+  // Fallback perbandingan waktu untuk hasil simulasi lama yang disimpan sebelum metadata fingerprint ada.
+  if (project.updatedAt && result.calculated_at) {
+    const projMs = Date.parse(project.updatedAt);
+    const calcMs = Date.parse(result.calculated_at);
+    if (Number.isFinite(projMs) && Number.isFinite(calcMs)) {
+      return projMs > calcMs;
+    }
+    return project.updatedAt > result.calculated_at;
+  }
+
+  return false;
+}
+
+export function saveSimulationResult(
+  projectId: string,
+  result: HybridSimulateResponse,
+  project?: HybridProjectConfig | null,
+): void {
+  if (typeof window === "undefined") return;
+  const sourceProject = project ?? getProject(projectId);
+  const fingerprint = sourceProject ? computeProjectConfigFingerprint(sourceProject) : undefined;
+  const enriched: ResultWithOptionalFingerprint = fingerprint
+    ? { ...result, _client_config_fingerprint: fingerprint }
+    : result;
+
+  if (fingerprint) {
+    try {
+      const meta: StoredSimulationResultMeta = {
+        fingerprint,
+        savedAt: new Date().toISOString(),
+      };
+      window.localStorage.setItem(`${RESULT_META_KEY_PREFIX}${projectId}`, JSON.stringify(meta));
+    } catch {
+      // Abaikan bila gagal menulis metadata pendamping.
+    }
+  }
+
+  try {
+    window.localStorage.setItem(`${RESULT_KEY_PREFIX}${projectId}`, JSON.stringify(enriched));
   } catch {
     // Jika quota localStorage penuh karena hourly_year_1 besar, simpan versi ringkas tanpa hourly.
-    const compact = { ...result, hourly_year_1: undefined };
+    const compact: ResultWithOptionalFingerprint = { ...enriched, hourly_year_1: undefined };
     try {
       window.localStorage.setItem(`${RESULT_KEY_PREFIX}${projectId}`, JSON.stringify(compact));
     } catch {
@@ -410,7 +559,14 @@ export function getSimulationResult(projectId: string): HybridSimulateResponse |
   try {
     const raw = window.localStorage.getItem(`${RESULT_KEY_PREFIX}${projectId}`);
     if (!raw) return null;
-    return JSON.parse(raw) as HybridSimulateResponse;
+    const parsed = JSON.parse(raw) as ResultWithOptionalFingerprint;
+    if (!parsed._client_config_fingerprint) {
+      const meta = readResultMeta(projectId);
+      if (meta?.fingerprint) {
+        parsed._client_config_fingerprint = meta.fingerprint;
+      }
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -420,6 +576,7 @@ export function clearSimulationResult(projectId: string): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.removeItem(`${RESULT_KEY_PREFIX}${projectId}`);
+    window.localStorage.removeItem(`${RESULT_META_KEY_PREFIX}${projectId}`);
   } catch {
     // Abaikan.
   }
