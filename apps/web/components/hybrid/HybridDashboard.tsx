@@ -13,6 +13,7 @@ import {
   buildMonthlyGeneratorOperations,
   buildSankeyEnergyData,
 } from "@/lib/hybrid-charts";
+import { summarizeActiveEmsRuleSet } from "@/lib/hybrid-ems-utils";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
 import { tr, usePreferences } from "@/lib/preferences";
 
@@ -978,6 +979,14 @@ export default function HybridDashboard({
   }, [result.cashflow_schedule]);
 
   const inspectStepIdx = Math.min(startStep + inspectHourOffset, (hourly?.steps_count ?? 1) - 1);
+  const customEmsSummary = useMemo(
+    () =>
+      (result.dispatch_strategy === "custom_ems" || config.simulation.dispatch_strategy === "custom_ems") &&
+      config.simulation.dispatch_params.ems_rules
+        ? summarizeActiveEmsRuleSet(config.simulation.dispatch_params.ems_rules, lang)
+        : null,
+    [result.dispatch_strategy, config.simulation.dispatch_strategy, config.simulation.dispatch_params.ems_rules, lang],
+  );
 
   return (
     <>
@@ -1459,6 +1468,59 @@ export default function HybridDashboard({
                 </div>
               </div>
             </div>
+
+            {customEmsSummary && (
+              <div className="sec card">
+                <div className="card-header">
+                  <h3>
+                    {tr(
+                      lang,
+                      `Active Custom Supervisory EMS Rules (${customEmsSummary.name})`,
+                      `Ringkasan Aturan Supervisory EMS Kustom Aktif (${customEmsSummary.name})`,
+                      `有効なカスタム監視EMSルール (${customEmsSummary.name})`,
+                    )}
+                  </h3>
+                  <span className="chip tabular-nums">
+                    v{customEmsSummary.schemaVersion} ({customEmsSummary.enabledCount}/{customEmsSummary.totalCount}{" "}
+                    {tr(lang, "active", "aktif", "有効")})
+                  </span>
+                </div>
+                {customEmsSummary.paramsSummary.length > 0 && (
+                  <p className="note tabular-nums" style={{ marginBottom: "0.5rem" }}>
+                    <strong>{tr(lang, "Thresholds:", "Ambang Parameter:", "設定閾値:")}</strong>{" "}
+                    {customEmsSummary.paramsSummary.map((p) => `${p.label} = ${p.valueText}`).join(" | ")}
+                  </p>
+                )}
+                <div className="tw" tabIndex={0} role="region" aria-label={tr(lang, "Active Custom EMS Rules Summary", "Ringkasan aturan EMS kustom aktif", "有効なカスタムEMSルール一覧")}>
+                  <table className="sens-main">
+                    <thead>
+                      <tr>
+                        <th scope="col">{tr(lang, "Priority", "Prioritas", "優先度")}</th>
+                        <th scope="col">{tr(lang, "Rule ID", "ID Aturan", "ルールID")}</th>
+                        <th scope="col">{tr(lang, "Status", "Status", "状態")}</th>
+                        <th scope="col">{tr(lang, "Condition", "Syarat Kondisi", "発動条件")}</th>
+                        <th scope="col">{tr(lang, "Action", "Keputusan Aksi", "アクション")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {customEmsSummary.rows.map((row) => (
+                        <tr key={row.id}>
+                          <td className="tabular-nums">{row.priority}</td>
+                          <th scope="row"><code>{row.id}</code></th>
+                          <td>
+                            {row.enabled
+                              ? tr(lang, "Enabled", "Aktif", "有効")
+                              : tr(lang, "Disabled", "Nonaktif", "無効")}
+                          </td>
+                          <td style={{ textAlign: "left" }}>{row.conditionText}</td>
+                          <td style={{ textAlign: "left" }}><strong>{row.actionText}</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

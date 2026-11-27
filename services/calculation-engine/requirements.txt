@@ -7,5 +7,5 @@ httpx>=0.27,<1.0
 numpy>=1.26,<3.0
 # Native multi-sheet Excel (.xlsx) report export for Stage 7 hybrid analysis.
 openpyxl>=3.1,<4.0
-# Stage 3B Supervisory EMS & Rule Interpreter (v0.1.0).
-renewablex-hybrid-controller @ git+https://github.com/dika314/renewablex-hybrid-controller.git@v0.1.0
+# Stage 3B Supervisory EMS & Rule Interpreter (v0.1.0), disalin ke monorepo karena repo sumber privat dan tidak bisa diakses CI.
+./packages/renewablex-hybrid-controller
