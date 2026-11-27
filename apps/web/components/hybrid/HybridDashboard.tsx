@@ -9,6 +9,8 @@ import { downloadFile, formatCompactCurrency, formatCurrency, formatNumber, form
 import {
   buildDegradationSeries,
   buildDurationCurveSeries,
+  buildMonthlyDiurnalProfile,
+  buildMonthlyGeneratorOperations,
   buildSankeyEnergyData,
 } from "@/lib/hybrid-charts";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
@@ -33,6 +35,7 @@ export default function HybridDashboard({
   const [activeTab, setActiveTab] = useState<DashboardTab>("overview");
   const [startDay, setStartDay] = useState(1);
   const [windowDays, setWindowDays] = useState<1 | 3 | 7>(3);
+  const [diurnalMonth, setDiurnalMonth] = useState<number>(0);
   const [heatmapMetric, setHeatmapMetric] = useState<HeatmapMetric>("load");
   const [inspectHourOffset, setInspectHourOffset] = useState(12);
   const tabRefs = useRef<Partial<Record<DashboardTab, HTMLButtonElement | null>>>({});
@@ -525,6 +528,196 @@ export default function HybridDashboard({
 
   // 4d. Grafik Degradasi Kapasitas PV & BESS Sepanjang Umur Proyek
   const degradationData = useMemo(() => buildDegradationSeries(result, config), [result, config]);
+
+  // 4e. Grafik Profil Harian Rata-rata per Bulan (24 Jam)
+  const diurnalData = useMemo(
+    () => (hourly ? buildMonthlyDiurnalProfile(hourly, diurnalMonth) : null),
+    [hourly, diurnalMonth],
+  );
+  const diurnalOption = useMemo<EChartsOption>(() => {
+    if (!diurnalData) return {};
+    return {
+      tooltip: { trigger: "axis" },
+      legend: { top: 0, textStyle: { color: colors.text } },
+      grid: { left: 52, right: 20, top: 82, bottom: 32 },
+      xAxis: {
+        type: "category",
+        data: diurnalData.hours,
+        axisLabel: { color: colors.muted },
+        axisLine: { lineStyle: { color: colors.border } },
+      },
+      yAxis: {
+        type: "value",
+        name: "kW",
+        nameGap: 8,
+        nameTextStyle: { color: colors.muted },
+        axisLabel: { color: colors.muted },
+        splitLine: { lineStyle: { color: colors.border } },
+      },
+      series: [
+        {
+          name: "PV",
+          type: "line",
+          symbol: "none",
+          color: colors.pv,
+          areaStyle: { opacity: 0.25 },
+          lineStyle: { width: 2 },
+          data: diurnalData.pvKw,
+        },
+        {
+          name: "Biomass",
+          type: "line",
+          symbol: "none",
+          color: colors.biomass,
+          areaStyle: { opacity: 0.2 },
+          lineStyle: { width: 2 },
+          data: diurnalData.biomassKw,
+        },
+        {
+          name: "Diesel",
+          type: "line",
+          symbol: "none",
+          color: colors.diesel,
+          areaStyle: { opacity: 0.2 },
+          lineStyle: { width: 2 },
+          data: diurnalData.dieselKw,
+        },
+        {
+          name: "BESS Discharge",
+          type: "line",
+          symbol: "none",
+          color: colors.bess,
+          lineStyle: { width: 2 },
+          data: diurnalData.bessDischargeKw,
+        },
+        {
+          name: "BESS Charge",
+          type: "line",
+          symbol: "none",
+          color: colors.bess,
+          lineStyle: { width: 1.75, type: "dotted" },
+          data: diurnalData.bessChargeKw,
+        },
+        {
+          name: "Grid Import",
+          type: "line",
+          symbol: "none",
+          color: colors.grid,
+          lineStyle: { width: 1.75 },
+          data: diurnalData.gridImportKw,
+        },
+        {
+          name: lang === "en" ? "Load" : "Beban",
+          type: "line",
+          symbol: "circle",
+          symbolSize: 4,
+          color: colors.load,
+          lineStyle: { width: 2.5, type: "dashed" },
+          data: diurnalData.loadKw,
+        },
+      ],
+    };
+  }, [diurnalData, colors, lang]);
+
+  // 4f. Grafik Konsumsi Bahan Bakar & Jam Operasi Generator Bulanan
+  const generatorOpsData = useMemo(() => buildMonthlyGeneratorOperations(result), [result]);
+  const generatorOpsOption = useMemo<EChartsOption>(() => {
+    if (!generatorOpsData.hasBiomass && !generatorOpsData.hasDiesel) return {};
+    const fuelAxisName =
+      generatorOpsData.hasBiomass && generatorOpsData.hasDiesel
+        ? lang === "en"
+          ? "Fuel (t / L)"
+          : "Bahan Bakar (t / L)"
+        : generatorOpsData.hasBiomass
+          ? lang === "en"
+            ? "Biomass (tons)"
+            : "Biomassa (ton)"
+          : lang === "en"
+            ? "Diesel (L)"
+            : "Solar (liter)";
+
+    return {
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      legend: { top: 0, textStyle: { color: colors.text } },
+      grid: { left: 56, right: 56, top: 82, bottom: 30 },
+      xAxis: {
+        type: "category",
+        data: monthLabels,
+        axisLabel: { color: colors.muted },
+        axisLine: { lineStyle: { color: colors.border } },
+      },
+      yAxis: [
+        {
+          type: "value",
+          name: fuelAxisName,
+          nameGap: 10,
+          nameTextStyle: { color: colors.muted },
+          axisLabel: { color: colors.muted },
+          splitLine: { lineStyle: { color: colors.border } },
+        },
+        {
+          type: "value",
+          name: lang === "en" ? "Operating Hours" : "Jam Operasi",
+          nameGap: 10,
+          nameTextStyle: { color: colors.muted },
+          axisLabel: { color: colors.muted },
+          splitLine: { show: false },
+        },
+      ],
+      series: [
+        ...(generatorOpsData.hasBiomass
+          ? [
+              {
+                name: lang === "en" ? "Biomass Fuel (tons)" : "Bahan Bakar Biomassa (ton)",
+                type: "bar" as const,
+                yAxisIndex: 0,
+                color: colors.biomass,
+                data: generatorOpsData.biomassFuelTons,
+              },
+            ]
+          : []),
+        ...(generatorOpsData.hasDiesel
+          ? [
+              {
+                name: lang === "en" ? "Diesel Fuel (liters)" : "Bahan Bakar Solar (liter)",
+                type: "bar" as const,
+                yAxisIndex: 0,
+                color: colors.diesel,
+                data: generatorOpsData.dieselFuelLiters,
+              },
+            ]
+          : []),
+        ...(generatorOpsData.hasBiomass
+          ? [
+              {
+                name: lang === "en" ? "Biomass Hours (h)" : "Jam Operasi Biomass (jam)",
+                type: "line" as const,
+                yAxisIndex: 1,
+                color: colors.pv,
+                lineStyle: { width: 2.5 },
+                symbol: "circle",
+                symbolSize: 6,
+                data: generatorOpsData.biomassHours,
+              },
+            ]
+          : []),
+        ...(generatorOpsData.hasDiesel
+          ? [
+              {
+                name: lang === "en" ? "Diesel Hours (h)" : "Jam Operasi Diesel (jam)",
+                type: "line" as const,
+                yAxisIndex: 1,
+                color: colors.bess,
+                lineStyle: { width: 2.5, type: "dashed" },
+                symbol: "diamond",
+                symbolSize: 6,
+                data: generatorOpsData.dieselHours,
+              },
+            ]
+          : []),
+      ],
+    };
+  }, [generatorOpsData, monthLabels, colors, lang]);
   const degradationOption = useMemo<EChartsOption>(() => {
     if (degradationData.years.length === 0) return {};
     const eventLines = degradationData.events.map((ev) => ({
@@ -1039,6 +1232,181 @@ export default function HybridDashboard({
                   </details>
                 </>
               )}
+            </div>
+
+            <div className="sec grid-2">
+              <div className="chart-card">
+                <div className="chart-head">
+                  <div>
+                    <h3>{lang === "en" ? "Average Daily Profile by Month (24 Hours)" : "Profil Harian Rata-rata per Bulan (24 Jam)"}</h3>
+                    <p className="note">
+                      {diurnalMonth === 0
+                        ? lang === "en"
+                          ? "24-hour mean power profile across all 365 days (kW)"
+                          : "Rata-rata daya per jam sepanjang 365 hari Tahun 1 (kW)"
+                        : `${lang === "en" ? "24-hour mean power profile for" : "Rata-rata daya per jam untuk bulan"} ${monthLabels[diurnalMonth - 1]} (kW)`}
+                    </p>
+                  </div>
+                  <div className="actions-inline">
+                    <label htmlFor="diurnal-month-select" className="note" style={{ margin: 0 }}>
+                      {lang === "en" ? "Period:" : "Periode:"}
+                    </label>
+                    <select
+                      id="diurnal-month-select"
+                      value={diurnalMonth}
+                      onChange={(e) => setDiurnalMonth(Number(e.target.value))}
+                      aria-label={lang === "en" ? "Select month for daily average profile" : "Pilih bulan untuk profil harian rata-rata"}
+                      style={{ width: "auto", minWidth: "140px", padding: "0.35rem 0.6rem" }}
+                    >
+                      <option value={0}>{lang === "en" ? "Full Year" : "Setahun Penuh"}</option>
+                      {monthLabels.map((mName, idx) => (
+                        <option key={mName} value={idx + 1}>
+                          {mName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {!hourly || !diurnalData ? (
+                  <div className="state">
+                    <p>
+                      {lang === "en"
+                        ? "Hourly time series is not cached in this browser. Re-run simulation on Step 7 to view the 24-hour diurnal profile."
+                        : "Deret waktu per jam tidak tersimpan di cache browser ini. Jalankan ulang simulasi di Halaman 7 untuk melihat profil harian rata-rata 24 jam."}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <EChart
+                      option={diurnalOption}
+                      height={310}
+                      ariaLabel="Grafik profil harian rata-rata 24 jam untuk beban, PV, Biomass, Diesel, BESS, dan Grid."
+                    />
+                    <details className="more">
+                      <summary>
+                        {lang === "en"
+                          ? "24-hour diurnal profile table (accessible alternative)"
+                          : "Tabel profil harian rata-rata 24 jam (alternatif teks)"}
+                      </summary>
+                      <div className="tw" tabIndex={0} role="region" aria-label="Tabel profil harian rata-rata 24 jam">
+                        <table className="sens-main">
+                          <caption>
+                            Profil daya rata-rata 24 jam ({diurnalMonth === 0 ? "Setahun Penuh" : monthLabels[diurnalMonth - 1]}, kW)
+                          </caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">Jam</th>
+                              <th scope="col">Beban</th>
+                              <th scope="col">PV</th>
+                              <th scope="col">Biomass</th>
+                              <th scope="col">Diesel</th>
+                              <th scope="col">BESS Chg.</th>
+                              <th scope="col">BESS Dis.</th>
+                              <th scope="col">Grid Imp.</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {diurnalData.rows.map((r) => (
+                              <tr key={r.hourLabel}>
+                                <th scope="row" className="tabular-nums">{r.hourLabel}</th>
+                                <td className="tabular-nums">{formatNumber(r.loadKw, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.pvKw, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.biomassKw, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.dieselKw, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.bessChargeKw, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.bessDischargeKw, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.gridImportKw, lang, 2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  </>
+                )}
+              </div>
+
+              <div className="chart-card">
+                <div className="chart-head">
+                  <div>
+                    <h3>
+                      {lang === "en"
+                        ? "Monthly Generator Fuel Consumption & Operating Hours"
+                        : "Konsumsi Bahan Bakar & Jam Operasi Generator Bulanan"}
+                    </h3>
+                    <p className="note">
+                      {lang === "en"
+                        ? "Monthly fuel usage (bars) and operating hours (lines) for Biomass and Diesel generators"
+                        : "Pemakaian bahan bakar bulanan (batang) dan jam operasi aktif (garis) untuk Biomass serta Diesel"}
+                    </p>
+                  </div>
+                  <span className="chip">{lang === "en" ? "Fuel & Hours" : "Bahan Bakar & Jam"}</span>
+                </div>
+                {!generatorOpsData.hasBiomass && !generatorOpsData.hasDiesel ? (
+                  <div className="state">
+                    <p>
+                      {lang === "en"
+                        ? "Biomass and Diesel Generator components are not enabled in this configuration."
+                        : "Komponen Biomass dan Diesel Generator tidak diaktifkan pada konfigurasi ini."}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <EChart
+                      option={generatorOpsOption}
+                      height={310}
+                      ariaLabel="Grafik sumbu ganda konsumsi bahan bakar bulanan dan jam operasi generator Biomass serta Diesel."
+                    />
+                    <details className="more">
+                      <summary>
+                        {lang === "en"
+                          ? "Monthly generator operations table (accessible alternative)"
+                          : "Tabel operasi & bahan bakar generator bulanan (alternatif teks)"}
+                      </summary>
+                      <div className="tw" tabIndex={0} role="region" aria-label="Tabel operasi dan bahan bakar generator bulanan">
+                        <table className="sens-main">
+                          <caption>Rincian jam operasi dan konsumsi bahan bakar generator Tahun 1</caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">Bulan</th>
+                              <th scope="col">Jam Biomass</th>
+                              <th scope="col">Biomassa (ton)</th>
+                              <th scope="col">Prod. Biomass (MWh)</th>
+                              <th scope="col">Jam Diesel</th>
+                              <th scope="col">Solar (liter)</th>
+                              <th scope="col">Prod. Diesel (MWh)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {generatorOpsData.rows.map((r) => (
+                              <tr key={r.month}>
+                                <th scope="row">{monthLabels[r.month - 1] ?? r.month}</th>
+                                <td className="tabular-nums">{formatNumber(r.biomassHours, lang, 1)}</td>
+                                <td className="tabular-nums">{formatNumber(r.biomassFuelTons, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.biomassGenerationMwh, lang, 2)}</td>
+                                <td className="tabular-nums">{formatNumber(r.dieselHours, lang, 1)}</td>
+                                <td className="tabular-nums">{formatNumber(r.dieselFuelLiters, lang, 1)}</td>
+                                <td className="tabular-nums">{formatNumber(r.dieselGenerationMwh, lang, 2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr>
+                              <th scope="row">Total</th>
+                              <td className="tabular-nums">{formatNumber(generatorOpsData.totals.biomassHours, lang, 1)}</td>
+                              <td className="tabular-nums">{formatNumber(generatorOpsData.totals.biomassFuelTons, lang, 2)}</td>
+                              <td className="tabular-nums">{formatNumber(generatorOpsData.totals.biomassGenerationMwh, lang, 2)}</td>
+                              <td className="tabular-nums">{formatNumber(generatorOpsData.totals.dieselHours, lang, 1)}</td>
+                              <td className="tabular-nums">{formatNumber(generatorOpsData.totals.dieselFuelLiters, lang, 1)}</td>
+                              <td className="tabular-nums">{formatNumber(generatorOpsData.totals.dieselGenerationMwh, lang, 2)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </details>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="sec grid-2">
