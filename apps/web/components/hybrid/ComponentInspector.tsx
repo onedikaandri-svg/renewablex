@@ -19,7 +19,7 @@ import type {
   TopologyNode,
   TopologyValidationResult,
 } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 
 export default function ComponentInspector({
   project,
@@ -124,13 +124,13 @@ export default function ComponentInspector({
   }
 
   const titleByKind: Record<TopologyNode["kind"], string> = {
-    pv: "Inspektor Solar PV",
-    bess: "Inspektor BESS (Baterai)",
-    biomass: "Inspektor Pembangkit Biomass",
-    diesel: "Inspektor Diesel Generator",
-    ac_bus: "Inspektor AC Bus & EMS",
-    load: "Inspektor Beban Listrik",
-    grid: "Inspektor Jaringan Listrik (Grid)",
+    pv: tr(lang, "Solar PV Inspector", "Pengaturan Solar PV", "太陽光 (PV) 設定"),
+    bess: tr(lang, "BESS (Battery) Inspector", "Pengaturan BESS (Baterai)", "蓄電池 (BESS) 設定"),
+    biomass: tr(lang, "Biomass Plant Inspector", "Pengaturan Pembangkit Biomass", "バイオマス発電設定"),
+    diesel: tr(lang, "Diesel Generator Inspector", "Pengaturan Diesel Generator", "ディーゼル発電機設定"),
+    ac_bus: tr(lang, "AC Bus & EMS Inspector", "Pengaturan AC Bus & EMS", "ACバス・EMS設定"),
+    load: tr(lang, "Electrical Load Inspector", "Pengaturan Beban Listrik", "電力負荷設定"),
+    grid: tr(lang, "Utility Grid Inspector", "Pengaturan Jaringan Grid", "電力系統設定"),
   };
 
   return (
@@ -139,11 +139,15 @@ export default function ComponentInspector({
         <div>
           <h2 id="h-inspector">{titleByKind[selectedNode.kind]}</h2>
           <p className="note tabular-nums">
-            Posisi kanvas: X {selectedNode.x}, Y {selectedNode.y}
+            {tr(lang, "Canvas position", "Posisi kanvas", "キャンバス座標")}: X {selectedNode.x}, Y {selectedNode.y}
           </p>
         </div>
         <span className={`chip ${isConnected ? "chip-viable" : "chip-marginal"}`}>
-          {isBus ? "Pusat Bus" : isConnected ? "Terhubung" : "Terputus"}
+          {isBus
+            ? tr(lang, "Bus Hub", "Pusat Bus", "中央バス")
+            : isConnected
+              ? tr(lang, "Connected", "Terhubung", "接続済")
+              : tr(lang, "Disconnected", "Terputus", "未接続")}
         </span>
       </div>
 
@@ -152,19 +156,19 @@ export default function ComponentInspector({
         <div className="actions-inline" style={{ marginBottom: "1rem" }}>
           {isConnected ? (
             <button type="button" className="btn btn-sm ghost" onClick={handleDisconnect}>
-              Putuskan Koneksi
+              {tr(lang, "Disconnect", "Putuskan Koneksi", "接続を解除")}
             </button>
           ) : (
             <button type="button" className="btn btn-sm primary" onClick={handleConnect}>
-              Hubungkan ke AC Bus
+              {tr(lang, "Connect to AC Bus", "Hubungkan ke AC Bus", "ACバスに接続")}
             </button>
           )}
 
           {isRequired ? (
-            <span className="chip">Komponen wajib terkunci</span>
+            <span className="chip">{tr(lang, "Required component locked", "Komponen wajib terkunci", "必須コンポーネント")}</span>
           ) : (
             <button type="button" className="btn btn-sm danger-ghost" onClick={handleRemove}>
-              Hapus dari Kanvas
+              {tr(lang, "Remove from Canvas", "Hapus dari Kanvas", "キャンバスから削除")}
             </button>
           )}
         </div>

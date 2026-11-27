@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import HybridShell from "@/components/hybrid/HybridShell";
 import { fetchHybridPresets } from "@/lib/hybrid-api";
 import type { DispatchStrategyId, HybridPresetsResponse } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 const FALLBACK_STRATEGIES: HybridPresetsResponse["dispatch_strategies"] = [
@@ -60,7 +60,13 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
     fetchHybridPresets().then(setPresets).catch(() => {});
   }, []);
 
-  if (!ready) return <div className="state"><p>Memuat proyek&hellip;</p></div>;
+  if (!ready) {
+    return (
+      <div className="state">
+        <p>{tr(lang, "Loading project...", "Lagi memuat proyek...", "プロジェクトを読み込み中...")}</p>
+      </div>
+    );
+  }
   if (!project) return <MissingProjectState />;
 
   const strategies = presets?.dispatch_strategies ?? FALLBACK_STRATEGIES;
@@ -86,13 +92,25 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
     <HybridShell
       project={project}
       activeStep="ems"
-      title={lang === "en" ? "Energy Management System (EMS)" : "Strategi Pengaturan Operasi (EMS)"}
-      subtitle="Pilih salah satu dari 5 strategi dispatch bawaan beserta batas transaksi jaringan listrik dan parameter operasinya."
+      title={tr(
+        lang,
+        "Energy Management System (EMS)",
+        "Strategi Pengaturan Operasi (EMS)",
+        "エネルギーマネジメントシステム (EMS) 運用戦略",
+      )}
+      subtitle={tr(
+        lang,
+        "Choose one of the 5 built-in dispatch strategies along with utility grid transaction rules and operating thresholds.",
+        "Pilih 1 dari 5 strategi dispatch bawaan beserta aturan impor/ekspor jaringan grid dan batas operasinya.",
+        "5種類の標準ディスパッチ戦略から1つを選択し、系統買電・売電の許可や運用しきい値を設定します。",
+      )}
       result={result}
     >
       <div className="grid-hybrid">
         <section aria-labelledby="h-ems-strat">
-          <h2 id="h-ems-strat" style={{ marginTop: 0 }}>Strategi Dispatch Bawaan</h2>
+          <h2 id="h-ems-strat" style={{ marginTop: 0 }}>
+            {tr(lang, "Built-in Dispatch Strategies", "Pilihan Strategi Dispatch", "標準ディスパッチ戦略")}
+          </h2>
           <div style={{ display: "grid", gap: "0.75rem" }}>
             {strategies.map((s) => (
               <button
@@ -103,10 +121,10 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                 onClick={() => selectStrategy(s.id)}
               >
                 <div className="actions-inline" style={{ justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                  <strong style={{ color: "var(--navytext)" }}>{lang === "en" ? s.name_en : s.name_id}</strong>
+                  <strong style={{ color: "var(--navytext)" }}>{lang === "id" ? s.name_id : s.name_en}</strong>
                   <span className="chip">{s.id}</span>
                 </div>
-                <p className="note">{lang === "en" ? s.description_en : s.description_id}</p>
+                <p className="note">{lang === "id" ? s.description_id : s.description_en}</p>
               </button>
             ))}
           </div>
@@ -114,7 +132,9 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
 
         <section className="card" aria-labelledby="h-ems-params">
           <div className="card-header">
-            <h2 id="h-ems-params">Parameter Operasi &amp; Grid</h2>
+            <h2 id="h-ems-params">
+              {tr(lang, "Operating & Grid Parameters", "Parameter Operasi & Grid", "運用および系統連系パラメータ")}
+            </h2>
           </div>
 
           <label className="check-row">

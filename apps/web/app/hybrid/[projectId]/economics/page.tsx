@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import HybridShell from "@/components/hybrid/HybridShell";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
 export default function HybridEconomicsPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -10,7 +10,13 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
   const { project, result, ready, updateProject } = useHybridProject(projectId);
   const { lang } = usePreferences();
 
-  if (!ready) return <div className="state"><p>Memuat proyek&hellip;</p></div>;
+  if (!ready) {
+    return (
+      <div className="state">
+        <p>{tr(lang, "Loading project...", "Lagi memuat proyek...", "プロジェクトを読み込み中...")}</p>
+      </div>
+    );
+  }
   if (!project) return <MissingProjectState />;
 
   const fin = project.finance;
@@ -24,19 +30,38 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
     <HybridShell
       project={project}
       activeStep="economics"
-      title={lang === "en" ? "Economics, Costs & Tariffs" : "Ekonomi, Biaya Investasi, dan Tarif"}
-      subtitle="Seluruh metrik keuangan (NPV, IRR, LCOE, Payback, nilai sisa, dan emisi) dihitung oleh mesin backend dengan presisi penuh."
+      title={tr(
+        lang,
+        "Economics, Costs & Tariffs",
+        "Ekonomi, Biaya Investasi & Tarif Listrik",
+        "経済性・設備投資コスト・電力料金",
+      )}
+      subtitle={tr(
+        lang,
+        "All financial metrics (NPV, IRR, LCOE, Payback, salvage value, and emissions) are computed directly by the backend engine.",
+        "Semua metrik keuangan (NPV, IRR, LCOE, Payback, nilai sisa, dan emisi) dihitung langsung dengan presisi penuh di mesin backend.",
+        "すべての財務指標（NPV、IRR、LCOE、回収期間、残存価値、CO2排出量）はバックエンド計算エンジンで厳密に算出されます。",
+      )}
       result={result}
     >
       <div className="grid-2">
         <section className="card" aria-labelledby="h-econ-1">
           <div className="card-header">
-            <h2 id="h-econ-1">Asumsi Proyek, Diskonto &amp; Tarif</h2>
+            <h2 id="h-econ-1">
+              {tr(
+                lang,
+                "Project Assumptions, Discount Rate & Tariffs",
+                "Asumsi Proyek, Diskonto & Tarif",
+                "事業前提・割引率・電力単価",
+              )}
+            </h2>
           </div>
 
           <div className="grid-2">
             <div className="fld">
-              <label htmlFor="econ-curr">Mata Uang Proyek</label>
+              <label htmlFor="econ-curr">
+                {tr(lang, "Project Currency", "Mata Uang Proyek", "プロジェクト通貨")}
+              </label>
               <select
                 id="econ-curr"
                 value={project.project.currency_code}

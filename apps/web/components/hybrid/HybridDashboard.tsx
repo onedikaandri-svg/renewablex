@@ -14,7 +14,7 @@ import {
   buildSankeyEnergyData,
 } from "@/lib/hybrid-charts";
 import type { HybridProjectConfig, HybridSimulateResponse } from "@/lib/hybrid-types";
-import { usePreferences } from "@/lib/preferences";
+import { tr, usePreferences } from "@/lib/preferences";
 
 type DashboardTab = "overview" | "dispatch" | "heatmap" | "finance";
 type HeatmapMetric = "load" | "pv" | "soc" | "unmet";
@@ -22,6 +22,7 @@ type HeatmapMetric = "load" | "pv" | "soc" | "unmet";
 const DASHBOARD_TABS: DashboardTab[] = ["overview", "dispatch", "heatmap", "finance"];
 const MONTH_NAMES_ID = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 const MONTH_NAMES_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_NAMES_JA = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
 
 export default function HybridDashboard({
   config,
@@ -59,7 +60,7 @@ export default function HybridDashboard({
   const fin = result.finance_summary;
   const em = result.emissions_summary;
   const curr = fin?.currency_code ?? config.project.currency_code;
-  const monthLabels = lang === "en" ? MONTH_NAMES_EN : MONTH_NAMES_ID;
+  const monthLabels = tr(lang, MONTH_NAMES_EN, MONTH_NAMES_ID, MONTH_NAMES_JA);
 
   const displayWarnings = useMemo(() => {
     if (result.warning_codes && result.warning_codes.length > 0) {
@@ -982,7 +983,7 @@ export default function HybridDashboard({
     <>
       {displayWarnings.length > 0 && (
         <div className="warn" role="note">
-          <h3>{lang === "en" ? "Simulation Notes" : "Catatan Simulasi"}</h3>
+          <h3>{tr(lang, "Simulation Notes", "Catatan Simulasi", "シミュレーション注記")}</h3>
           <ul>{displayWarnings.map((w, idx) => <li key={idx}>{w}</li>)}</ul>
         </div>
       )}
@@ -990,17 +991,17 @@ export default function HybridDashboard({
       {/* Strip KPI Utama */}
       <div className="kpis">
         <div className="kpi">
-          <span>NPV ({fin ? `${fin.project_lifetime_years} thn` : "-"})</span>
+          <span>NPV ({fin ? `${fin.project_lifetime_years} ${tr(lang, "yrs", "thn", "年")}` : "-"})</span>
           <b className={fin && fin.npv >= 0 ? "pos" : "neg"}>
-            {fin ? formatCompactCurrency(fin.npv, curr, lang) : "Belum dihitung"}
+            {fin ? formatCompactCurrency(fin.npv, curr, lang) : tr(lang, "Not calculated", "Belum dihitung", "未計算")}
           </b>
           <span>{fin ? `WACC ${formatPercent(fin.discount_rate, lang, 1)}` : ""}</span>
         </div>
 
         <div className="kpi">
-          <span>{lang === "en" ? "Project IRR" : "IRR Proyek"}</span>
+          <span>{tr(lang, "Project IRR", "IRR Proyek", "プロジェクトIRR")}</span>
           <b className="accent">
-            {fin && fin.irr !== null ? formatPercent(fin.irr, lang, 2) : (lang === "en" ? "N/A" : "Tidak tersedia")}
+            {fin && fin.irr !== null ? formatPercent(fin.irr, lang, 2) : tr(lang, "N/A", "Tidak tersedia", "該当なし")}
           </b>
           <span>{fin ? fin.irr_status : ""}</span>
         </div>
@@ -1012,29 +1013,31 @@ export default function HybridDashboard({
         </div>
 
         <div className="kpi">
-          <span>{lang === "en" ? "Simple / Disc. Payback" : "Payback Sederhana / Terdiskonto"}</span>
+          <span>{tr(lang, "Simple / Disc. Payback", "Balik Modal (Payback)", "投資回収期間（単純／割引）")}</span>
           <b>
-            {fin && fin.simple_payback_years !== null ? `${formatNumber(fin.simple_payback_years, lang, 1)} thn` : "Belum kembali"}
+            {fin && fin.simple_payback_years !== null
+              ? `${formatNumber(fin.simple_payback_years, lang, 1)} ${tr(lang, "yrs", "thn", "年")}`
+              : tr(lang, "Not recovered", "Belum balik modal", "期間内未回収")}
           </b>
           <span>
             {fin && fin.discounted_payback_years !== null
-              ? `Terdiskonto: ${formatNumber(fin.discounted_payback_years, lang, 1)} thn`
-              : "Terdiskonto: belum kembali"}
+              ? `${tr(lang, "Discounted", "Terdiskonto", "割引後")}: ${formatNumber(fin.discounted_payback_years, lang, 1)} ${tr(lang, "yrs", "thn", "年")}`
+              : `${tr(lang, "Discounted: not recovered", "Terdiskonto: belum balik", "割引後: 未回収")}`}
           </span>
         </div>
 
         <div className="kpi">
-          <span>{lang === "en" ? "Renewable Fraction" : "Pangsa Terbarukan"}</span>
+          <span>{tr(lang, "Renewable Share", "Porsi Energi Terbarukan", "再エネ比率")}</span>
           <b className="pos">{formatPercent(result.summary.renewable_fraction, lang, 1)}</b>
           <span>
-            Unmet: {formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} MWh/thn
+            Unmet: {formatNumber(result.summary.unmet_load_kwh / 1000, lang, 1)} {tr(lang, "MWh/yr", "MWh/thn", "MWh/年")}
           </span>
         </div>
 
         <div className="kpi">
-          <span>{lang === "en" ? "Avoided Emissions" : "Emisi Dihindari"}</span>
+          <span>{tr(lang, "Avoided Emissions", "Emisi CO2e Dihindari", "CO2削減量")}</span>
           <b className="pos">
-            {em ? `${formatNumber(em.avoided_emissions_tons_co2e, lang, 0)} ton CO2e` : "-"}
+            {em ? `${formatNumber(em.avoided_emissions_tons_co2e, lang, 0)} ${tr(lang, "tCO2e", "ton CO2e", "t-CO2e")}` : "-"}
           </b>
           <span>{em ? `Baseline grid ${em.grid_emission_factor_kg_co2e_per_kwh} kg/kWh` : ""}</span>
         </div>
@@ -1042,7 +1045,7 @@ export default function HybridDashboard({
 
       {/* Tab Navigasi Hasil */}
       <div className="sec">
-        <div className="tabs" role="tablist" aria-label={lang === "en" ? "Dashboard sections" : "Bagian dasbor hasil"}>
+        <div className="tabs" role="tablist" aria-label={tr(lang, "Dashboard sections", "Bagian dasbor hasil", "ダッシュボード表示切替")}>
           <button
             ref={(el) => { tabRefs.current.overview = el; }}
             type="button"
@@ -1056,7 +1059,7 @@ export default function HybridDashboard({
             onKeyDown={(e) => handleTabKeyDown(e, "overview")}
           >
             <IconBarChart size={15} />
-            {lang === "en" ? "Overview & Monthly" : "Ringkasan & Bulanan"}
+            {tr(lang, "Overview & Monthly", "Ringkasan & Bulanan", "概要・月別エネルギー")}
           </button>
           <button
             ref={(el) => { tabRefs.current.dispatch = el; }}
@@ -1071,7 +1074,7 @@ export default function HybridDashboard({
             onKeyDown={(e) => handleTabKeyDown(e, "dispatch")}
           >
             <IconActivity size={15} />
-            {lang === "en" ? "Dispatch & SOC" : "Dispatch & SOC"}
+            {tr(lang, "Dispatch & SOC", "Dispatch & SOC Baterai", "時間別運用・SOC")}
           </button>
           <button
             ref={(el) => { tabRefs.current.heatmap = el; }}
@@ -1086,7 +1089,7 @@ export default function HybridDashboard({
             onKeyDown={(e) => handleTabKeyDown(e, "heatmap")}
           >
             <IconGrid size={15} />
-            {lang === "en" ? "8760h Heatmaps" : "Peta Panas 8.760 Jam"}
+            {tr(lang, "8,760h Heatmaps", "Heatmap 8.760 Jam", "8,760時間ヒートマップ")}
           </button>
           <button
             ref={(el) => { tabRefs.current.finance = el; }}
@@ -1101,7 +1104,7 @@ export default function HybridDashboard({
             onKeyDown={(e) => handleTabKeyDown(e, "finance")}
           >
             <IconWallet size={15} />
-            {lang === "en" ? "Finance & Cash Flow" : "Keuangan & Arus Kas"}
+            {tr(lang, "Finance & Cash Flow", "Keuangan & Arus Kas", "財務・キャッシュフロー")}
           </button>
         </div>
 
