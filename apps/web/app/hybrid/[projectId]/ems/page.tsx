@@ -189,46 +189,199 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
           )}
 
           {activeStrategy === "time_of_use_arbitrage" && (
-            <div className="grid-2">
-              <div className="fld">
-                <label htmlFor="ems-tou-chg">Target Charge Luar Puncak (%)</label>
-                <input
-                  id="ems-tou-chg"
-                  type="number"
-                  min={20}
-                  max={100}
-                  value={Math.round(dp.tou_charge_soc_target * 100)}
-                  onChange={(e) => {
-                    const v = Number(e.target.value) / 100;
-                    if (Number.isFinite(v)) {
+            <>
+              <div className="grid-2">
+                <div className="fld">
+                  <label htmlFor="ems-tou-chg">Target Charge Luar Puncak (%)</label>
+                  <input
+                    id="ems-tou-chg"
+                    type="number"
+                    min={20}
+                    max={100}
+                    value={Math.round(dp.tou_charge_soc_target * 100)}
+                    onChange={(e) => {
+                      const v = Number(e.target.value) / 100;
+                      if (Number.isFinite(v)) {
+                        updateProject((p) => ({
+                          ...p,
+                          simulation: { ...p.simulation, dispatch_params: { ...p.simulation.dispatch_params, tou_charge_soc_target: v } },
+                        }));
+                      }
+                    }}
+                  />
+                </div>
+                <div className="fld">
+                  <label htmlFor="ems-tou-dis">Batas Bawah Discharge Puncak (%)</label>
+                  <input
+                    id="ems-tou-dis"
+                    type="number"
+                    min={5}
+                    max={90}
+                    value={Math.round(dp.tou_discharge_soc_floor * 100)}
+                    onChange={(e) => {
+                      const v = Number(e.target.value) / 100;
+                      if (Number.isFinite(v)) {
+                        updateProject((p) => ({
+                          ...p,
+                          simulation: { ...p.simulation, dispatch_params: { ...p.simulation.dispatch_params, tou_discharge_soc_floor: v } },
+                        }));
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              <fieldset style={{ marginTop: "1rem" }}>
+                <legend>Jadwal Jam Tarif Puncak (Peak Hours, 00:00 sampai 23:00)</legend>
+                <p className="note" style={{ marginTop: "0.25rem" }}>
+                  Klik tombol jam untuk mengaktifkan atau menonaktifkan jam tarif puncak (discharge baterai diprioritaskan). Jam tidak boleh tumpang tindih dengan jam luar puncak.
+                </p>
+                <div
+                  role="group"
+                  aria-label="Pemilih jam tarif puncak"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(3.25rem, 1fr))",
+                    gap: "0.375rem",
+                    marginTop: "0.5rem",
+                  }}
+                >
+                  {Array.from({ length: 24 }, (_, hr) => {
+                    const isPeak = dp.peak_hours.includes(hr);
+                    const isOffPeak = dp.off_peak_hours.includes(hr);
+                    return (
+                      <button
+                        key={`peak-hr-${hr}`}
+                        type="button"
+                        className="seg-btn tabular-nums"
+                        aria-pressed={isPeak}
+                        style={{
+                          border: "1px solid var(--border)",
+                          opacity: isOffPeak && !isPeak ? 0.55 : 1,
+                        }}
+                        title={
+                          isOffPeak && !isPeak
+                            ? `Jam ${String(hr).padStart(2, "0")}:00 saat ini terdaftar sebagai Jam Luar Puncak (klik untuk memindahkan ke Jam Puncak)`
+                            : `Toggle jam puncak ${String(hr).padStart(2, "0")}:00`
+                        }
+                        onClick={() => {
+                          updateProject((p) => {
+                            const curPeak = p.simulation.dispatch_params.peak_hours;
+                            const curOff = p.simulation.dispatch_params.off_peak_hours;
+                            const nextPeak = curPeak.includes(hr)
+                              ? curPeak.filter((h) => h !== hr)
+                              : [...curPeak, hr].sort((a, b) => a - b);
+                            const nextOff = curPeak.includes(hr) ? curOff : curOff.filter((h) => h !== hr);
+                            return {
+                              ...p,
+                              simulation: {
+                                ...p.simulation,
+                                dispatch_params: {
+                                  ...p.simulation.dispatch_params,
+                                  peak_hours: nextPeak,
+                                  off_peak_hours: nextOff,
+                                },
+                              },
+                            };
+                          });
+                        }}
+                      >
+                        {String(hr).padStart(2, "0")}:00
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="note tabular-nums" style={{ marginTop: "0.375rem" }}>
+                  Jam Puncak aktif: <strong>{dp.peak_hours.length > 0 ? dp.peak_hours.join(", ") : "Tidak ada"}</strong>
+                </p>
+              </fieldset>
+
+              <fieldset style={{ marginTop: "1rem" }}>
+                <legend>Jadwal Jam Luar Puncak (Off-Peak Hours, 00:00 sampai 23:00)</legend>
+                <p className="note" style={{ marginTop: "0.25rem" }}>
+                  Klik tombol jam untuk memilih jadwal pengisian baterai saat tarif murah luar puncak.
+                </p>
+                <div
+                  role="group"
+                  aria-label="Pemilih jam luar puncak"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(3.25rem, 1fr))",
+                    gap: "0.375rem",
+                    marginTop: "0.5rem",
+                  }}
+                >
+                  {Array.from({ length: 24 }, (_, hr) => {
+                    const isOffPeak = dp.off_peak_hours.includes(hr);
+                    const isPeak = dp.peak_hours.includes(hr);
+                    return (
+                      <button
+                        key={`offpeak-hr-${hr}`}
+                        type="button"
+                        className="seg-btn tabular-nums"
+                        aria-pressed={isOffPeak}
+                        style={{
+                          border: "1px solid var(--border)",
+                          opacity: isPeak && !isOffPeak ? 0.55 : 1,
+                        }}
+                        title={
+                          isPeak && !isOffPeak
+                            ? `Jam ${String(hr).padStart(2, "0")}:00 saat ini terdaftar sebagai Jam Puncak (klik untuk memindahkan ke Jam Luar Puncak)`
+                            : `Toggle jam luar puncak ${String(hr).padStart(2, "0")}:00`
+                        }
+                        onClick={() => {
+                          updateProject((p) => {
+                            const curOff = p.simulation.dispatch_params.off_peak_hours;
+                            const curPeak = p.simulation.dispatch_params.peak_hours;
+                            const nextOff = curOff.includes(hr)
+                              ? curOff.filter((h) => h !== hr)
+                              : [...curOff, hr].sort((a, b) => a - b);
+                            const nextPeak = curOff.includes(hr) ? curPeak : curPeak.filter((h) => h !== hr);
+                            return {
+                              ...p,
+                              simulation: {
+                                ...p.simulation,
+                                dispatch_params: {
+                                  ...p.simulation.dispatch_params,
+                                  off_peak_hours: nextOff,
+                                  peak_hours: nextPeak,
+                                },
+                              },
+                            };
+                          });
+                        }}
+                      >
+                        {String(hr).padStart(2, "0")}:00
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="actions-inline" style={{ justifyContent: "space-between", marginTop: "0.375rem" }}>
+                  <p className="note tabular-nums">
+                    Jam Luar Puncak aktif: <strong>{dp.off_peak_hours.length > 0 ? dp.off_peak_hours.join(", ") : "Tidak ada"}</strong>
+                  </p>
+                  <button
+                    type="button"
+                    className="btn ghost btn-sm"
+                    onClick={() =>
                       updateProject((p) => ({
                         ...p,
-                        simulation: { ...p.simulation, dispatch_params: { ...p.simulation.dispatch_params, tou_charge_soc_target: v } },
-                      }));
+                        simulation: {
+                          ...p.simulation,
+                          dispatch_params: {
+                            ...p.simulation.dispatch_params,
+                            peak_hours: [17, 18, 19, 20, 21],
+                            off_peak_hours: [0, 1, 2, 3, 4, 5],
+                          },
+                        },
+                      }))
                     }
-                  }}
-                />
-              </div>
-              <div className="fld">
-                <label htmlFor="ems-tou-dis">Batas Bawah Discharge Puncak (%)</label>
-                <input
-                  id="ems-tou-dis"
-                  type="number"
-                  min={5}
-                  max={90}
-                  value={Math.round(dp.tou_discharge_soc_floor * 100)}
-                  onChange={(e) => {
-                    const v = Number(e.target.value) / 100;
-                    if (Number.isFinite(v)) {
-                      updateProject((p) => ({
-                        ...p,
-                        simulation: { ...p.simulation, dispatch_params: { ...p.simulation.dispatch_params, tou_discharge_soc_floor: v } },
-                      }));
-                    }
-                  }}
-                />
-              </div>
-            </div>
+                  >
+                    Reset Jam Default
+                  </button>
+                </div>
+              </fieldset>
+            </>
           )}
 
           <div className="warn sec" role="note" style={{ marginBottom: 0 }}>

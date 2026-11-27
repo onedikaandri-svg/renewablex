@@ -57,6 +57,7 @@ export async function previewHybridWeather(
   cfg: HybridProjectConfig,
   signal?: AbortSignal,
 ): Promise<HybridWeatherPreviewResponse> {
+  const isCustom = cfg.simulation.weather_source === "custom_json";
   return postJson<HybridWeatherPreviewResponse>(
     "/v1/hybrid/weather/preview",
     {
@@ -65,6 +66,7 @@ export async function previewHybridWeather(
       timezone: cfg.project.timezone,
       weather_source: cfg.simulation.weather_source,
       step_minutes: cfg.simulation.step_minutes,
+      ...(isCustom && cfg.simulation.weather_data ? { weather_data: cfg.simulation.weather_data } : {}),
     },
     signal,
   );
@@ -89,6 +91,12 @@ export async function previewHybridLoad(
               peak_load_kw: lp.peak_load_kw,
               seed: lp.seed,
               noise_fraction: lp.noise_fraction,
+              ...(Array.isArray(lp.daily_profile) && lp.daily_profile.length === 24
+                ? { daily_profile: lp.daily_profile }
+                : {}),
+              ...(Array.isArray(lp.monthly_factors) && lp.monthly_factors.length === 12
+                ? { monthly_factors: lp.monthly_factors }
+                : {}),
             },
     },
     signal,
@@ -98,6 +106,7 @@ export async function previewHybridLoad(
 export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<string, unknown> {
   const { pv, bess, biomass, diesel } = cfg.components;
   const lp = cfg.load_profile;
+  const isCustomWeather = cfg.simulation.weather_source === "custom_json";
 
   const bioPayload: Record<string, unknown> = biomass.enabled
     ? {
@@ -155,6 +164,7 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
       step_minutes: cfg.simulation.step_minutes,
       leap_day_policy: cfg.simulation.leap_day_policy,
       weather_source: cfg.simulation.weather_source,
+      ...(isCustomWeather && cfg.simulation.weather_data ? { weather_data: cfg.simulation.weather_data } : {}),
       dispatch_strategy: cfg.simulation.dispatch_strategy,
       dispatch_params: {
         allow_grid_import: cfg.simulation.dispatch_params.allow_grid_import,
@@ -178,6 +188,12 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
             peak_load_kw: lp.peak_load_kw,
             seed: lp.seed,
             noise_fraction: lp.noise_fraction,
+            ...(Array.isArray(lp.daily_profile) && lp.daily_profile.length === 24
+              ? { daily_profile: lp.daily_profile }
+              : {}),
+            ...(Array.isArray(lp.monthly_factors) && lp.monthly_factors.length === 12
+              ? { monthly_factors: lp.monthly_factors }
+              : {}),
           },
     components: {
       pv: {
@@ -186,14 +202,36 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
         capacity_kwp: pv.capacity_kwp,
         inverter_ac_kw: pv.inverter_ac_kw,
         transposition_model: pv.transposition_model,
+        albedo: pv.albedo ?? 0.2,
         tracking_mode: pv.tracking_mode,
         tilt_degrees: pv.tilt_degrees,
         azimuth_degrees: pv.azimuth_degrees,
+        iam_b0: pv.iam_b0 ?? 0.05,
+        ...(Array.isArray(pv.soiling_monthly) && pv.soiling_monthly.length === 12
+          ? { soiling_monthly: pv.soiling_monthly }
+          : {}),
         cell_temp_model: pv.cell_temp_model,
+        noct_c: pv.noct_c ?? 45.0,
+        faiman_u0: pv.faiman_u0 ?? 25.0,
+        faiman_u1: pv.faiman_u1 ?? 6.84,
         dc_model: pv.dc_model,
+        temp_coeff_per_c: pv.temp_coeff_per_c ?? -0.004,
+        i_sc: pv.i_sc ?? 13.8,
+        v_oc: pv.v_oc ?? 49.5,
+        i_mp: pv.i_mp ?? 13.0,
+        v_mp: pv.v_mp ?? 41.5,
+        alpha_sc: pv.alpha_sc ?? 0.0069,
+        beta_voc: pv.beta_voc ?? -0.1386,
+        cells_in_series: pv.cells_in_series ?? 72,
         system_loss_fraction: pv.system_loss_fraction,
+        mismatch_fraction: pv.mismatch_fraction ?? 0.02,
+        dc_wiring_fraction: pv.dc_wiring_fraction ?? 0.02,
+        shading_fraction: pv.shading_fraction ?? 0.0,
+        availability_fraction: pv.availability_fraction ?? 0.01,
+        lid_fraction: pv.lid_fraction ?? 0.015,
         annual_degradation_fraction: pv.annual_degradation_fraction,
         inverter_efficiency: pv.inverter_efficiency,
+        night_tare_kw: pv.night_tare_kw ?? 0.0,
       },
       bess: bess.enabled
         ? {
@@ -207,6 +245,7 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
             charge_efficiency: bess.charge_efficiency,
             discharge_efficiency: bess.discharge_efficiency,
             pcs_loss_fraction: bess.pcs_loss_fraction,
+            aux_load_kw: bess.aux_load_kw ?? 0.0,
             calendar_fade_per_year: bess.calendar_fade_per_year,
             cycle_fade_per_efc: bess.cycle_fade_per_efc,
             eol_capacity_fraction: bess.eol_capacity_fraction,

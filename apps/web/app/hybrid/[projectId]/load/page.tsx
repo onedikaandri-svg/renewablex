@@ -11,6 +11,60 @@ import { previewHybridLoad } from "@/lib/hybrid-api";
 import { usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
+type LoadShapePresetId = "engine_default" | "industrial_24h" | "commercial_day" | "residential_evening" | "custom";
+
+const ENGINE_DEFAULT_DAILY_24: number[] = [
+  0.10, 0.08, 0.06, 0.06, 0.08, 0.15,
+  0.35, 0.58, 0.78, 0.90, 0.96, 1.00,
+  0.95, 0.97, 0.94, 0.88, 0.76, 0.65,
+  0.58, 0.50, 0.42, 0.30, 0.20, 0.14,
+];
+
+const INDUSTRIAL_24H_DAILY_24: number[] = [
+  0.88, 0.86, 0.85, 0.85, 0.87, 0.90,
+  0.94, 0.98, 1.00, 1.00, 0.99, 0.96,
+  0.95, 0.99, 1.00, 0.99, 0.97, 0.95,
+  0.94, 0.93, 0.92, 0.91, 0.90, 0.89,
+];
+
+const COMMERCIAL_DAY_DAILY_24: number[] = [
+  0.08, 0.07, 0.07, 0.07, 0.08, 0.12,
+  0.28, 0.62, 0.88, 0.96, 1.00, 0.98,
+  0.92, 0.97, 1.00, 0.95, 0.82, 0.52,
+  0.30, 0.20, 0.15, 0.12, 0.10, 0.09,
+];
+
+const RESIDENTIAL_EVENING_DAILY_24: number[] = [
+  0.22, 0.18, 0.16, 0.15, 0.18, 0.32,
+  0.48, 0.42, 0.30, 0.26, 0.25, 0.27,
+  0.30, 0.32, 0.34, 0.38, 0.50, 0.74,
+  0.94, 1.00, 0.96, 0.82, 0.56, 0.34,
+];
+
+const DEFAULT_MONTHLY_12: number[] = [
+  1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+  1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+];
+
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+function arraysEqual(a: number[] | null | undefined, b: number[]): boolean {
+  if (!Array.isArray(a) || a.length !== b.length) return false;
+  return a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
+}
+
+function detectLoadShapePreset(
+  daily: number[] | null | undefined,
+  monthly: number[] | null | undefined,
+): LoadShapePresetId {
+  const isDefaultMonthly = !monthly || arraysEqual(monthly, DEFAULT_MONTHLY_12);
+  if (!daily && !monthly) return "engine_default";
+  if (isDefaultMonthly && arraysEqual(daily, INDUSTRIAL_24H_DAILY_24)) return "industrial_24h";
+  if (isDefaultMonthly && arraysEqual(daily, COMMERCIAL_DAY_DAILY_24)) return "commercial_day";
+  if (isDefaultMonthly && arraysEqual(daily, RESIDENTIAL_EVENING_DAILY_24)) return "residential_evening";
+  return "custom";
+}
+
 export default function HybridLoadPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = use(params);
   const { project, result, ready, updateProject } = useHybridProject(projectId);
@@ -97,6 +151,125 @@ export default function HybridLoadPage({ params }: { params: Promise<{ projectId
   if (!project) return <MissingProjectState />;
 
   const lp = project.load_profile;
+  const activePresetId = detectLoadShapePreset(lp.daily_profile, lp.monthly_factors);
+  const editableDaily =
+    Array.isArray(lp.daily_profile) && lp.daily_profile.length === 24
+      ? lp.daily_profile
+      : ENGINE_DEFAULT_DAILY_24;
+  const editableMonthly =
+    Array.isArray(lp.monthly_factors) && lp.monthly_factors.length === 12
+      ? lp.monthly_factors
+      : DEFAULT_MONTHLY_12;
+
+  function handleSelectShapePreset(preset: LoadShapePresetId) {
+    if (preset === "engine_default") {
+      updateProject((p) => ({
+        ...p,
+        load_profile: { ...p.load_profile, daily_profile: null, monthly_factors: null },
+        loadPreview: null,
+      }));
+      return;
+    }
+    if (preset === "industrial_24h") {
+      updateProject((p) => ({
+        ...p,
+        load_profile: {
+          ...p.load_profile,
+          daily_profile: [...INDUSTRIAL_24H_DAILY_24],
+          monthly_factors: [...DEFAULT_MONTHLY_12],
+        },
+        loadPreview: null,
+      }));
+      return;
+    }
+    if (preset === "commercial_day") {
+      updateProject((p) => ({
+        ...p,
+        load_profile: {
+          ...p.load_profile,
+          daily_profile: [...COMMERCIAL_DAY_DAILY_24],
+          monthly_factors: [...DEFAULT_MONTHLY_12],
+        },
+        loadPreview: null,
+      }));
+      return;
+    }
+    if (preset === "residential_evening") {
+      updateProject((p) => ({
+        ...p,
+        load_profile: {
+          ...p.load_profile,
+          daily_profile: [...RESIDENTIAL_EVENING_DAILY_24],
+          monthly_factors: [...DEFAULT_MONTHLY_12],
+        },
+        loadPreview: null,
+      }));
+      return;
+    }
+    updateProject((p) => ({
+      ...p,
+      load_profile: {
+        ...p.load_profile,
+        daily_profile:
+          Array.isArray(p.load_profile.daily_profile) && p.load_profile.daily_profile.length === 24
+            ? [...p.load_profile.daily_profile]
+            : [...ENGINE_DEFAULT_DAILY_24],
+        monthly_factors:
+          Array.isArray(p.load_profile.monthly_factors) && p.load_profile.monthly_factors.length === 12
+            ? [...p.load_profile.monthly_factors]
+            : [...DEFAULT_MONTHLY_12],
+      },
+      loadPreview: null,
+    }));
+  }
+
+  function handleUpdateHourlyWeight(hourIdx: number, val: number) {
+    const clamped = Math.max(0, val);
+    updateProject((p) => {
+      const nextDaily =
+        Array.isArray(p.load_profile.daily_profile) && p.load_profile.daily_profile.length === 24
+          ? [...p.load_profile.daily_profile]
+          : [...ENGINE_DEFAULT_DAILY_24];
+      nextDaily[hourIdx] = clamped;
+      const nextMonthly =
+        Array.isArray(p.load_profile.monthly_factors) && p.load_profile.monthly_factors.length === 12
+          ? [...p.load_profile.monthly_factors]
+          : [...DEFAULT_MONTHLY_12];
+      return {
+        ...p,
+        load_profile: {
+          ...p.load_profile,
+          daily_profile: nextDaily,
+          monthly_factors: nextMonthly,
+        },
+        loadPreview: null,
+      };
+    });
+  }
+
+  function handleUpdateMonthlyFactor(monthIdx: number, val: number) {
+    const clamped = Math.max(0, val);
+    updateProject((p) => {
+      const nextDaily =
+        Array.isArray(p.load_profile.daily_profile) && p.load_profile.daily_profile.length === 24
+          ? [...p.load_profile.daily_profile]
+          : [...ENGINE_DEFAULT_DAILY_24];
+      const nextMonthly =
+        Array.isArray(p.load_profile.monthly_factors) && p.load_profile.monthly_factors.length === 12
+          ? [...p.load_profile.monthly_factors]
+          : [...DEFAULT_MONTHLY_12];
+      nextMonthly[monthIdx] = clamped;
+      return {
+        ...p,
+        load_profile: {
+          ...p.load_profile,
+          daily_profile: nextDaily,
+          monthly_factors: nextMonthly,
+        },
+        loadPreview: null,
+      };
+    });
+  }
 
   async function handlePreview() {
     if (!project) return;
@@ -213,6 +386,95 @@ export default function HybridLoadPage({ params }: { params: Promise<{ projectId
                   />
                 </div>
               </div>
+
+              <div className="fld">
+                <label htmlFor="load-shape-preset">Preset Pola Harian [REAL DATA]</label>
+                <select
+                  id="load-shape-preset"
+                  value={activePresetId}
+                  onChange={(e) => handleSelectShapePreset(e.target.value as LoadShapePresetId)}
+                >
+                  <option value="engine_default">Bawaan Mesin (Standar Industri)</option>
+                  <option value="industrial_24h">Industri 24 Jam / 3 Shift [REAL DATA]</option>
+                  <option value="commercial_day">Komersial &amp; Perkantoran Siang (08:00 - 17:00) [REAL DATA]</option>
+                  <option value="residential_evening">Perumahan / Puncak Malam (18:00 - 22:00) [REAL DATA]</option>
+                  <option value="custom">Kustom (Edit 24 Jam &amp; 12 Bulan)</option>
+                </select>
+              </div>
+
+              <details className="more">
+                <summary>Editor Pola Harian (24 Jam) &amp; Faktor Musiman (12 Bulan)</summary>
+                <p className="note" style={{ marginTop: "0.375rem" }}>
+                  Bobot jam (0,00 sampai 1,00+) menentukan interpolasi antara beban dasar dan beban puncak. Faktor bulanan mengalikan profil beban pada masing-masing bulan.
+                </p>
+
+                <fieldset style={{ marginTop: "0.75rem" }}>
+                  <legend>Bobot Harian 24 Jam (00:00 sampai 23:00)</legend>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(5.25rem, 1fr))",
+                      gap: "0.5rem",
+                      marginTop: "0.5rem",
+                    }}
+                  >
+                    {editableDaily.map((w, idx) => {
+                      const hourLabel = `${String(idx).padStart(2, "0")}:00`;
+                      return (
+                        <div key={`hr-${idx}`} className="fld" style={{ marginTop: 0 }}>
+                          <label htmlFor={`load-hr-${idx}`} className="tabular-nums" style={{ fontSize: "0.75rem" }}>
+                            {hourLabel}
+                          </label>
+                          <input
+                            id={`load-hr-${idx}`}
+                            type="number"
+                            step="0.05"
+                            min={0}
+                            max={2}
+                            value={w}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              if (Number.isFinite(v)) handleUpdateHourlyWeight(idx, v);
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                <fieldset style={{ marginTop: "0.875rem" }}>
+                  <legend>Faktor Musiman 12 Bulan (Jan sampai Des)</legend>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(5.25rem, 1fr))",
+                      gap: "0.5rem",
+                      marginTop: "0.5rem",
+                    }}
+                  >
+                    {editableMonthly.map((mFactor, idx) => (
+                      <div key={`mo-${idx}`} className="fld" style={{ marginTop: 0 }}>
+                        <label htmlFor={`load-mo-${idx}`} style={{ fontSize: "0.75rem" }}>
+                          {MONTH_NAMES[idx]}
+                        </label>
+                        <input
+                          id={`load-mo-${idx}`}
+                          type="number"
+                          step="0.05"
+                          min={0}
+                          max={3}
+                          value={mFactor}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (Number.isFinite(v)) handleUpdateMonthlyFactor(idx, v);
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </fieldset>
+              </details>
             </>
           ) : (
             <div className="fld">
