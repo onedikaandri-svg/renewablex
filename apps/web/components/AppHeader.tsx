@@ -2,16 +2,82 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { IconBookOpen, IconLayers, IconMoon, IconSun, IconZap } from "@/components/Icons";
-import { usePreferences } from "@/lib/preferences";
+import { getProject, HYBRID_PROJECT_UPDATED_EVENT, saveProject } from "@/lib/hybrid-storage";
+import { usePreferences, type CurrencyCode } from "@/lib/preferences";
 
 const HYBRID_STUDIO_VERSION = "v0.7.0";
+
+function extractActiveHybridProjectId(pathname: string): string | null {
+  const match = pathname.match(/^\/hybrid\/([^/]+)(?:\/|$)/);
+  if (!match) return null;
+  const segment = match[1];
+  if (!segment || segment === "guide") return null;
+  return segment;
+}
 
 export default function AppHeader() {
   const pathname = usePathname() || "/";
   const { theme, setTheme, lang, setLang, currency, setCurrency } = usePreferences();
   const isGuide = pathname.startsWith("/hybrid/guide");
   const isHybrid = pathname.startsWith("/hybrid");
+  const activeProjectId = useMemo(() => extractActiveHybridProjectId(pathname), [pathname]);
+  const [projectCurrency, setProjectCurrency] = useState<CurrencyCode | null>(null);
+
+  useEffect(() => {
+    if (!activeProjectId) {
+      setProjectCurrency(null);
+      return;
+    }
+
+    function syncFromStorage() {
+      if (!activeProjectId) return;
+      const p = getProject(activeProjectId);
+      const code = p?.project.currency_code ?? null;
+      setProjectCurrency(code);
+      if (code && code !== currency) {
+        setCurrency(code);
+      }
+    }
+
+    syncFromStorage();
+
+    function handleProjectUpdated(e: Event) {
+      const detail = (e as CustomEvent<{ projectId?: string }>).detail;
+      if (detail?.projectId && detail.projectId !== activeProjectId) return;
+      const p = activeProjectId ? getProject(activeProjectId) : null;
+      const code = p?.project.currency_code ?? null;
+      setProjectCurrency(code);
+      if (code) {
+        setCurrency(code);
+      }
+    }
+
+    window.addEventListener(HYBRID_PROJECT_UPDATED_EVENT, handleProjectUpdated);
+    return () => {
+      window.removeEventListener(HYBRID_PROJECT_UPDATED_EVENT, handleProjectUpdated);
+    };
+  }, [activeProjectId]);
+
+  const effectiveCurrency: CurrencyCode = activeProjectId && projectCurrency ? projectCurrency : currency;
+
+  function handleSelectCurrency(nextCurrency: CurrencyCode) {
+    setCurrency(nextCurrency);
+    if (activeProjectId) {
+      const p = getProject(activeProjectId);
+      if (p && p.project.currency_code !== nextCurrency) {
+        saveProject({
+          ...p,
+          project: {
+            ...p.project,
+            currency_code: nextCurrency,
+          },
+        });
+      }
+      setProjectCurrency(nextCurrency);
+    }
+  }
 
   return (
     <header className="top">
@@ -47,16 +113,16 @@ export default function AppHeader() {
             <button
               type="button"
               className="seg-btn"
-              aria-pressed={currency === "IDR"}
-              onClick={() => setCurrency("IDR")}
+              aria-pressed={effectiveCurrency === "IDR"}
+              onClick={() => handleSelectCurrency("IDR")}
             >
               IDR
             </button>
             <button
               type="button"
               className="seg-btn"
-              aria-pressed={currency === "USD"}
-              onClick={() => setCurrency("USD")}
+              aria-pressed={effectiveCurrency === "USD"}
+              onClick={() => handleSelectCurrency("USD")}
             >
               USD
             </button>
