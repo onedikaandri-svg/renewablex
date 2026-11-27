@@ -143,6 +143,69 @@ def build_hybrid_excel_bytes(
         _write_row(ws_sum, r, [label, val, unit])
         r += 1
 
+    sim_cfg = project_config.get("simulation") or {}
+    disp_params = sim_cfg.get("dispatch_params") or {}
+    ems_rules_doc = disp_params.get("ems_rules")
+    if simulation_result.get("dispatch_strategy") == "custom_ems" and isinstance(ems_rules_doc, dict):
+        raw_rules = ems_rules_doc.get("rules")
+        rules_list = raw_rules if isinstance(raw_rules, list) else []
+        enabled_rules = [item for item in rules_list if isinstance(item, dict) and item.get("enabled", True) is not False]
+        r += 1
+        ws_sum.cell(
+            row=r,
+            column=1,
+            value="Ringkasan Aturan Supervisory EMS Kustom" if not is_en else "Custom Supervisory EMS Rules Summary",
+        ).font = _SECTION_FONT
+        r += 1
+        _style_table_header(
+            ws_sum,
+            r,
+            [
+                "ID Aturan / Paket" if not is_en else "Rule ID / Rule Set",
+                "Prioritas / Status" if not is_en else "Priority / Status",
+                "Aksi & Cakupan Mode" if not is_en else "Actions & Mode Scope",
+            ],
+        )
+        r += 1
+        _write_row(
+            ws_sum,
+            r,
+            [
+                f"Paket: {ems_rules_doc.get('name', 'custom_ems')} (v{ems_rules_doc.get('ems_schema_version', '0.1')})",
+                f"{len(enabled_rules)}/{len(rules_list)} aktif" if not is_en else f"{len(enabled_rules)}/{len(rules_list)} active",
+                str(ems_rules_doc.get("description", "")),
+            ],
+        )
+        r += 1
+        sorted_rules = sorted(
+            [item for item in rules_list if isinstance(item, dict)],
+            key=lambda item: int(item.get("priority", 999)) if isinstance(item.get("priority"), int) else 999,
+        )
+        for rule_item in sorted_rules:
+            actions_raw = rule_item.get("then") if isinstance(rule_item.get("then"), list) else []
+            action_labels: list[str] = []
+            for act in actions_raw:
+                if isinstance(act, dict):
+                    act_name = str(act.get("action", ""))
+                    arg_val = act.get("limit") if "limit" in act else act.get("target")
+                    action_labels.append(f"{act_name}({arg_val})" if arg_val is not None else act_name)
+            status_label = (
+                ("Aktif" if rule_item.get("enabled", True) is not False else "Nonaktif")
+                if not is_en
+                else ("Enabled" if rule_item.get("enabled", True) is not False else "Disabled")
+            )
+            _write_row(
+                ws_sum,
+                r,
+                [
+                    str(rule_item.get("id", "")),
+                    f"P{rule_item.get('priority', 0)} ({status_label})",
+                    ", ".join(action_labels),
+                ],
+            )
+            r += 1
+
+
     r += 1
     ws_sum.cell(row=r, column=1, value="KPI Keuangan & Emisi" if not is_en else "Financial & Emissions KPI").font = _SECTION_FONT
     r += 1

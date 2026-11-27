@@ -22,6 +22,7 @@ from app.hybrid.ems import (
     get_ems_rule_presets,
     validate_custom_ems_rules,
 )
+from app.hybrid.excel_export import build_hybrid_excel_bytes
 from app.hybrid.load import generate_synthetic_load
 from app.hybrid.simulator import SimulationConfig, run_simulation
 from app.hybrid.time_grid import TimeConfig
@@ -226,3 +227,24 @@ def test_api_presets_validation_endpoint_and_simulate_with_custom_ems(mock_get_w
     assert s_data["dispatch_strategy"] == "custom_ems"
     assert s_data["summary"]["max_balance_error_kw"] < 1e-6
     assert len(s_data["hourly_year_1"]["trace_reason"]) == 8760
+
+    # Pastikan ekspor Excel menyertakan ringkasan aturan EMS kustom pada sheet Ringkasan
+    from io import BytesIO
+    from openpyxl import load_workbook
+
+    xlsx_bytes = build_hybrid_excel_bytes(
+        project_config=payload,
+        simulation_result=s_data,
+        language="id",
+    )
+    wb = load_workbook(BytesIO(xlsx_bytes), data_only=True)
+    ws_sum = wb["Ringkasan"]
+    sheet_texts = [
+        str(ws_sum.cell(row=r, column=c).value or "")
+        for r in range(1, ws_sum.max_row + 1)
+        for c in range(1, 5)
+    ]
+    joined = " | ".join(sheet_texts)
+    assert "peak_cut_daytime" in joined
+    assert "r_peak_cut_charge_surplus" in joined
+

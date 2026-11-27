@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ViabilityChip } from "@/components/hybrid/HybridShell";
 import SystemSchematicSvg from "@/components/hybrid/SystemSchematicSvg";
 import { formatCompactCurrency, formatCurrency, formatNumber, formatPercent } from "@/lib/format";
+import { summarizeActiveEmsRuleSet } from "@/lib/hybrid-ems-utils";
 import { serializeSchematicSvgWithLightTheme } from "@/lib/hybrid-topology";
 import type { HybridProjectConfig, HybridSimulateResponse, HybridSweepResult } from "@/lib/hybrid-types";
 import { tr, usePreferences } from "@/lib/preferences";
@@ -231,6 +232,51 @@ export default function PrintReportPreview({
           <p className="print-note">
             <strong>EMS &amp; Ekonomi:</strong> Strategi {project.simulation.dispatch_strategy}, umur {project.simulation.project_lifetime_years} tahun ({project.simulation.multi_year_mode}), WACC {formatPercent(project.finance.discount_rate, lang, 1)}, tarif {formatCurrency(project.finance.electricity_tariff_per_kwh, curr, lang, 0)}/kWh, faktor emisi grid {project.finance.grid_emission_factor_kg_co2e_per_kwh} kg CO2e/kWh [REAL DATA].
           </p>
+          {project.simulation.dispatch_strategy === "custom_ems" &&
+            project.simulation.dispatch_params.ems_rules && (() => {
+              const emsSummary = summarizeActiveEmsRuleSet(project.simulation.dispatch_params.ems_rules, lang);
+              return (
+                <div style={{ marginTop: "0.5rem" }}>
+                  <p className="print-note">
+                    <strong>
+                      {tr(
+                        lang,
+                        `Custom Supervisory EMS Rule Set (${emsSummary.name}, v${emsSummary.schemaVersion}):`,
+                        `Paket Aturan Supervisory EMS Kustom (${emsSummary.name}, v${emsSummary.schemaVersion}):`,
+                        `カスタム監視EMSルールセット (${emsSummary.name}, v${emsSummary.schemaVersion}):`,
+                      )}
+                    </strong>{" "}
+                    {emsSummary.enabledCount}/{emsSummary.totalCount}{" "}
+                    {tr(lang, "active rules", "aturan aktif", "ルール有効")}
+                    {emsSummary.paramsSummary.length > 0
+                      ? ` | ${emsSummary.paramsSummary.map((p) => `${p.label}: ${p.valueText}`).join(", ")}`
+                      : ""}
+                  </p>
+                  <table className="print-table" style={{ marginTop: "0.35rem" }}>
+                    <thead>
+                      <tr>
+                        <th>{tr(lang, "Priority", "Prioritas", "優先度")}</th>
+                        <th>{tr(lang, "Rule ID", "ID Aturan", "ルールID")}</th>
+                        <th>{tr(lang, "Condition", "Syarat Kondisi", "発動条件")}</th>
+                        <th>{tr(lang, "Action", "Keputusan Aksi", "アクション")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {emsSummary.rows
+                        .filter((r) => r.enabled)
+                        .map((r) => (
+                          <tr key={r.id}>
+                            <td>{r.priority}</td>
+                            <td>{r.id}</td>
+                            <td>{r.conditionText}</td>
+                            <td>{r.actionText}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
         </section>
       )}
 

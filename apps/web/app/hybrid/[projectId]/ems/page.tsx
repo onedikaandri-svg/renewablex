@@ -5,9 +5,26 @@ import HybridShell from "@/components/hybrid/HybridShell";
 import { ApiError } from "@/lib/api";
 import { translateIssue } from "@/lib/errors-id";
 import { fetchHybridPresets, validateHybridEmsRules } from "@/lib/hybrid-api";
+import {
+  EMS_ACTION_SPECS,
+  EMS_VARIABLE_SPECS,
+  addVisualEmsRule,
+  extractVisualDraftFromRule,
+  formatEmsActionSummary,
+  formatEmsConditionSummary,
+  formatEmsParamMeta,
+  formatEmsPresetMeta,
+  formatEmsStrategyMeta,
+  removeEmsRuleById,
+  updateVisualEmsRule,
+  type VisualActionKind,
+  type VisualConditionCombinator,
+  type VisualConditionOperator,
+  type VisualEmsConditionClause,
+  type VisualEmsRuleDraft,
+} from "@/lib/hybrid-ems-utils";
 import type {
   DispatchStrategyId,
-  HybridEmsRuleAction,
   HybridEmsRuleItem,
   HybridEmsRulePreset,
   HybridEmsRuleSet,
@@ -259,99 +276,27 @@ const FALLBACK_STRATEGIES: HybridPresetsResponse["dispatch_strategies"] = [
   },
 ];
 
-const PARAM_LABELS_ID: Record<string, { label: string; isPercent: boolean; unit: string }> = {
-  reserve_soc_fraction: { label: "Batas Cadangan SOC Baterai", isPercent: true, unit: "%" },
-  soc_min_fraction: { label: "Batas Minimum SOC Baterai", isPercent: true, unit: "%" },
-  soc_max_fraction: { label: "Batas Maksimum Pengisian SOC", isPercent: true, unit: "%" },
-  peak_reserve_soc: { label: "Batas Bawah SOC Jam Sibuk", isPercent: true, unit: "%" },
-  daytime_hold_soc: { label: "Target Tahan SOC Siang Hari", isPercent: true, unit: "%" },
-  grid_export_limit_kw: { label: "Batas Daya Ekspor Jaringan", isPercent: false, unit: "kW" },
-};
+const OPERATOR_CHOICES: Array<{ op: VisualConditionOperator; labelEn: string; labelId: string; labelJa: string }> = [
+  { op: ">", labelEn: "> (greater than)", labelId: "> (lebih besar dari)", labelJa: "> (より大きい)" },
+  { op: ">=", labelEn: ">= (at least)", labelId: ">= (minimal)", labelJa: ">= (以上)" },
+  { op: "<", labelEn: "< (less than)", labelId: "< (lebih kecil dari)", labelJa: "< (より小さい)" },
+  { op: "<=", labelEn: "<= (at most)", labelId: "<= (maksimal)", labelJa: "<= (以下)" },
+  { op: "==", labelEn: "== (equals)", labelId: "== (sama dengan)", labelJa: "== (等しい)" },
+  { op: "!=", labelEn: "!= (not equal)", labelId: "!= (tidak sama dengan)", labelJa: "!= (等しくない)" },
+  { op: "in", labelEn: "in (in list, comma-separated)", labelId: "in (di dalam daftar jam/angka)", labelJa: "in (リストに含まれる)" },
+  { op: "not_in", labelEn: "not_in (outside list)", labelId: "not_in (di luar daftar jam/angka)", labelJa: "not_in (リスト外)" },
+];
 
-const VAR_LABELS_ID: Record<string, string> = {
-  pv_surplus_kw: "Surplus Surya (kW)",
-  net_load_kw: "Beban Bersih setelah PV (kW)",
-  local_load_kw: "Beban Listrik (kW)",
-  pv_available_kw: "Daya PV Tersedia (kW)",
-  bess_soc_fraction: "SOC Baterai",
-  hour_of_day: "Jam Operasi",
-  grid_connected: "Status Grid Terhubung",
-  biomass_can_start: "Biomass Siap Menyala",
-  biomass_status: "Status Biomass",
-};
-
-const ACTION_LABELS_ID: Record<string, string> = {
-  charge_bess: "Isi Baterai (Charge BESS)",
-  discharge_bess: "Kuras Baterai (Discharge BESS)",
-  hold_bess: "Tahan Baterai (Hold)",
-  start_biomass: "Nyalakan Pembangkit Biomass",
-  stop_biomass: "Matikan Pembangkit Biomass",
-  set_biomass_target: "Atur Target Daya Biomass",
-  curtail_pv: "Batasi Keluaran PV (Curtail)",
-  enforce_export_limit: "Terapkan Batas Ekspor Grid",
-  follow_export_target: "Ikuti Target Ekspor Grid",
-};
-
-function formatConditionSummary(
-  node: Record<string, unknown>,
-  params: Record<string, number> | undefined,
-): string {
-  if (Array.isArray(node.all)) {
-    return (node.all as Array<Record<string, unknown>>)
-      .map((child) => formatConditionSummary(child, params))
-      .join(" DAN ");
-  }
-  if (Array.isArray(node.any)) {
-    return (node.any as Array<Record<string, unknown>>)
-      .map((child) => formatConditionSummary(child, params))
-      .join(" ATAU ");
-  }
-  const rawVar = String(node.var ?? "");
-  const varLabel = VAR_LABELS_ID[rawVar] ?? rawVar;
-  const op = String(node.op ?? "==");
-  const rawVal = node.value;
-  let valText = String(rawVal ?? "");
-  if (typeof rawVal === "string" && rawVal.startsWith("$params.")) {
-    const key = rawVal.slice("$params.".length);
-    const paramMeta = PARAM_LABELS_ID[key];
-    const numVal = params?.[key];
-    if (typeof numVal === "number" && paramMeta) {
-      valText = paramMeta.isPercent ? `${Math.round(numVal * 100)}%` : `${numVal} ${paramMeta.unit}`;
-    } else {
-      valText = key;
-    }
-  } else if (Array.isArray(rawVal)) {
-    valText = rawVal.map((v) => `${String(v).padStart(2, "0")}:00`).join(", ");
-  } else if (typeof rawVal === "boolean") {
-    valText = rawVal ? "Ya" : "Tidak";
-  }
-  const opLabel = op === "in" ? "pada jam" : op === "not_in" ? "di luar jam" : op;
-  return `${varLabel} ${opLabel} ${valText}`;
-}
-
-function formatActionSummary(
-  actions: HybridEmsRuleAction[],
-  params: Record<string, number> | undefined,
-): string {
-  return actions
-    .map((a) => {
-      const base = ACTION_LABELS_ID[a.action] ?? a.action;
-      const arg = a.limit ?? a.target;
-      if (arg === undefined) return base;
-      if (typeof arg === "string" && arg.startsWith("$params.")) {
-        const key = arg.slice("$params.".length);
-        const meta = PARAM_LABELS_ID[key];
-        const numVal = params?.[key];
-        if (typeof numVal === "number" && meta) {
-          return `${base} (${meta.isPercent ? `${Math.round(numVal * 100)}%` : `${numVal} ${meta.unit}`})`;
-        }
-      }
-      if (typeof arg === "string" && VAR_LABELS_ID[arg]) {
-        return `${base} sebesar ${VAR_LABELS_ID[arg]}`;
-      }
-      return `${base} (${String(arg)})`;
-    })
-    .join(" + ");
+function createDefaultVisualDraft(nextIndex: number): VisualEmsRuleDraft {
+  return {
+    id: `r_custom_${nextIndex}`,
+    priority: nextIndex * 10,
+    enabled: true,
+    combinator: "all",
+    conditions: [{ variable: "pv_surplus_kw", operator: ">", valueText: "0" }],
+    actionType: "charge_bess",
+    actionArgText: "pv_surplus_kw",
+  };
 }
 
 export default function HybridEmsPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -361,6 +306,8 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
   const [presets, setPresets] = useState<HybridPresetsResponse | null>(null);
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false);
   const [jsonDraft, setJsonDraft] = useState("");
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+  const [visualDraft, setVisualDraft] = useState<VisualEmsRuleDraft>(() => createDefaultVisualDraft(4));
   const [validationState, setValidationState] = useState<{
     status: "idle" | "checking" | "valid" | "error";
     message: string;
@@ -385,6 +332,22 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
   const dp = project.simulation.dispatch_params;
   const activeRuleSet: HybridEmsRuleSet = dp.ems_rules ?? DEFAULT_CUSTOM_EMS_RULES;
   const matchedPreset = rulePresets.find((pr) => pr.rule_set.name === activeRuleSet.name);
+  const selectedActionSpec = EMS_ACTION_SPECS.find((a) => a.id === visualDraft.actionType) ?? EMS_ACTION_SPECS[0];
+
+  function commitRuleSet(nextSet: HybridEmsRuleSet) {
+    updateProject((p) => ({
+      ...p,
+      simulation: {
+        ...p.simulation,
+        dispatch_strategy: "custom_ems",
+        dispatch_params: {
+          ...p.simulation.dispatch_params,
+          ems_rules: nextSet,
+        },
+      },
+    }));
+    setJsonDraft(JSON.stringify(nextSet, null, 2));
+  }
 
   function selectStrategy(id: DispatchStrategyId) {
     updateProject((p) => ({
@@ -410,21 +373,18 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
 
   function applyRulePreset(preset: HybridEmsRulePreset) {
     const cloned = structuredClone(preset.rule_set);
-    updateProject((p) => ({
-      ...p,
-      simulation: {
-        ...p.simulation,
-        dispatch_strategy: "custom_ems",
-        dispatch_params: {
-          ...p.simulation.dispatch_params,
-          ems_rules: cloned,
-        },
-      },
-    }));
-    setJsonDraft(JSON.stringify(cloned, null, 2));
+    const meta = formatEmsPresetMeta(preset, lang);
+    commitRuleSet(cloned);
+    setEditingRuleId(null);
+    setVisualDraft(createDefaultVisualDraft(cloned.rules.length + 1));
     setValidationState({
       status: "valid",
-      message: `Preset "${lang === "id" ? preset.name_id : preset.name_en}" siap digunakan (${cloned.rules.length} aturan aktif).`,
+      message: tr(
+        lang,
+        `Preset "${meta.name}" applied (${cloned.rules.length} active rules).`,
+        `Preset "${meta.name}" siap digunakan (${cloned.rules.length} aturan aktif).`,
+        `プリセット「${meta.name}」を適用しました（有効ルール ${cloned.rules.length} 件）。`,
+      ),
     });
   }
 
@@ -432,18 +392,7 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
     const nextRules: HybridEmsRuleItem[] = activeRuleSet.rules.map((r) =>
       r.id === ruleId ? { ...r, enabled: nextEnabled } : r,
     );
-    const nextSet: HybridEmsRuleSet = { ...activeRuleSet, rules: nextRules };
-    updateProject((p) => ({
-      ...p,
-      simulation: {
-        ...p.simulation,
-        dispatch_params: {
-          ...p.simulation.dispatch_params,
-          ems_rules: nextSet,
-        },
-      },
-    }));
-    setJsonDraft(JSON.stringify(nextSet, null, 2));
+    commitRuleSet({ ...activeRuleSet, rules: nextRules });
   }
 
   function updateRuleParam(paramKey: string, nextValue: number) {
@@ -455,27 +404,99 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
         [paramKey]: nextValue,
       },
     };
-    updateProject((p) => ({
-      ...p,
-      simulation: {
-        ...p.simulation,
-        dispatch_params: {
-          ...p.simulation.dispatch_params,
-          ems_rules: nextSet,
-        },
-      },
+    commitRuleSet(nextSet);
+  }
+
+  function handleEditRuleRow(rule: HybridEmsRuleItem) {
+    const extracted = extractVisualDraftFromRule(rule);
+    if (!extracted) {
+      setJsonEditorOpen(true);
+      setJsonDraft(JSON.stringify(activeRuleSet, null, 2));
+      setValidationState({
+        status: "idle",
+        message: tr(
+          lang,
+          `Rule "${rule.id}" uses nested expressions; opened Advanced JSON Editor.`,
+          `Aturan "${rule.id}" memiliki ekspresi bersarang; Editor JSON Tingkat Lanjut dibuka.`,
+          `ルール「${rule.id}」はネスト条件を含むため、JSONエディタを開きました。`,
+        ),
+      });
+      return;
+    }
+    setEditingRuleId(rule.id);
+    setVisualDraft(extracted);
+  }
+
+  function handleDeleteRuleRow(ruleId: string) {
+    const nextSet = removeEmsRuleById(activeRuleSet, ruleId);
+    commitRuleSet(nextSet);
+    if (editingRuleId === ruleId) {
+      setEditingRuleId(null);
+      setVisualDraft(createDefaultVisualDraft(nextSet.rules.length + 1));
+    }
+    void handleValidateCurrentRules(nextSet);
+  }
+
+  function handleSaveVisualRule() {
+    const nextSet = editingRuleId
+      ? updateVisualEmsRule(activeRuleSet, editingRuleId, visualDraft)
+      : addVisualEmsRule(activeRuleSet, visualDraft);
+    commitRuleSet(nextSet);
+    setEditingRuleId(null);
+    setVisualDraft(createDefaultVisualDraft(nextSet.rules.length + 1));
+    void handleValidateCurrentRules(nextSet);
+  }
+
+  function handleCancelVisualEdit() {
+    setEditingRuleId(null);
+    setVisualDraft(createDefaultVisualDraft(activeRuleSet.rules.length + 1));
+  }
+
+  function updateVisualCondition(idx: number, patch: Partial<VisualEmsConditionClause>) {
+    setVisualDraft((prev) => ({
+      ...prev,
+      conditions: prev.conditions.map((c, i) => (i === idx ? { ...c, ...patch } : c)),
     }));
-    setJsonDraft(JSON.stringify(nextSet, null, 2));
+  }
+
+  function addVisualConditionClause() {
+    setVisualDraft((prev) => ({
+      ...prev,
+      conditions: [
+        ...prev.conditions,
+        { variable: "bess_soc_fraction", operator: "<", valueText: "$params.soc_max_fraction" },
+      ],
+    }));
+  }
+
+  function removeVisualConditionClause(idx: number) {
+    setVisualDraft((prev) => ({
+      ...prev,
+      conditions: prev.conditions.length > 1 ? prev.conditions.filter((_, i) => i !== idx) : prev.conditions,
+    }));
   }
 
   async function handleValidateCurrentRules(candidateSet?: HybridEmsRuleSet) {
     const target = candidateSet ?? activeRuleSet;
-    setValidationState({ status: "checking", message: "Memeriksa keamanan dan struktur aturan EMS..." });
+    setValidationState({
+      status: "checking",
+      message: tr(
+        lang,
+        "Checking EMS rule structure and safety constraints...",
+        "Memeriksa keamanan dan struktur aturan EMS...",
+        "EMSルールの構造と安全制約を検証しています...",
+      ),
+    });
     try {
       const report = await validateHybridEmsRules(target);
       setValidationState({
         status: "valid",
-        message: `Aturan EMS sah (Skema v${report.schema_version}): ${report.enabled_rule_count} dari ${report.rule_count} aturan aktif dan aman dijalankan.`,
+        message: tr(
+          lang,
+          `Valid EMS rules (Schema v${report.schema_version}): ${report.enabled_rule_count} of ${report.rule_count} rules enabled and safe to execute.`,
+          `Aturan EMS sah (Skema v${report.schema_version}): ${report.enabled_rule_count} dari ${report.rule_count} aturan aktif dan aman dijalankan.`,
+          `EMSルール検証OK（スキーマ v${report.schema_version}）: ${report.rule_count} 件中 ${report.enabled_rule_count} 件が有効で安全に実行可能です。`,
+        ),
       });
     } catch (err) {
       if (err instanceof ApiError && err.problems.issues.length > 0) {
@@ -486,7 +507,15 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
       } else if (err instanceof Error) {
         setValidationState({ status: "error", message: err.message });
       } else {
-        setValidationState({ status: "error", message: "Gagal memvalidasi aturan EMS." });
+        setValidationState({
+          status: "error",
+          message: tr(
+            lang,
+            "Failed to validate EMS rules.",
+            "Gagal memvalidasi aturan EMS.",
+            "EMSルールの検証に失敗しました。",
+          ),
+        });
       }
     }
   }
@@ -498,30 +527,33 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
     } catch {
       setValidationState({
         status: "error",
-        message: "Format JSON tidak sah. Periksa tanda kutip atau koma yang kurang.",
+        message: tr(
+          lang,
+          "Invalid JSON syntax. Please check missing quotes or commas.",
+          "Format JSON tidak sah. Periksa tanda kutip atau koma yang kurang.",
+          "JSON構文が無効です。引用符やカンマを確認してください。",
+        ),
       });
       return;
     }
     if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as HybridEmsRuleSet).rules)) {
       setValidationState({
         status: "error",
-        message: "Dokumen aturan EMS harus berupa objek JSON yang memiliki daftar 'rules'.",
+        message: tr(
+          lang,
+          "EMS rule document must be a JSON object containing a 'rules' array.",
+          "Dokumen aturan EMS harus berupa objek JSON yang memiliki daftar 'rules'.",
+          "EMSルールドキュメントは 'rules' 配列を含むJSONオブジェクトである必要があります。",
+        ),
       });
       return;
     }
     const candidate = parsed as HybridEmsRuleSet;
-    updateProject((p) => ({
-      ...p,
-      simulation: {
-        ...p.simulation,
-        dispatch_params: {
-          ...p.simulation.dispatch_params,
-          ems_rules: candidate,
-        },
-      },
-    }));
+    commitRuleSet(candidate);
     void handleValidateCurrentRules(candidate);
   }
+
+  const paramKeys = Object.keys(activeRuleSet.params ?? {});
 
   return (
     <HybridShell
@@ -535,9 +567,9 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
       )}
       subtitle={tr(
         lang,
-        "Choose a built-in dispatch strategy or activate Custom Supervisory EMS Rules with ready-to-use templates.",
-        "Pilih strategi dispatch bawaan atau aktifkan Aturan EMS Kustom (Supervisory Controller) dengan preset siap pakai.",
-        "標準ディスパッチ戦略を選択するか、プリセット付きのカスタム監視EMSルールを有効化します。",
+        "Choose a built-in dispatch strategy or configure Custom Supervisory EMS Rules with templates and the visual rule builder.",
+        "Pilih strategi dispatch bawaan atau atur Aturan EMS Kustom (Supervisory Controller) lewat preset dan perakit aturan visual.",
+        "標準ディスパッチ戦略を選択するか、プリセットとビジュアルルールビルダーでカスタム監視EMSルールを構成します。",
       )}
       result={result}
     >
@@ -547,21 +579,24 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
             {tr(lang, "Dispatch Strategies", "Pilihan Strategi Dispatch", "ディスパッチ戦略の選択")}
           </h2>
           <div style={{ display: "grid", gap: "0.75rem" }}>
-            {strategies.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className="strategy-card"
-                aria-pressed={activeStrategy === s.id}
-                onClick={() => selectStrategy(s.id)}
-              >
-                <div className="actions-inline" style={{ justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                  <strong style={{ color: "var(--navytext)" }}>{lang === "id" ? s.name_id : s.name_en}</strong>
-                  <span className="chip">{s.id}</span>
-                </div>
-                <p className="note">{lang === "id" ? s.description_id : s.description_en}</p>
-              </button>
-            ))}
+            {strategies.map((s) => {
+              const meta = formatEmsStrategyMeta(s, lang);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  className="strategy-card"
+                  aria-pressed={activeStrategy === s.id}
+                  onClick={() => selectStrategy(s.id)}
+                >
+                  <div className="actions-inline" style={{ justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                    <strong style={{ color: "var(--navytext)" }}>{meta.name}</strong>
+                    <span className="chip">{s.id}</span>
+                  </div>
+                  <p className="note">{meta.description}</p>
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -589,7 +624,14 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                 }))
               }
             />
-            <span>Izinkan impor listrik dari jaringan Grid saat defisit</span>
+            <span>
+              {tr(
+                lang,
+                "Allow electricity import from Grid during deficit",
+                "Izinkan impor listrik dari jaringan Grid saat defisit",
+                "電力不足時に系統（グリッド）からの受電を許可",
+              )}
+            </span>
           </label>
 
           <label className="check-row">
@@ -606,12 +648,21 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                 }))
               }
             />
-            <span>Izinkan ekspor surplus listrik ke jaringan Grid</span>
+            <span>
+              {tr(
+                lang,
+                "Allow surplus electricity export to Grid",
+                "Izinkan ekspor surplus listrik ke jaringan Grid",
+                "余剰電力の系統（グリッド）への逆潮流を許可",
+              )}
+            </span>
           </label>
 
           {activeStrategy === "cycle_charging" && (
             <div className="fld">
-              <label htmlFor="ems-target-soc">Target SOC Pengisian Siklus (%)</label>
+              <label htmlFor="ems-target-soc">
+                {tr(lang, "Cycle Charging Target SOC (%)", "Target SOC Pengisian Siklus (%)", "サイクル充電目標SOC (%)")}
+              </label>
               <input
                 id="ems-target-soc"
                 type="number"
@@ -637,7 +688,9 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
 
           {activeStrategy === "peak_shaving" && (
             <div className="fld">
-              <label htmlFor="ems-peak-limit">Batas Beban Puncak Grid (kW)</label>
+              <label htmlFor="ems-peak-limit">
+                {tr(lang, "Grid Peak Load Limit (kW)", "Batas Beban Puncak Grid (kW)", "系統ピーク負荷上限 (kW)")}
+              </label>
               <input
                 id="ems-peak-limit"
                 type="number"
@@ -664,7 +717,9 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
             <>
               <div className="grid-2">
                 <div className="fld">
-                  <label htmlFor="ems-tou-chg">Target Charge Luar Puncak (%)</label>
+                  <label htmlFor="ems-tou-chg">
+                    {tr(lang, "Off-Peak Charge Target (%)", "Target Charge Luar Puncak (%)", "オフピーク充電目標SOC (%)")}
+                  </label>
                   <input
                     id="ems-tou-chg"
                     type="number"
@@ -687,7 +742,9 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                   />
                 </div>
                 <div className="fld">
-                  <label htmlFor="ems-tou-dis">Batas Bawah Discharge Puncak (%)</label>
+                  <label htmlFor="ems-tou-dis">
+                    {tr(lang, "Peak Discharge Floor (%)", "Batas Bawah Discharge Puncak (%)", "ピーク放電下限SOC (%)")}
+                  </label>
                   <input
                     id="ems-tou-dis"
                     type="number"
@@ -712,13 +769,25 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
               </div>
 
               <fieldset style={{ marginTop: "1rem" }}>
-                <legend>Jadwal Jam Tarif Puncak (Peak Hours, 00:00 sampai 23:00)</legend>
+                <legend>
+                  {tr(
+                    lang,
+                    "Peak Tariff Hours Schedule (00:00 to 23:00)",
+                    "Jadwal Jam Tarif Puncak (Peak Hours, 00:00 sampai 23:00)",
+                    "ピーク料金時間帯スケジュール (00:00〜23:00)",
+                  )}
+                </legend>
                 <p className="note" style={{ marginTop: "0.25rem" }}>
-                  Klik tombol jam untuk mengaktifkan atau menonaktifkan jam tarif puncak (discharge baterai diprioritaskan). Jam tidak boleh tumpang tindih dengan jam luar puncak.
+                  {tr(
+                    lang,
+                    "Click hour buttons to toggle peak tariff hours (battery discharge prioritized). Cannot overlap with off-peak hours.",
+                    "Klik tombol jam untuk mengaktifkan atau menonaktifkan jam tarif puncak (discharge baterai diprioritaskan). Jam tidak boleh tumpang tindih dengan jam luar puncak.",
+                    "時間ボタンをクリックしてピーク時間帯（蓄電池放電優先）を切り替えます。オフピーク時間帯とは重複できません。",
+                  )}
                 </p>
                 <div
                   role="group"
-                  aria-label="Pemilih jam tarif puncak"
+                  aria-label={tr(lang, "Peak tariff hours selector", "Pemilih jam tarif puncak", "ピーク料金時間帯セレクター")}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fill, minmax(3.25rem, 1fr))",
@@ -741,8 +810,18 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                         }}
                         title={
                           isOffPeak && !isPeak
-                            ? `Jam ${String(hr).padStart(2, "0")}:00 saat ini terdaftar sebagai Jam Luar Puncak (klik untuk memindahkan ke Jam Puncak)`
-                            : `Toggle jam puncak ${String(hr).padStart(2, "0")}:00`
+                            ? tr(
+                                lang,
+                                `Hour ${String(hr).padStart(2, "0")}:00 is currently Off-Peak (click to move to Peak)`,
+                                `Jam ${String(hr).padStart(2, "0")}:00 saat ini terdaftar sebagai Jam Luar Puncak (klik untuk memindahkan ke Jam Puncak)`,
+                                `${String(hr).padStart(2, "0")}:00 は現在オフピークです（クリックでピークへ移動）`,
+                              )
+                            : tr(
+                                lang,
+                                `Toggle peak hour ${String(hr).padStart(2, "0")}:00`,
+                                `Toggle jam puncak ${String(hr).padStart(2, "0")}:00`,
+                                `ピーク時間帯 ${String(hr).padStart(2, "0")}:00 を切替`,
+                              )
                         }
                         onClick={() => {
                           updateProject((p) => {
@@ -772,18 +851,31 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                   })}
                 </div>
                 <p className="note tabular-nums" style={{ marginTop: "0.375rem" }}>
-                  Jam Puncak aktif: <strong>{dp.peak_hours.length > 0 ? dp.peak_hours.join(", ") : "Tidak ada"}</strong>
+                  {tr(lang, "Active Peak Hours:", "Jam Puncak aktif:", "有効なピーク時間帯:")}{" "}
+                  <strong>{dp.peak_hours.length > 0 ? dp.peak_hours.join(", ") : tr(lang, "None", "Tidak ada", "なし")}</strong>
                 </p>
               </fieldset>
 
               <fieldset style={{ marginTop: "1rem" }}>
-                <legend>Jadwal Jam Luar Puncak (Off-Peak Hours, 00:00 sampai 23:00)</legend>
+                <legend>
+                  {tr(
+                    lang,
+                    "Off-Peak Tariff Hours Schedule (00:00 to 23:00)",
+                    "Jadwal Jam Luar Puncak (Off-Peak Hours, 00:00 sampai 23:00)",
+                    "オフピーク料金時間帯スケジュール (00:00〜23:00)",
+                  )}
+                </legend>
                 <p className="note" style={{ marginTop: "0.25rem" }}>
-                  Klik tombol jam untuk memilih jadwal pengisian baterai saat tarif murah luar puncak.
+                  {tr(
+                    lang,
+                    "Click hour buttons to select battery charging hours during low-tariff off-peak periods.",
+                    "Klik tombol jam untuk memilih jadwal pengisian baterai saat tarif murah luar puncak.",
+                    "低料金のオフピーク時間帯に蓄電池を充電する時間を選択します。",
+                  )}
                 </p>
                 <div
                   role="group"
-                  aria-label="Pemilih jam luar puncak"
+                  aria-label={tr(lang, "Off-peak hours selector", "Pemilih jam luar puncak", "オフピーク時間帯セレクター")}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "repeat(auto-fill, minmax(3.25rem, 1fr))",
@@ -806,8 +898,18 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                         }}
                         title={
                           isPeak && !isOffPeak
-                            ? `Jam ${String(hr).padStart(2, "0")}:00 saat ini terdaftar sebagai Jam Puncak (klik untuk memindahkan ke Jam Luar Puncak)`
-                            : `Toggle jam luar puncak ${String(hr).padStart(2, "0")}:00`
+                            ? tr(
+                                lang,
+                                `Hour ${String(hr).padStart(2, "0")}:00 is currently Peak (click to move to Off-Peak)`,
+                                `Jam ${String(hr).padStart(2, "0")}:00 saat ini terdaftar sebagai Jam Puncak (klik untuk memindahkan ke Jam Luar Puncak)`,
+                                `${String(hr).padStart(2, "0")}:00 は現在ピークです（クリックでオフピークへ移動）`,
+                              )
+                            : tr(
+                                lang,
+                                `Toggle off-peak hour ${String(hr).padStart(2, "0")}:00`,
+                                `Toggle jam luar puncak ${String(hr).padStart(2, "0")}:00`,
+                                `オフピーク時間帯 ${String(hr).padStart(2, "0")}:00 を切替`,
+                              )
                         }
                         onClick={() => {
                           updateProject((p) => {
@@ -838,7 +940,8 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                 </div>
                 <div className="actions-inline" style={{ justifyContent: "space-between", marginTop: "0.375rem" }}>
                   <p className="note tabular-nums">
-                    Jam Luar Puncak aktif: <strong>{dp.off_peak_hours.length > 0 ? dp.off_peak_hours.join(", ") : "Tidak ada"}</strong>
+                    {tr(lang, "Active Off-Peak Hours:", "Jam Luar Puncak aktif:", "有効なオフピーク時間帯:")}{" "}
+                    <strong>{dp.off_peak_hours.length > 0 ? dp.off_peak_hours.join(", ") : tr(lang, "None", "Tidak ada", "なし")}</strong>
                   </p>
                   <button
                     type="button"
@@ -857,7 +960,7 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                       }))
                     }
                   >
-                    Reset Jam Default
+                    {tr(lang, "Reset Default Hours", "Reset Jam Default", "デフォルト時間に戻す")}
                   </button>
                 </div>
               </fieldset>
@@ -867,16 +970,29 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
           {activeStrategy === "custom_ems" && (
             <div className="sec">
               <div className="card-header" style={{ marginBottom: "0.5rem" }}>
-                <h3 style={{ margin: 0 }}>1. Pilih Preset Aturan Supervisory Siap Pakai</h3>
-                <span className="chip">Klik untuk menerapkan</span>
+                <h3 style={{ margin: 0 }}>
+                  {tr(
+                    lang,
+                    "1. Choose a Ready-to-Use Supervisory Rule Preset",
+                    "1. Pilih Preset Aturan Supervisory Siap Pakai",
+                    "1. 監視EMSルールプリセットの選択",
+                  )}
+                </h3>
+                <span className="chip">{tr(lang, "Click to apply", "Klik untuk menerapkan", "クリックして適用")}</span>
               </div>
               <p className="note" style={{ marginBottom: "0.75rem" }}>
-                Pilih salah satu paket aturan di bawah ini sesuai kebutuhan proyek Anda. Seluruh aturan dieksekusi secara deterministik tanpa eksekusi kode bebas.
+                {tr(
+                  lang,
+                  "Select a rule template matching your operating profile. All rules execute deterministically as pure data without arbitrary code execution.",
+                  "Pilih salah satu paket aturan di bawah ini sesuai kebutuhan proyek Anda. Seluruh aturan dieksekusi secara deterministik tanpa eksekusi kode bebas.",
+                  "プロジェクトの運用形態に合ったルールセットを選択してください。すべてのルールは純粋なデータとして決定論的に実行されます。",
+                )}
               </p>
 
               <div style={{ display: "grid", gap: "0.625rem" }}>
                 {rulePresets.map((preset) => {
                   const isCurrentPreset = activeRuleSet.name === preset.rule_set.name;
+                  const meta = formatEmsPresetMeta(preset, lang);
                   return (
                     <button
                       key={preset.id}
@@ -886,12 +1002,12 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                       onClick={() => applyRulePreset(preset)}
                     >
                       <div className="actions-inline" style={{ justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                        <strong style={{ color: "var(--navytext)" }}>
-                          {lang === "id" ? preset.name_id : preset.name_en}
-                        </strong>
-                        <span className="chip">{preset.rule_set.rules.length} aturan</span>
+                        <strong style={{ color: "var(--navytext)" }}>{meta.name}</strong>
+                        <span className="chip tabular-nums">
+                          {preset.rule_set.rules.length} {tr(lang, "rules", "aturan", "ルール")}
+                        </span>
                       </div>
-                      <p className="note">{lang === "id" ? preset.description_id : preset.description_en}</p>
+                      <p className="note">{meta.description}</p>
                     </button>
                   );
                 })}
@@ -899,16 +1015,25 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
 
               {activeRuleSet.params && Object.keys(activeRuleSet.params).length > 0 && (
                 <div className="sec">
-                  <h3 style={{ marginBottom: "0.5rem" }}>2. Sesuaikan Ambang Batas Aturan (Default Preset / Input Pengguna)</h3>
+                  <h3 style={{ marginBottom: "0.5rem" }}>
+                    {tr(
+                      lang,
+                      "2. Adjust Rule Thresholds (Preset Default vs User Input)",
+                      "2. Sesuaikan Ambang Batas Aturan (Default Preset vs Input Pengguna)",
+                      "2. ルール閾値パラメータの調整（プリセット初期値／ユーザー入力）",
+                    )}
+                  </h3>
                   <div className="grid-2">
                     {Object.entries(activeRuleSet.params).map(([key, rawVal]) => {
-                      const meta = PARAM_LABELS_ID[key] ?? { label: key, isPercent: false, unit: "" };
+                      const meta = formatEmsParamMeta(key, lang);
                       const displayVal = meta.isPercent ? Math.round(Number(rawVal) * 100) : Number(rawVal);
                       const inputId = `ems-param-${key}`;
                       const presetDefault = matchedPreset?.rule_set.params?.[key];
                       const isPresetDefault =
                         typeof presetDefault === "number" && Math.abs(Number(rawVal) - presetDefault) < 1e-9;
-                      const sourceLabel = isPresetDefault ? "Default Preset" : "Input Pengguna";
+                      const sourceLabel = isPresetDefault
+                        ? tr(lang, "Preset Default", "Default Preset", "プリセット初期値")
+                        : tr(lang, "User Input", "Input Pengguna", "ユーザー入力");
                       return (
                         <div className="fld" key={key} style={{ marginTop: 0 }}>
                           <div className="label-row">
@@ -940,14 +1065,23 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
 
               <div className="sec">
                 <div className="actions-inline" style={{ justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                  <h3 style={{ margin: 0 }}>3. Tabel Urutan Prioritas Aturan EMS</h3>
+                  <h3 style={{ margin: 0 }}>
+                    {tr(
+                      lang,
+                      "3. EMS Rule Priority Table",
+                      "3. Tabel Urutan Prioritas Aturan EMS",
+                      "3. EMSルール優先度テーブル",
+                    )}
+                  </h3>
                   <button
                     type="button"
                     className="btn ghost btn-sm"
                     disabled={validationState.status === "checking"}
                     onClick={() => void handleValidateCurrentRules()}
                   >
-                    {validationState.status === "checking" ? "Memeriksa Aturan..." : "Periksa Keamanan Aturan"}
+                    {validationState.status === "checking"
+                      ? tr(lang, "Checking Rules...", "Memeriksa Aturan...", "検証中...")
+                      : tr(lang, "Validate Rule Safety", "Periksa Keamanan Aturan", "ルールの安全性を検証")}
                   </button>
                 </div>
 
@@ -970,25 +1104,46 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                   </div>
                 )}
 
-                <div className="tw" tabIndex={0} role="region" aria-label="Tabel daftar aturan EMS kustom">
+                <div
+                  className="tw"
+                  tabIndex={0}
+                  role="region"
+                  aria-label={tr(
+                    lang,
+                    "Custom EMS rules priority table",
+                    "Tabel daftar aturan EMS kustom",
+                    "カスタムEMSルール一覧テーブル",
+                  )}
+                >
                   <table className="sens-main">
                     <caption>
-                      Daftar aturan aktif pada paket &ldquo;{activeRuleSet.name}&rdquo; (diurutkan dari angka prioritas terkecil)
+                      {tr(
+                        lang,
+                        `Active rules in "${activeRuleSet.name}" (sorted by lowest priority number first)`,
+                        `Daftar aturan aktif pada paket "${activeRuleSet.name}" (diurutkan dari angka prioritas terkecil)`,
+                        `ルールセット「${activeRuleSet.name}」の登録ルール（優先度数値の小さい順）`,
+                      )}
                     </caption>
                     <thead>
                       <tr>
-                        <th scope="col">Aktif</th>
-                        <th scope="col">Prioritas</th>
-                        <th scope="col">ID Aturan</th>
-                        <th scope="col">Syarat Kondisi (Kapan Aktif)</th>
-                        <th scope="col">Keputusan Aksi</th>
+                        <th scope="col">{tr(lang, "Enabled", "Aktif", "有効")}</th>
+                        <th scope="col">{tr(lang, "Priority", "Prioritas", "優先度")}</th>
+                        <th scope="col">{tr(lang, "Rule ID", "ID Aturan", "ルールID")}</th>
+                        <th scope="col">{tr(lang, "Condition (When Active)", "Syarat Kondisi (Kapan Aktif)", "発動条件 (When)")}</th>
+                        <th scope="col">{tr(lang, "Action Decision", "Keputusan Aksi", "制御アクション (Then)")}</th>
+                        <th scope="col">{tr(lang, "Manage", "Kelola", "操作")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {activeRuleSet.rules.length === 0 ? (
                         <tr>
-                          <td colSpan={5} style={{ textAlign: "left" }}>
-                            Belum ada aturan EMS kustom yang terdaftar. Pilih salah satu preset aturan siap pakai di atas untuk memulai.
+                          <td colSpan={6} style={{ textAlign: "left" }}>
+                            {tr(
+                              lang,
+                              "No custom EMS rules registered yet. Select a preset above or add a rule using the Visual Rule Builder below.",
+                              "Belum ada aturan EMS kustom yang terdaftar. Pilih salah satu preset di atas atau tambahkan aturan lewat Perakit Aturan Visual di bawah.",
+                              "カスタムEMSルールが登録されていません。上のプリセットを選択するか、下のビジュアルルールビルダーから追加してください。",
+                            )}
                           </td>
                         </tr>
                       ) : (
@@ -1002,7 +1157,12 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                                   <input
                                     type="checkbox"
                                     checked={isEnabled}
-                                    aria-label={`Aktifkan aturan ${rule.id}`}
+                                    aria-label={tr(
+                                      lang,
+                                      `Enable rule ${rule.id}`,
+                                      `Aktifkan aturan ${rule.id}`,
+                                      `ルール ${rule.id} を有効化`,
+                                    )}
                                     onChange={(e) => toggleRuleEnabled(rule.id, e.target.checked)}
                                   />
                                 </td>
@@ -1011,10 +1171,28 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                                   <code>{rule.id}</code>
                                 </th>
                                 <td style={{ textAlign: "left" }}>
-                                  {formatConditionSummary(rule.when, activeRuleSet.params)}
+                                  {formatEmsConditionSummary(rule.when, activeRuleSet.params, lang)}
                                 </td>
                                 <td style={{ textAlign: "left" }}>
-                                  <strong>{formatActionSummary(rule.then, activeRuleSet.params)}</strong>
+                                  <strong>{formatEmsActionSummary(rule.then, activeRuleSet.params, lang)}</strong>
+                                </td>
+                                <td>
+                                  <div className="actions-inline" style={{ justifyContent: "flex-end" }}>
+                                    <button
+                                      type="button"
+                                      className="btn ghost btn-sm"
+                                      onClick={() => handleEditRuleRow(rule)}
+                                    >
+                                      {tr(lang, "Edit", "Ubah", "編集")}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn ghost btn-sm"
+                                      onClick={() => handleDeleteRuleRow(rule.id)}
+                                    >
+                                      {tr(lang, "Delete", "Hapus", "削除")}
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -1022,6 +1200,292 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                       )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              <div className="sec card" style={{ background: "var(--surface-subtle)" }}>
+                <div className="card-header" style={{ marginBottom: "0.5rem" }}>
+                  <h3 style={{ margin: 0 }}>
+                    {editingRuleId
+                      ? tr(
+                          lang,
+                          `4. Visual Rule Builder (Editing: ${editingRuleId})`,
+                          `4. Perakit Aturan Visual (Mengubah: ${editingRuleId})`,
+                          `4. ビジュアルルールビルダー（編集中: ${editingRuleId}）`,
+                        )
+                      : tr(
+                          lang,
+                          "4. Visual Rule Builder (Add or Edit Rules Without JSON)",
+                          "4. Perakit Aturan Visual (Tambah atau Ubah Aturan Tanpa JSON)",
+                          "4. ビジュアルルールビルダー（JSON不要でルールを追加・編集）",
+                        )}
+                  </h3>
+                  <span className="chip">{tr(lang, "Whitelist Guarded", "Daftar Putih Aman", "ホワイトリスト保護")}</span>
+                </div>
+                <p className="note" style={{ marginBottom: "0.75rem" }}>
+                  {tr(
+                    lang,
+                    "Compose condition clauses and target actions from whitelisted plant variables. Rules with lower priority numbers execute first.",
+                    "Susun syarat kondisi dan keputusan aksi dari variabel pembangkit resmi. Aturan dengan angka prioritas lebih kecil dijalankan lebih dulu.",
+                    "許可されたプラント変数から条件とアクションを組み立てます。優先度の数値が小さいルールから順に評価されます。",
+                  )}
+                </p>
+
+                <div className="grid-2">
+                  <div className="fld" style={{ marginTop: 0 }}>
+                    <label htmlFor="vb-rule-id">
+                      {tr(lang, "Rule ID", "ID Aturan", "ルールID")}
+                    </label>
+                    <input
+                      id="vb-rule-id"
+                      type="text"
+                      value={visualDraft.id}
+                      onChange={(e) => setVisualDraft((prev) => ({ ...prev, id: e.target.value }))}
+                    />
+                  </div>
+                  <div className="fld" style={{ marginTop: 0 }}>
+                    <label htmlFor="vb-rule-priority">
+                      {tr(lang, "Priority Order (1 = highest)", "Angka Prioritas (1 = tertinggi)", "優先度（1 = 最優先）")}
+                    </label>
+                    <input
+                      id="vb-rule-priority"
+                      type="number"
+                      className="tabular-nums"
+                      min={1}
+                      max={999}
+                      value={visualDraft.priority}
+                      onChange={(e) =>
+                        setVisualDraft((prev) => ({
+                          ...prev,
+                          priority: Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : 10,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="fld" style={{ marginTop: "0.75rem" }}>
+                  <div className="actions-inline" style={{ justifyContent: "space-between" }}>
+                    <label htmlFor="vb-combinator">
+                      {tr(lang, "When Condition Logic", "Logika Penggabung Syarat (When)", "条件結合ロジック (When)")}
+                    </label>
+                    <select
+                      id="vb-combinator"
+                      value={visualDraft.combinator}
+                      onChange={(e) =>
+                        setVisualDraft((prev) => ({
+                          ...prev,
+                          combinator: e.target.value as VisualConditionCombinator,
+                        }))
+                      }
+                      style={{ width: "auto", minWidth: "220px" }}
+                    >
+                      <option value="all">
+                        {tr(lang, "ALL conditions must match (AND)", "SEMUA syarat terpenuhi (DAN)", "すべての条件を満たす (AND)")}
+                      </option>
+                      <option value="any">
+                        {tr(lang, "ANY condition matches (OR)", "SALAH SATU syarat terpenuhi (ATAU)", "いずれかの条件を満たす (OR)")}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gap: "0.5rem", marginTop: "0.5rem" }}>
+                  {visualDraft.conditions.map((clause, idx) => {
+                    const varSpec = EMS_VARIABLE_SPECS.find((v) => v.id === clause.variable);
+                    return (
+                      <div
+                        key={`clause-${idx}`}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1.4fr 1fr 1.2fr auto",
+                          gap: "0.5rem",
+                          alignItems: "end",
+                        }}
+                      >
+                        <div className="fld" style={{ marginTop: 0 }}>
+                          <label htmlFor={`vb-var-${idx}`}>
+                            {tr(lang, `Variable #${idx + 1}`, `Variabel #${idx + 1}`, `変数 #${idx + 1}`)}
+                          </label>
+                          <select
+                            id={`vb-var-${idx}`}
+                            value={clause.variable}
+                            onChange={(e) => {
+                              const nextVar = e.target.value;
+                              const nextSpec = EMS_VARIABLE_SPECS.find((v) => v.id === nextVar);
+                              const defaultVal =
+                                nextSpec?.valueType === "bool"
+                                  ? "true"
+                                  : nextSpec?.isFraction
+                                    ? "0.30"
+                                    : nextVar === "hour_of_day"
+                                      ? "17, 18, 19, 20, 21"
+                                      : "0";
+                              const defaultOp: VisualConditionOperator =
+                                nextSpec?.valueType === "bool" || nextSpec?.valueType === "str"
+                                  ? "=="
+                                  : nextVar === "hour_of_day"
+                                    ? "in"
+                                    : ">";
+                              updateVisualCondition(idx, {
+                                variable: nextVar,
+                                operator: defaultOp,
+                                valueText: defaultVal,
+                              });
+                            }}
+                          >
+                            {EMS_VARIABLE_SPECS.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                {tr(lang, v.labelEn, v.labelId, v.labelJa)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="fld" style={{ marginTop: 0 }}>
+                          <label htmlFor={`vb-op-${idx}`}>
+                            {tr(lang, "Operator", "Operator", "演算子")}
+                          </label>
+                          <select
+                            id={`vb-op-${idx}`}
+                            value={clause.operator}
+                            onChange={(e) =>
+                              updateVisualCondition(idx, { operator: e.target.value as VisualConditionOperator })
+                            }
+                          >
+                            {OPERATOR_CHOICES.map((opItem) => (
+                              <option key={opItem.op} value={opItem.op}>
+                                {tr(lang, opItem.labelEn, opItem.labelId, opItem.labelJa)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="fld" style={{ marginTop: 0 }}>
+                          <label htmlFor={`vb-val-${idx}`}>
+                            {tr(lang, "Threshold / Value", "Nilai / Ambang", "比較値・閾値")}
+                          </label>
+                          {varSpec?.valueType === "bool" ? (
+                            <select
+                              id={`vb-val-${idx}`}
+                              value={clause.valueText.toLowerCase() === "false" ? "false" : "true"}
+                              onChange={(e) => updateVisualCondition(idx, { valueText: e.target.value })}
+                            >
+                              <option value="true">{tr(lang, "Yes (true)", "Ya (true)", "はい (true)")}</option>
+                              <option value="false">{tr(lang, "No (false)", "Tidak (false)", "いいえ (false)")}</option>
+                            </select>
+                          ) : (
+                            <input
+                              id={`vb-val-${idx}`}
+                              type="text"
+                              className="tabular-nums"
+                              list={`vb-param-list-${idx}`}
+                              value={clause.valueText}
+                              onChange={(e) => updateVisualCondition(idx, { valueText: e.target.value })}
+                              placeholder={
+                                clause.operator === "in" || clause.operator === "not_in"
+                                  ? "17, 18, 19, 20"
+                                  : varSpec?.isFraction
+                                    ? "0.30 / $params.reserve_soc_fraction"
+                                    : "0"
+                              }
+                            />
+                          )}
+                          <datalist id={`vb-param-list-${idx}`}>
+                            {paramKeys.map((pk) => (
+                              <option key={pk} value={`$params.${pk}`} />
+                            ))}
+                          </datalist>
+                        </div>
+
+                        <div>
+                          <button
+                            type="button"
+                            className="btn ghost btn-sm"
+                            disabled={visualDraft.conditions.length <= 1}
+                            onClick={() => removeVisualConditionClause(idx)}
+                          >
+                            {tr(lang, "Remove", "Hapus", "削除")}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="actions-inline" style={{ marginTop: "0.5rem" }}>
+                  <button type="button" className="btn ghost btn-sm" onClick={addVisualConditionClause}>
+                    {tr(lang, "+ Add Condition Clause", "+ Tambah Baris Syarat", "+ 条件行を追加")}
+                  </button>
+                </div>
+
+                <div className="grid-2" style={{ marginTop: "0.75rem" }}>
+                  <div className="fld" style={{ marginTop: 0 }}>
+                    <label htmlFor="vb-action-type">
+                      {tr(lang, "Then Action Decision", "Keputusan Aksi (Then)", "実行アクション (Then)")}
+                    </label>
+                    <select
+                      id="vb-action-type"
+                      value={visualDraft.actionType}
+                      onChange={(e) => {
+                        const nextAct = e.target.value as VisualActionKind;
+                        const spec = EMS_ACTION_SPECS.find((a) => a.id === nextAct) ?? EMS_ACTION_SPECS[0];
+                        setVisualDraft((prev) => ({
+                          ...prev,
+                          actionType: nextAct,
+                          actionArgText: spec.defaultArg,
+                        }));
+                      }}
+                    >
+                      {EMS_ACTION_SPECS.map((act) => (
+                        <option key={act.id} value={act.id}>
+                          {tr(lang, act.labelEn, act.labelId, act.labelJa)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedActionSpec.argKind !== "none" && (
+                    <div className="fld" style={{ marginTop: 0 }}>
+                      <label htmlFor="vb-action-arg">
+                        {selectedActionSpec.argKind === "limit"
+                          ? tr(lang, "Power Limit Source / kW", "Sumber Batas Daya / Nilai kW", "電力上限ソース / kW値")
+                          : tr(lang, "Target Power Source / kW", "Sumber Target Daya / Nilai kW", "目標出力ソース / kW値")}
+                      </label>
+                      <input
+                        id="vb-action-arg"
+                        type="text"
+                        className="tabular-nums"
+                        list="vb-action-sources"
+                        value={visualDraft.actionArgText}
+                        onChange={(e) => setVisualDraft((prev) => ({ ...prev, actionArgText: e.target.value }))}
+                      />
+                      <datalist id="vb-action-sources">
+                        <option value="pv_surplus_kw" />
+                        <option value="net_load_kw" />
+                        <option value="local_load_kw" />
+                        <option value="bess_max_charge_kw" />
+                        <option value="bess_max_discharge_kw" />
+                        <option value="biomass_available_kw" />
+                        {paramKeys.map((pk) => (
+                          <option key={pk} value={`$params.${pk}`} />
+                        ))}
+                      </datalist>
+                    </div>
+                  )}
+                </div>
+
+                <div className="actions-inline" style={{ marginTop: "0.75rem" }}>
+                  <button type="button" className="btn primary btn-sm" onClick={handleSaveVisualRule}>
+                    {editingRuleId
+                      ? tr(lang, "Save Rule Changes", "Simpan Perubahan Aturan", "ルールの変更を保存")
+                      : tr(lang, "Add Rule to Priority Table", "Tambahkan Aturan ke Tabel", "ルールをテーブルに追加")}
+                  </button>
+                  {editingRuleId && (
+                    <button type="button" className="btn ghost btn-sm" onClick={handleCancelVisualEdit}>
+                      {tr(lang, "Cancel Edit", "Batal Mengubah", "編集をキャンセル")}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1037,12 +1501,31 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                     setJsonEditorOpen(!jsonEditorOpen);
                   }}
                 >
-                  {jsonEditorOpen ? "Sembunyikan Editor JSON Tingkat Lanjut" : "Buka Editor JSON Tingkat Lanjut (Opsional)"}
+                  {jsonEditorOpen
+                    ? tr(
+                        lang,
+                        "Hide Advanced JSON Editor",
+                        "Sembunyikan Editor JSON Tingkat Lanjut",
+                        "高度なJSONエディタを閉じる",
+                      )
+                    : tr(
+                        lang,
+                        "Open Advanced JSON Editor (Optional)",
+                        "Buka Editor JSON Tingkat Lanjut (Opsional)",
+                        "高度なJSONエディタを開く（任意）",
+                      )}
                 </button>
 
                 {jsonEditorOpen && (
                   <div className="fld" style={{ marginTop: "0.75rem" }}>
-                    <label htmlFor="ems-json-editor">Dokumen Skema JSON EMS v0.1</label>
+                    <label htmlFor="ems-json-editor">
+                      {tr(
+                        lang,
+                        "EMS v0.1 JSON Schema Document",
+                        "Dokumen Skema JSON EMS v0.1",
+                        "EMS v0.1 JSONスキーマドキュメント",
+                      )}
+                    </label>
                     <textarea
                       id="ems-json-editor"
                       rows={12}
@@ -1061,7 +1544,7 @@ export default function HybridEmsPage({ params }: { params: Promise<{ projectId:
                     />
                     <div className="actions-inline" style={{ marginTop: "0.5rem" }}>
                       <button type="button" className="btn primary btn-sm" onClick={handleApplyJsonDraft}>
-                        Terapkan &amp; Validasi JSON
+                        {tr(lang, "Apply & Validate JSON", "Terapkan & Validasi JSON", "JSONを適用して検証")}
                       </button>
                     </div>
                   </div>
