@@ -83,6 +83,7 @@ const CODE_MESSAGES: Record<string, string> = {
   invalid_biomass_config: "Konfigurasi pembangkit biomass tidak valid. Periksa kapasitas, kurva bahan bakar, dan parameter pasokan.",
   invalid_diesel_config: "Konfigurasi diesel generator tidak valid. Periksa kapasitas, beban minimum, kurva solar, dan parameter operasi.",
   invalid_dispatch_config: "Konfigurasi strategi dispatch EMS tidak valid. Periksa jam puncak atau batas beban puncak.",
+  invalid_ems_rules: "Aturan EMS kustom tidak valid. Periksa format JSON, kondisi variabel, atau pilih salah satu preset aturan siap pakai.",
   invalid_finance_config: "Parameter keuangan tidak valid. Periksa tingkat diskonto, eskalasi, CAPEX, dan tarif.",
   invalid_lifetime_config: "Umur proyek harus antara 1 sampai 40 tahun dan mode multi-tahun harus valid.",
   job_not_found: "Job simulasi tidak ditemukan atau sudah kedaluwarsa di memori server.",

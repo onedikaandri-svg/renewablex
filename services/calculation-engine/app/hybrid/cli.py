@@ -198,6 +198,7 @@ def _parse_dispatch_config(sim_raw: dict[str, Any]) -> DispatchConfig | None:
         off_peak_hours=tuple(int(h) for h in off_peak_raw),
         tou_charge_soc_target=float(params.get("tou_charge_soc_target", 0.90)),
         tou_discharge_soc_floor=float(params.get("tou_discharge_soc_floor", 0.25)),
+        ems_rules=params.get("ems_rules"),
     )
 
 

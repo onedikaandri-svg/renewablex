@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import math
-from typing import Literal
+from typing import Any, Literal
 
 from app.errors import EngineError
 
@@ -13,6 +13,7 @@ StrategyName = Literal[
     "cycle_charging",
     "peak_shaving",
     "time_of_use_arbitrage",
+    "custom_ems",
 ]
 
 
@@ -74,7 +75,7 @@ class DispatchDecision:
 
 @dataclass(frozen=True)
 class DispatchConfig:
-    """Konfigurasi strategi dispatch bawaan Tahap 2."""
+    """Konfigurasi strategi dispatch bawaan Tahap 2 dan kustom Tahap 3B."""
 
     strategy: StrategyName = "self_consumption"
     allow_grid_import: bool = False
@@ -85,6 +86,7 @@ class DispatchConfig:
     off_peak_hours: tuple[int, ...] = (0, 1, 2, 3, 4, 5)
     tou_charge_soc_target: float = 0.90
     tou_discharge_soc_floor: float = 0.25
+    ems_rules: dict[str, Any] | None = None
 
 
 def _validate_hours(hours: tuple[int, ...], name: str) -> None:
@@ -711,5 +713,9 @@ def create_dispatch_strategy(config: DispatchConfig) -> DispatchStrategy:
             tou_charge_soc_target=config.tou_charge_soc_target,
             tou_discharge_soc_floor=config.tou_discharge_soc_floor,
         )
+    if config.strategy == "custom_ems":
+        from app.hybrid.ems import CustomEMSStrategy
+
+        return CustomEMSStrategy(config)
 
     raise EngineError("invalid_dispatch_config", f"Strategi dispatch tidak dikenal: {config.strategy}.")

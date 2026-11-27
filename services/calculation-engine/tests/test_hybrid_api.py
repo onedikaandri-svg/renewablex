@@ -62,7 +62,8 @@ def test_presets_endpoint_returns_complete_catalog():
     assert data["contract_version"] == "0.5"
     assert set(data["fuel_presets"]) == {"efb", "wood_pellet", "pks", "woodchip", "rice_husk"}
     assert set(data["plant_samples"]) == {"sample_gasifier_250kw", "sample_steam_turbine_1000kw"}
-    assert len(data["dispatch_strategies"]) == 5
+    assert len(data["dispatch_strategies"]) == 6
+    assert len(data["ems_rule_presets"]) >= 3
     assert len(data["location_presets"]) >= 5
     assert data["sample_config"]["components"]["pv"]["capacity_kwp"] == 500.0
 

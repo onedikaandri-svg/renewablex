@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, Response
 import numpy as np
 
 from app.api.hybrid_schemas import (
+    HybridEMSValidateRequest,
     HybridExcelExportRequest,
     HybridLoadPreviewRequest,
     HybridLoadProfileInput,
@@ -31,6 +32,11 @@ from app.hybrid.cli import (
     _parse_diesel_config,
     _parse_dispatch_config,
     _parse_pv_config,
+)
+from app.hybrid.ems import (
+    get_default_ems_rule_set_dict,
+    get_ems_rule_presets,
+    validate_custom_ems_rules,
 )
 from app.hybrid.diesel import (
     DEFAULT_DIESEL_EMISSION_FACTOR_KG_PER_LITER,
@@ -132,6 +138,24 @@ DISPATCH_STRATEGIES: list[dict[str, Any]] = [
             "off_peak_hours": [0, 1, 2, 3, 4, 5],
             "tou_charge_soc_target": 0.90,
             "tou_discharge_soc_floor": 0.25,
+        },
+    },
+    {
+        "id": "custom_ems",
+        "name_id": "Aturan EMS Kustom (Supervisory Controller)",
+        "name_en": "Custom Supervisory EMS Rules",
+        "description_id": (
+            "Menjalankan aturan prioritas berbasis kondisi (SOC baterai, jam operasi, surplus PV, "
+            "beban bersih, dan batas ekspor) dengan pengawasan keselamatan otomatis."
+        ),
+        "description_en": (
+            "Executes priority condition-action rules (battery SOC, hour of day, PV surplus, "
+            "net load, and export limits) with automated supervisory safety checks."
+        ),
+        "default_params": {
+            "allow_grid_import": False,
+            "allow_grid_export": False,
+            "ems_rules": get_default_ems_rule_set_dict(),
         },
     },
 ]
@@ -542,8 +566,23 @@ def get_presets() -> dict[str, Any]:
         "plant_samples": BIOMASS_PLANT_SAMPLES,
         "diesel_defaults": diesel_defaults,
         "dispatch_strategies": DISPATCH_STRATEGIES,
+        "ems_rule_presets": list(get_ems_rule_presets().values()),
         "location_presets": LOCATION_PRESETS,
         "sample_config": sample_config,
+    }
+
+
+@router.post("/ems/validate")
+def validate_hybrid_ems_rules(req: HybridEMSValidateRequest) -> dict[str, Any]:
+    """Memvalidasi dokumen aturan JSON EMS v0.1 tanpa menjalankan simulasi penuh."""
+    try:
+        report = validate_custom_ems_rules(req.ems_rules)
+    except EngineError as exc:
+        _raise_engine_error(exc)
+    return {
+        "engine_version": ENGINE_VERSION,
+        "contract_version": CONTRACT_VERSION,
+        **report,
     }
 
 

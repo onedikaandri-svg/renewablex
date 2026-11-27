@@ -12,6 +12,7 @@ import {
   runHybridSimulate,
   submitHybridJob,
   submitHybridSweepJob,
+  validateHybridEmsRules,
 } from "./hybrid-api";
 import { buildSampleProject } from "./hybrid-storage";
 import type { HybridSimulateResponse } from "./hybrid-types";
@@ -199,5 +200,56 @@ describe("hybrid-api", () => {
     const excel = await downloadHybridExcelReport({ cfg, result: fakeResult, language: "id" });
     expect(excel.filename).toBe("cikarang-laporan-hybrid.xlsx");
     expect(excel.blob.size).toBe(4);
+  });
+
+  it("menyertakan ems_rules saat strategi custom_ems dipilih dan memvalidasi aturan EMS", async () => {
+    const cfg = buildSampleProject("ems-test-id");
+    cfg.simulation.dispatch_strategy = "custom_ems";
+    cfg.simulation.dispatch_params.ems_rules = {
+      ems_schema_version: "0.1",
+      name: "peak_cut_daytime",
+      description: "Aturan supervisory peak-cut",
+      params: { reserve_soc_fraction: 0.3, soc_max_fraction: 0.95 },
+      priority: ["pv", "bess", "biomass"],
+      fallback_mode_dispatcher: true,
+      rules: [
+        {
+          id: "r1",
+          enabled: true,
+          priority: 10,
+          mode_scope: ["*"],
+          when: { var: "pv_surplus_kw", op: ">", value: 0 },
+          then: [{ action: "charge_bess", limit: "pv_surplus_kw" }],
+        },
+      ],
+    };
+
+    const payload = buildHybridSimulatePayload(cfg);
+    const simPayload = payload.simulation as {
+      dispatch_strategy: string;
+      dispatch_params: Record<string, unknown>;
+    };
+    expect(simPayload.dispatch_strategy).toBe("custom_ems");
+    expect(simPayload.dispatch_params.ems_rules).toBeDefined();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            valid: true,
+            schema_version: "0.1",
+            name: "peak_cut_daytime",
+            rule_count: 1,
+            enabled_rule_count: 1,
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
+    const valRes = await validateHybridEmsRules(cfg.simulation.dispatch_params.ems_rules);
+    expect(valRes.valid).toBe(true);
+    expect(valRes.rule_count).toBe(1);
   });
 });

@@ -1,5 +1,7 @@
 import { API_URL, ApiError, NetworkError, parseProblems } from "@/lib/api";
 import type {
+  HybridEmsRuleSet,
+  HybridEmsValidationResponse,
   HybridJobStatusResponse,
   HybridLoadPreviewResponse,
   HybridPresetsResponse,
@@ -175,6 +177,9 @@ export function buildHybridSimulatePayload(cfg: HybridProjectConfig): Record<str
         off_peak_hours: cfg.simulation.dispatch_params.off_peak_hours,
         tou_charge_soc_target: cfg.simulation.dispatch_params.tou_charge_soc_target,
         tou_discharge_soc_floor: cfg.simulation.dispatch_params.tou_discharge_soc_floor,
+        ...(cfg.simulation.dispatch_strategy === "custom_ems" && cfg.simulation.dispatch_params.ems_rules
+          ? { ems_rules: cfg.simulation.dispatch_params.ems_rules }
+          : {}),
       },
       project_lifetime_years: cfg.simulation.project_lifetime_years,
       multi_year_mode: cfg.simulation.multi_year_mode,
@@ -297,6 +302,13 @@ export async function runHybridSimulate(
   signal?: AbortSignal,
 ): Promise<HybridSimulateResponse> {
   return postJson<HybridSimulateResponse>("/v1/hybrid/simulate", buildHybridSimulatePayload(cfg), signal);
+}
+
+export async function validateHybridEmsRules(
+  emsRules: HybridEmsRuleSet,
+  signal?: AbortSignal,
+): Promise<HybridEmsValidationResponse> {
+  return postJson<HybridEmsValidationResponse>("/v1/hybrid/ems/validate", { ems_rules: emsRules }, signal);
 }
 
 export async function submitHybridJob(

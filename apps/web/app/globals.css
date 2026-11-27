@@ -843,6 +843,16 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   color: var(--errtext);
 }
 
+.state.good {
+  background: var(--successbg);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.state.good h3, .state.good p {
+  color: var(--success);
+}
+
 .state ul, .warn ul {
   margin: 0.375rem 0 0.5rem;
   padding-left: 1.25rem;

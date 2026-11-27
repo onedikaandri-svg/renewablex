@@ -3,7 +3,55 @@ export type DispatchStrategyId =
   | "load_following"
   | "cycle_charging"
   | "peak_shaving"
-  | "time_of_use_arbitrage";
+  | "time_of_use_arbitrage"
+  | "custom_ems";
+
+export interface HybridEmsRuleAction {
+  action: string;
+  limit?: string | number;
+  target?: string | number;
+}
+
+export interface HybridEmsRuleItem {
+  id: string;
+  enabled?: boolean;
+  priority: number;
+  mode_scope: string[];
+  when: Record<string, unknown>;
+  then: HybridEmsRuleAction[];
+}
+
+export interface HybridEmsRuleSet {
+  ems_schema_version: string;
+  name: string;
+  description?: string;
+  params?: Record<string, number>;
+  priority?: string[];
+  fallback_mode_dispatcher?: boolean;
+  rules: HybridEmsRuleItem[];
+}
+
+export interface HybridEmsRulePreset {
+  id: string;
+  name_id: string;
+  name_en: string;
+  description_id: string;
+  description_en: string;
+  rule_set: HybridEmsRuleSet;
+}
+
+export interface HybridEmsValidationResponse {
+  engine_version?: string;
+  contract_version?: string;
+  valid: boolean;
+  schema_version: string;
+  name: string;
+  description: string;
+  rule_count: number;
+  enabled_rule_count: number;
+  priority_order?: string[];
+  fallback_mode_dispatcher?: boolean;
+}
 
 export type MultiYearMode = "scaled_year_1" | "full_hourly";
 export type BiomassPresetId = "efb" | "wood_pellet" | "pks" | "woodchip" | "rice_husk";
@@ -142,6 +190,7 @@ export interface HybridProjectConfig {
       off_peak_hours: number[];
       tou_charge_soc_target: number;
       tou_discharge_soc_floor: number;
+      ems_rules?: HybridEmsRuleSet | null;
     };
     project_lifetime_years: number;
     multi_year_mode: MultiYearMode;
@@ -349,6 +398,7 @@ export interface HybridPresetsResponse {
     description_en: string;
     default_params: Record<string, unknown>;
   }>;
+  ems_rule_presets?: HybridEmsRulePreset[];
   location_presets: Array<{
     id: string;
     name: string;

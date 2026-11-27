@@ -53,6 +53,11 @@ class HybridDispatchParamsInput(HybridStrictModel):
     off_peak_hours: list[int] = Field(default_factory=lambda: [0, 1, 2, 3, 4, 5])
     tou_charge_soc_target: float = 0.90
     tou_discharge_soc_floor: float = 0.25
+    ems_rules: dict[str, Any] | None = None
+
+
+class HybridEMSValidateRequest(HybridStrictModel):
+    ems_rules: dict[str, Any]
 
 
 class HybridSimulationInput(HybridStrictModel):
@@ -66,6 +71,7 @@ class HybridSimulationInput(HybridStrictModel):
         "cycle_charging",
         "peak_shaving",
         "time_of_use_arbitrage",
+        "custom_ems",
     ] = "load_following"
     dispatch_params: HybridDispatchParamsInput = Field(default_factory=HybridDispatchParamsInput)
     project_lifetime_years: int = Field(default=25, ge=1, le=40)
