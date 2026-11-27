@@ -102,6 +102,41 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
             </div>
           </div>
 
+          {fin.tax_model === "after_tax" && (
+            <div className="grid-2">
+              <div className="fld">
+                <label htmlFor="econ-corp-tax">Tarif PPh Badan (%) [REAL DATA]</label>
+                <input
+                  id="econ-corp-tax"
+                  type="number"
+                  step="0.5"
+                  min={0}
+                  max={60}
+                  value={Number((fin.corporate_tax_rate * 100).toFixed(2))}
+                  onChange={(e) => {
+                    const v = Number(e.target.value) / 100;
+                    if (Number.isFinite(v)) patchFinance({ corporate_tax_rate: v });
+                  }}
+                />
+              </div>
+              <div className="fld">
+                <label htmlFor="econ-tax-credit">Kredit Pajak Investasi (%)</label>
+                <input
+                  id="econ-tax-credit"
+                  type="number"
+                  step="0.5"
+                  min={0}
+                  max={100}
+                  value={Number((fin.tax_credit_fraction * 100).toFixed(2))}
+                  onChange={(e) => {
+                    const v = Number(e.target.value) / 100;
+                    if (Number.isFinite(v)) patchFinance({ tax_credit_fraction: v });
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="grid-2">
             <div className="fld">
               <label htmlFor="econ-wacc">Tingkat Diskonto / WACC (%)</label>
@@ -131,7 +166,36 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
             </div>
           </div>
 
-          <div className="grid-3">
+          <div className="grid-2">
+            <div className="fld">
+              <label htmlFor="econ-grid-imp">Tarif Impor Grid ({project.project.currency_code}/kWh) [REAL DATA]</label>
+              <input
+                id="econ-grid-imp"
+                type="number"
+                min={0}
+                value={fin.grid_import_tariff_per_kwh}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) patchFinance({ grid_import_tariff_per_kwh: v });
+                }}
+              />
+            </div>
+            <div className="fld">
+              <label htmlFor="econ-grid-exp">Tarif Ekspor Grid ({project.project.currency_code}/kWh)</label>
+              <input
+                id="econ-grid-exp"
+                type="number"
+                min={0}
+                value={fin.grid_export_tariff_per_kwh}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) patchFinance({ grid_export_tariff_per_kwh: v });
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
             <div className="fld">
               <label htmlFor="econ-esc-tar">Eskalasi Tarif (%/thn)</label>
               <input
@@ -155,6 +219,22 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
                 onChange={(e) => {
                   const v = Number(e.target.value) / 100;
                   if (Number.isFinite(v)) patchFinance({ om_escalation_rate: v });
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="fld">
+              <label htmlFor="econ-esc-fuel">Eskalasi Harga Bahan Bakar (%/thn) [REAL DATA]</label>
+              <input
+                id="econ-esc-fuel"
+                type="number"
+                step="0.1"
+                value={Number((fin.fuel_escalation_rate * 100).toFixed(2))}
+                onChange={(e) => {
+                  const v = Number(e.target.value) / 100;
+                  if (Number.isFinite(v)) patchFinance({ fuel_escalation_rate: v });
                 }}
               />
             </div>
@@ -270,22 +350,20 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
 
           <div className="grid-2">
             <div className="fld">
-              <label htmlFor="econ-diesel-overhaul-life">Umur Overhaul Diesel untuk Nilai Sisa (Tahun)</label>
+              <label htmlFor="econ-bos-capex">Biaya BOS &amp; Lainnya Tahun 0 ({project.project.currency_code})</label>
               <input
-                id="econ-diesel-overhaul-life"
+                id="econ-bos-capex"
                 type="number"
-                min={0.5}
-                max={30}
-                step={0.5}
-                value={fin.diesel_overhaul_life_years}
+                min={0}
+                value={fin.bos_and_other_capex}
                 onChange={(e) => {
                   const v = Number(e.target.value);
-                  if (Number.isFinite(v)) patchFinance({ diesel_overhaul_life_years: v });
+                  if (Number.isFinite(v)) patchFinance({ bos_and_other_capex: v });
                 }}
               />
             </div>
             <div className="fld">
-              <label htmlFor="econ-grant">Hibah Modal / Grant Tahun 0</label>
+              <label htmlFor="econ-grant">Hibah Modal / Grant Tahun 0 ({project.project.currency_code})</label>
               <input
                 id="econ-grant"
                 type="number"
@@ -332,6 +410,74 @@ export default function HybridEconomicsPage({ params }: { params: Promise<{ proj
               />
             </div>
           </div>
+
+          <fieldset style={{ marginTop: "1rem" }}>
+            <legend>Umur Desain Acuan Nilai Sisa (Salvage Value) [REAL DATA]</legend>
+            <div className="grid-2">
+              <div className="fld">
+                <label htmlFor="econ-bess-design-life">Umur Desain BESS (Tahun)</label>
+                <input
+                  id="econ-bess-design-life"
+                  type="number"
+                  min={0.5}
+                  max={30}
+                  step={0.5}
+                  value={fin.bess_design_life_years}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) patchFinance({ bess_design_life_years: v });
+                  }}
+                />
+              </div>
+              <div className="fld">
+                <label htmlFor="econ-inv-design-life">Umur Desain Inverter PV (Tahun)</label>
+                <input
+                  id="econ-inv-design-life"
+                  type="number"
+                  min={0.5}
+                  max={30}
+                  step={0.5}
+                  value={fin.inverter_design_life_years}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) patchFinance({ inverter_design_life_years: v });
+                  }}
+                />
+              </div>
+            </div>
+            <div className="grid-2">
+              <div className="fld">
+                <label htmlFor="econ-bio-overhaul-life">Umur Overhaul Biomass (Tahun)</label>
+                <input
+                  id="econ-bio-overhaul-life"
+                  type="number"
+                  min={0.5}
+                  max={30}
+                  step={0.5}
+                  value={fin.biomass_overhaul_life_years}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) patchFinance({ biomass_overhaul_life_years: v });
+                  }}
+                />
+              </div>
+              <div className="fld">
+                <label htmlFor="econ-diesel-overhaul-life">Umur Overhaul Diesel (Tahun)</label>
+                <input
+                  id="econ-diesel-overhaul-life"
+                  type="number"
+                  min={0.5}
+                  max={30}
+                  step={0.5}
+                  value={fin.diesel_overhaul_life_years}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) patchFinance({ diesel_overhaul_life_years: v });
+                  }}
+                />
+              </div>
+            </div>
+          </fieldset>
         </section>
       </div>
     </HybridShell>

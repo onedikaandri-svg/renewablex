@@ -65,6 +65,8 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
       step_minutes: 60,
       leap_day_policy: "ignore_feb_29",
       weather_source: "pvgis_tmy",
+      weather_data: null,
+      weather_filename: "",
       dispatch_strategy: "load_following",
       dispatch_params: {
         allow_grid_import: false,
@@ -85,6 +87,8 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
       peak_load_kw: 350.0,
       seed: 42,
       noise_fraction: 0.05,
+      daily_profile: null,
+      monthly_factors: null,
       csv_text: "",
       csv_filename: "",
     },
@@ -95,14 +99,34 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
         capacity_kwp: 500.0,
         inverter_ac_kw: 420.0,
         transposition_model: "perez",
+        albedo: 0.2,
         tracking_mode: "fixed",
         tilt_degrees: 10.0,
         azimuth_degrees: 0.0,
+        iam_b0: 0.05,
+        soiling_monthly: null,
         cell_temp_model: "faiman",
+        noct_c: 45.0,
+        faiman_u0: 25.0,
+        faiman_u1: 6.84,
         dc_model: "pvwatts",
+        temp_coeff_per_c: -0.004,
+        i_sc: 13.8,
+        v_oc: 49.5,
+        i_mp: 13.0,
+        v_mp: 41.5,
+        alpha_sc: 0.0069,
+        beta_voc: -0.1386,
+        cells_in_series: 72,
         system_loss_fraction: 0.14,
+        mismatch_fraction: 0.02,
+        dc_wiring_fraction: 0.02,
+        shading_fraction: 0.0,
+        availability_fraction: 0.01,
+        lid_fraction: 0.015,
         annual_degradation_fraction: 0.005,
         inverter_efficiency: 0.96,
+        night_tare_kw: 0.0,
       },
       bess: {
         enabled: true,
@@ -115,6 +139,7 @@ export function buildSampleProject(id = makeId()): HybridProjectConfig {
         charge_efficiency: 0.94,
         discharge_efficiency: 0.94,
         pcs_loss_fraction: 0.02,
+        aux_load_kw: 0.0,
         calendar_fade_per_year: 0.015,
         cycle_fade_per_efc: 0.00005,
         eol_capacity_fraction: 0.80,
@@ -234,7 +259,21 @@ function readAllRaw(): HybridProjectConfig[] {
 
 function writeAllRaw(items: HybridProjectConfig[]): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(PROJECTS_KEY, JSON.stringify(items));
+  try {
+    window.localStorage.setItem(PROJECTS_KEY, JSON.stringify(items));
+  } catch {
+    // Bila weather_data 8760 jam membuat kuota localStorage penuh, simpan proyek dengan weatherPreview/loadPreview diringkas
+    try {
+      const slim = items.map((item) => ({
+        ...item,
+        weatherPreview: item.weatherPreview ?? null,
+        loadPreview: item.loadPreview ? { ...item.loadPreview, hourly_load_kw: [] } : null,
+      }));
+      window.localStorage.setItem(PROJECTS_KEY, JSON.stringify(slim));
+    } catch {
+      // Abaikan bila tetap penuh
+    }
+  }
 }
 
 export function listProjects(): HybridProjectConfig[] {

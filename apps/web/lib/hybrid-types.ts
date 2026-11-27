@@ -93,6 +93,26 @@ export interface HybridDieselComponentConfig {
   emission_factor_kg_co2e_per_liter: number;
 }
 
+export interface HybridCustomWeatherData {
+  metadata?: {
+    provider?: string;
+    dataset?: string | null;
+    dataset_version?: string | null;
+    period?: string | null;
+    latitude?: number;
+    longitude?: number;
+    elevation_m?: number | null;
+    retrieved_at?: string;
+  };
+  hourly: {
+    ghi_w_m2: number[];
+    dni_w_m2: number[];
+    dhi_w_m2: number[];
+    temp_air_c: number[];
+    wind_speed_m_s: number[];
+  };
+}
+
 export interface HybridProjectConfig {
   id: string;
   schemaVersion: "0.5" | "0.6" | "0.7";
@@ -109,7 +129,9 @@ export interface HybridProjectConfig {
   simulation: {
     step_minutes: 60;
     leap_day_policy: "ignore_feb_29";
-    weather_source: "pvgis_tmy";
+    weather_source: "pvgis_tmy" | "custom_json";
+    weather_data?: HybridCustomWeatherData | null;
+    weather_filename?: string;
     dispatch_strategy: DispatchStrategyId;
     dispatch_params: {
       allow_grid_import: boolean;
@@ -130,6 +152,8 @@ export interface HybridProjectConfig {
     peak_load_kw: number;
     seed: number;
     noise_fraction: number;
+    daily_profile: number[] | null;
+    monthly_factors: number[] | null;
     csv_text: string;
     csv_filename: string;
   };
@@ -140,14 +164,34 @@ export interface HybridProjectConfig {
       capacity_kwp: number;
       inverter_ac_kw: number;
       transposition_model: "isotropic" | "hay_davies" | "perez";
+      albedo?: number;
       tracking_mode: "fixed" | "single_axis" | "two_axis";
       tilt_degrees: number;
       azimuth_degrees: number;
+      iam_b0?: number;
+      soiling_monthly?: number[] | null;
       cell_temp_model: "noct" | "faiman";
+      noct_c?: number;
+      faiman_u0?: number;
+      faiman_u1?: number;
       dc_model: "pvwatts" | "single_diode";
+      temp_coeff_per_c?: number;
+      i_sc?: number;
+      v_oc?: number;
+      i_mp?: number;
+      v_mp?: number;
+      alpha_sc?: number;
+      beta_voc?: number;
+      cells_in_series?: number;
       system_loss_fraction: number;
+      mismatch_fraction?: number;
+      dc_wiring_fraction?: number;
+      shading_fraction?: number;
+      availability_fraction?: number;
+      lid_fraction?: number;
       annual_degradation_fraction: number;
       inverter_efficiency: number;
+      night_tare_kw?: number;
     };
     bess: {
       enabled: boolean;
@@ -160,6 +204,7 @@ export interface HybridProjectConfig {
       charge_efficiency: number;
       discharge_efficiency: number;
       pcs_loss_fraction: number;
+      aux_load_kw?: number;
       calendar_fade_per_year: number;
       cycle_fade_per_efc: number;
       eol_capacity_fraction: number;

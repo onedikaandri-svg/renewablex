@@ -17,6 +17,7 @@ import {
   suggestIndonesiaTimezone,
   type GeocodeSuggestion,
 } from "@/lib/location-utils";
+import { parseWeatherFileContent } from "@/lib/weather-file-utils";
 import { usePreferences } from "@/lib/preferences";
 import { MissingProjectState, useHybridProject } from "@/lib/use-hybrid-project";
 
@@ -62,6 +63,7 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
   // State tempel koordinat 1-baris
   const [pasteInput, setPasteInput] = useState("");
   const [pasteError, setPasteError] = useState("");
+  const [uploadError, setUploadError] = useState("");
 
   useEffect(() => {
     fetchHybridPresets().then(setPresets).catch(() => {});
@@ -186,8 +188,56 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
     applyCoordinates(parsed.data.latitude, parsed.data.longitude, "koordinat tempel");
   }
 
+  async function handleWeatherFileUpload(file: File | undefined) {
+    if (!file || !project) return;
+    setUploadError("");
+    setErrorMsg("");
+    try {
+      const text = await file.text();
+      const parsed = parseWeatherFileContent(text, file.name);
+      const nextLat = parsed.locationMeta?.latitude ?? project.project.latitude;
+      const nextLon = parsed.locationMeta?.longitude ?? project.project.longitude;
+      const nextElev = parsed.locationMeta?.elevation_m ?? project.project.elevation_m;
+      const suggestedTz = suggestIndonesiaTimezone(nextLat, nextLon);
+
+      updateProject((p) => ({
+        ...p,
+        project: {
+          ...p.project,
+          latitude: nextLat,
+          longitude: nextLon,
+          elevation_m: nextElev,
+          timezone: suggestedTz ?? p.project.timezone,
+        },
+        simulation: {
+          ...p.simulation,
+          weather_source: "custom_json",
+          weather_data: parsed.weatherData,
+          weather_filename: file.name,
+        },
+        weatherPreview: null,
+      }));
+      const metaInfo =
+        parsed.locationMeta?.latitude !== undefined && parsed.locationMeta?.longitude !== undefined
+          ? ` (koordinat ${formatCoordinatePair(nextLat, nextLon, 4)})`
+          : "";
+      pushToast(`Berkas cuaca "${file.name}" (8.760 jam)${metaInfo} berhasil dimuat.`, "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Gagal membaca berkas cuaca kustom.";
+      setUploadError(msg);
+      pushToast(msg, "error");
+    }
+  }
+
   async function handleFetchWeather() {
     if (!project) return;
+    const isCustom = project.simulation.weather_source === "custom_json";
+    if (isCustom && !project.simulation.weather_data) {
+      const msg = "Silakan unggah berkas cuaca kustom (CSV, JSON, atau EPW 8.760 jam) terlebih dahulu.";
+      setErrorMsg(msg);
+      pushToast(msg, "error");
+      return;
+    }
     setLoading(true);
     setErrorMsg("");
     try {
@@ -200,7 +250,12 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
         },
         weatherPreview: preview,
       }));
-      pushToast("Data cuaca PVGIS v5.3 TMY berhasil diambil.", "success");
+      pushToast(
+        isCustom
+          ? "Pratinjau data cuaca kustom 8.760 jam berhasil divalidasi oleh mesin."
+          : "Data cuaca PVGIS v5.3 TMY berhasil diambil.",
+        "success",
+      );
     } catch (err) {
       if (err instanceof ApiError) {
         setErrorMsg([...err.problems.general, ...Object.values(err.problems.fields)].join(" "));
@@ -487,9 +542,62 @@ export default function HybridLocationPage({ params }: { params: Promise<{ proje
             </select>
           </div>
 
+          <div className="fld">
+            <label htmlFor="loc-weather-src">Sumber Data Cuaca 8.760 Jam</label>
+            <select
+              id="loc-weather-src"
+              value={project.simulation.weather_source}
+              onChange={(e) => {
+                const nextSrc = e.target.value as "pvgis_tmy" | "custom_json";
+                setUploadError("");
+                setErrorMsg("");
+                updateProject((p) => ({
+                  ...p,
+                  simulation: {
+                    ...p.simulation,
+                    weather_source: nextSrc,
+                  },
+                  weatherPreview: null,
+                }));
+              }}
+            >
+              <option value="pvgis_tmy">PVGIS v5.3 TMY (Otomatis dari Koordinat)</option>
+              <option value="custom_json">Unggah Berkas Cuaca Kustom (CSV / JSON / EPW 8.760 Jam)</option>
+            </select>
+          </div>
+
+          {project.simulation.weather_source === "custom_json" && (
+            <div className="fld">
+              <label htmlFor="loc-weather-file">Pilih Berkas Cuaca Kustom (CSV / JSON / EPW 8.760 Jam)</label>
+              <input
+                id="loc-weather-file"
+                type="file"
+                accept=".csv,.json,.epw,text/csv,application/json,text/plain"
+                onChange={(e) => void handleWeatherFileUpload(e.target.files?.[0])}
+              />
+              <p className="note" style={{ marginTop: "0.375rem" }}>
+                Mendukung CSV (kolom <code>ghi</code>, <code>dni</code>, <code>dhi</code>, <code>temp</code>, <code>wind</code>), JSON (array 8.760 jam), atau EnergyPlus EPW.
+              </p>
+              {project.simulation.weather_filename && project.simulation.weather_data && (
+                <p className="note" style={{ color: "var(--success)", fontWeight: 600 }}>
+                  Berkas termuat: {project.simulation.weather_filename} (8.760 jam tervalidasi)
+                </p>
+              )}
+              {uploadError && (
+                <p className="err" role="alert">
+                  {uploadError}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="row">
             <button type="button" className="btn primary" disabled={loading} onClick={() => void handleFetchWeather()}>
-              {loading ? "Mengambil Data Cuaca..." : "Ambil Data Cuaca PVGIS"}
+              {loading
+                ? "Memproses Data Cuaca..."
+                : project.simulation.weather_source === "custom_json"
+                  ? "Pratinjau & Validasi Cuaca Kustom"
+                  : "Ambil Data Cuaca PVGIS"}
             </button>
           </div>
         </section>

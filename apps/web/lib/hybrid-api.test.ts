@@ -31,6 +31,73 @@ describe("hybrid-api", () => {
     expect((payload.components as Record<string, unknown>).diesel).toEqual({ enabled: false });
   });
 
+  it("menyertakan weather_data kustom, daily_profile, monthly_factors, dan parameter fisik SAM lengkap", async () => {
+    const cfg = buildSampleProject("sam-test-id");
+    const ones8760 = Array.from({ length: 8760 }, () => 100);
+    cfg.simulation.weather_source = "custom_json";
+    cfg.simulation.weather_data = {
+      metadata: { provider: "custom_epw", dataset: "test.epw" },
+      hourly: {
+        ghi_w_m2: ones8760,
+        dni_w_m2: ones8760,
+        dhi_w_m2: ones8760,
+        temp_air_c: Array.from({ length: 8760 }, () => 27.5),
+        wind_speed_m_s: Array.from({ length: 8760 }, () => 2.1),
+      },
+    };
+    cfg.load_profile.daily_profile = Array.from({ length: 24 }, (_, i) => (i >= 8 && i <= 17 ? 1.0 : 0.4));
+    cfg.load_profile.monthly_factors = Array.from({ length: 12 }, () => 1.05);
+    cfg.components.pv.dc_model = "single_diode";
+    cfg.components.pv.soiling_monthly = Array.from({ length: 12 }, () => 0.025);
+    cfg.components.pv.night_tare_kw = 0.35;
+    cfg.components.bess.aux_load_kw = 1.2;
+    cfg.components.biomass.fuel_price_per_ton = 400000;
+    cfg.components.biomass.logistics_cost_per_ton = 125000;
+    cfg.components.biomass.moisture_fraction = 0.38;
+    cfg.finance.tax_model = "after_tax";
+    cfg.finance.corporate_tax_rate = 0.22;
+    cfg.finance.tax_credit_fraction = 0.1;
+
+    const payload = buildHybridSimulatePayload(cfg);
+    const simPayload = payload.simulation as Record<string, unknown>;
+    expect(simPayload.weather_source).toBe("custom_json");
+    expect(simPayload.weather_data).toBeDefined();
+
+    const lpPayload = payload.load_profile as Record<string, unknown>;
+    expect(lpPayload.daily_profile).toHaveLength(24);
+    expect(lpPayload.monthly_factors).toHaveLength(12);
+
+    const comps = payload.components as Record<string, Record<string, unknown>>;
+    expect(comps.pv.dc_model).toBe("single_diode");
+    expect(comps.pv.i_sc).toBe(13.8);
+    expect(comps.pv.soiling_monthly).toHaveLength(12);
+    expect(comps.pv.night_tare_kw).toBe(0.35);
+    expect(comps.bess.aux_load_kw).toBe(1.2);
+    expect(comps.biomass.fuel_price_per_ton).toBe(400000);
+    expect(comps.biomass.logistics_cost_per_ton).toBe(125000);
+    expect(comps.biomass.moisture_fraction).toBe(0.38);
+
+    const finPayload = payload.finance as Record<string, unknown>;
+    expect(finPayload.tax_model).toBe("after_tax");
+    expect(finPayload.corporate_tax_rate).toBe(0.22);
+    expect(finPayload.tax_credit_fraction).toBe(0.1);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ annual_summary: { steps_count: 8760 } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ summary: { total_load_kwh: 2000 } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await previewHybridWeather(cfg);
+    const weatherReqBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(weatherReqBody.weather_source).toBe("custom_json");
+    expect(weatherReqBody.weather_data.hourly.ghi_w_m2).toHaveLength(8760);
+
+    await previewHybridLoad(cfg);
+    const loadReqBody = JSON.parse(fetchMock.mock.calls[1][1].body as string);
+    expect(loadReqBody.load_profile.daily_profile).toHaveLength(24);
+    expect(loadReqBody.load_profile.monthly_factors).toHaveLength(12);
+  });
+
   it("memetakan respons sukses dan galat 422 dengan code stabil", async () => {
     const cfg = buildSampleProject("test-id");
     vi.stubGlobal(
