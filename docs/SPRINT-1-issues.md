@@ -1,8 +1,8 @@
-# GitHub Issues — Sprint 1: PV Calculation Engine
+# GitHub Issues (Sprint 1): PV Calculation Engine
 
 Create each section below as an individual GitHub Issue.
 
-## S1-01 — Scaffold FastAPI calculation service
+## S1-01: Scaffold FastAPI calculation service
 **Labels:** feature, backend  
 **Priority:** P0
 
@@ -16,7 +16,7 @@ Create each section below as an individual GitHub Issue.
 - `/health` returns a valid status response.
 - API docs are available in development.
 
-## S1-02 — Implement PV energy calculation for manual specific yield
+## S1-02: Implement PV energy calculation for manual specific yield
 **Labels:** calculation, feature  
 **Priority:** P0
 
@@ -32,7 +32,7 @@ Create each section below as an individual GitHub Issue.
 - Invalid capacity, yield, life, and degradation are rejected.
 - Unit tests cover normal and boundary cases.
 
-## S1-03 — Implement location-based yield provider interface
+## S1-03: Implement location-based yield provider interface
 **Labels:** feature, calculation, integration  
 **Priority:** P1
 
@@ -48,7 +48,7 @@ Create each section below as an individual GitHub Issue.
 - No default or guessed yield is silently substituted.
 - Manual specific-yield mode remains available.
 
-## S1-04 — Implement unlevered pre-tax financial model
+## S1-04: Implement unlevered pre-tax financial model
 **Labels:** calculation, feature  
 **Priority:** P0
 
@@ -66,7 +66,7 @@ Create each section below as an individual GitHub Issue.
 - Payback status is correct when cash flow never recovers.
 - Output clearly states pre-tax and unlevered scope.
 
-## S1-05 — Add API request/response schemas and validation
+## S1-05: Add API request/response schemas and validation
 **Labels:** backend, feature  
 **Priority:** P0
 
@@ -81,7 +81,7 @@ Create each section below as an individual GitHub Issue.
 - Valid requests return stable documented response structure.
 - Numeric outputs are finite or explicitly null with a status.
 
-## S1-06 — Add calculation regression test suite
+## S1-06: Add calculation regression test suite
 **Labels:** tests, calculation  
 **Priority:** P0
 
@@ -97,7 +97,7 @@ Create each section below as an individual GitHub Issue.
 - Test cases document expected values and tolerances.
 - Formula changes cannot merge without passing tests.
 
-## S1-07 — Add sample API request and usage documentation
+## S1-07: Add sample API request and usage documentation
 **Labels:** documentation  
 **Priority:** P1
 

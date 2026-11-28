@@ -1,11 +1,11 @@
-# RenewableX — PV Calculation Methodology (MVP)
+# RenewableX: PV Calculation Methodology (MVP)
 
 **Document status:** Draft for implementation  
 **Scope:** Preliminary annual-energy and unlevered project-finance screening for grid-connected PV.
 
 ## 1. Calculation modes
 
-### Mode A — Manual specific yield
+### Mode A: Manual specific yield
 
 The user supplies annual specific yield:
 
@@ -16,7 +16,7 @@ The user supplies annual specific yield:
 
 The application must define the yield boundary clearly. For the MVP, use **annual net AC energy delivered per installed kWp DC at the selected delivery boundary**. If the user instead enters a gross or pre-loss yield, the UI must identify that basis and apply losses only once.
 
-### Mode B — Location-based estimate
+### Mode B: Location-based estimate
 
 The user provides latitude, longitude, installed DC capacity, mounting/tilt/azimuth assumptions, and system loss assumptions. A resource-provider adapter retrieves solar resource or estimated PV yield data.
 
@@ -41,8 +41,8 @@ Do not hardcode a guessed yield. If no provider credentials or supported source 
 | Installed DC capacity | kWp |
 | Specific yield | kWh/kWp/year |
 | Annual AC energy | kWh/year or MWh/year |
-| Performance loss fraction | 0–1 |
-| Annual degradation fraction | 0–1 |
+| Performance loss fraction | 0 to 1 |
+| Annual degradation fraction | 0 to 1 |
 | CAPEX / OPEX / revenue | Project currency |
 | Discount rate | Fraction, e.g. 0.10 = 10% |
 | Project life | Years |
@@ -139,9 +139,9 @@ No scenario adjustment should be silently applied. Display the exact delta or ov
 Reject or flag:
 
 - capacity <= 0
-- project life outside supported range (MVP: 1–40 years)
+- project life outside supported range (MVP: 1 to 40 years)
 - specific yield <= 0
-- loss or degradation outside 0–1
+- loss or degradation outside 0 to 1
 - discount rate <= -1
 - negative CAPEX or OPEX
 - missing tariff for fixed-tariff revenue
