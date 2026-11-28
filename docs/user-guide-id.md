@@ -36,9 +36,9 @@ RenewableX memiliki dua ruang kerja yang dapat dipilih dari menu navigasi atas:
    - Klik sebuah komponen untuk mengatur parameternya pada panel inspektor di sebelah kanan (atau di bawah kanvas pada layar ponsel `360px`).
    - Komponen wajib (**AC Bus**, **Solar PV**, dan **Beban Listrik**) terkunci agar tidak terhapus, dan bila kabelnya terputus sistem akan menampilkan galat validasi sebelum simulasi.
 5. **Langkah 5: Strategi Operasi EMS (`/hybrid/[projectId]/ems`)**
-   - Pilih salah satu dari 5 strategi bawaan: **Self-Consumption**, **Load Following**, **Cycle Charging**, **Peak Shaving**, atau **Time-of-Use Arbitrage**.
+   - Pilih salah satu dari 5 strategi bawaan: **Self-Consumption**, **Load Following**, **Cycle Charging**, **Peak Shaving**, atau **Time-of-Use Arbitrage**, atau pilih opsi EMS kustom lalu ubah kumpulan aturannya (disimpan sebagai JSON).
    - Atur izin impor dan ekspor listrik ke jaringan PLN/Grid serta parameter spesifik strategi (misalnya target SOC atau batas beban puncak).
-   - *(Catatan: Interpreter aturan EMS kustom berbasis JSON pada Tahap 3B dan editor visual Tahap 6B akan aktif setelah skema EMS resmi pemilik digabungkan.)*
+   - *(Catatan: Aturan EMS kustom memakai format aturan draf sampai skema EMS final dari pemilik dikonfirmasi.)*
 6. **Langkah 6: Ekonomi, Biaya & Tarif (`/hybrid/[projectId]/economics`)**
    - Pilih mata uang (**IDR** atau **USD**), umur proyek (1 sampai 40 tahun), model pajak (`Pre-Tax` atau `After-Tax`), tingkat diskonto (**WACC**), eskalasi tarif/O&M/bahan bakar, CAPEX per komponen, dan tarif listrik.
 7. **Langkah 7: Ringkasan & Jalankan Simulasi (`/hybrid/[projectId]/run`)**

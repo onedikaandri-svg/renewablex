@@ -1,8 +1,8 @@
-# GitHub Issues — Sprint 0: Repository & Project Foundation
+# GitHub Issues (Sprint 0): Repository & Project Foundation
 
 Create each section below as an individual GitHub Issue.
 
-## S0-01 — Initialize public repository and project documentation
+## S0-01: Initialize public repository and project documentation
 **Labels:** documentation, setup  
 **Priority:** P0
 
@@ -17,7 +17,7 @@ Create each section below as an individual GitHub Issue.
 - README explains scope, setup, limitations, and contribution process.
 - No secrets or confidential data are committed.
 
-## S0-02 — Define PV MVP calculation contract
+## S0-02: Define PV MVP calculation contract
 **Labels:** calculation, documentation  
 **Priority:** P0
 
@@ -34,7 +34,7 @@ Create each section below as an individual GitHub Issue.
 - Yield losses cannot be applied twice.
 - Location mode records provider/source metadata and has a manual fallback.
 
-## S0-03 — Create sample project and reference calculations
+## S0-03: Create sample project and reference calculations
 **Labels:** calculation, tests  
 **Priority:** P0
 
@@ -48,7 +48,7 @@ Create each section below as an individual GitHub Issue.
 - Expected outputs can be independently reproduced.
 - Reference assumptions and units are documented.
 
-## S0-04 — Add GitHub Actions CI
+## S0-04: Add GitHub Actions CI
 **Labels:** setup, tests  
 **Priority:** P1
 
